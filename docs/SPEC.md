@@ -69,7 +69,7 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 | `close` | `{guard_id, chain, address, nonce, sig}` | `{status: "closed"}`; owner signs `ripcord:close:<guard_id>:<chain>:<address>:<nonce>`; the address must be on the policy (if not, `policy` first) |
 | `policy` | `{guard_id, close: {chain, address}}` | `{encrypted_policy, wallet_signature}` for an owner-signed `update_policy` |
 
-**Sealed storage.** `s/<guard_id>`: settings and salt. `t/<guard_id>`: `{epoch, drawn_line, drawn_target, history: [(t, distance)] for the last 60 s, pending: [{index, liq_before, at, amount, request_id}], budget_used, last_fee_month}`. `i/<key>`: idempotency records.
+**Sealed storage.** Each record is encrypted under the `vault` key with its name as associated data and stored under `v/` + hex(mac(name)), so the storage operator sees neither names nor values. `s/<guard_id>`: settings, salt and the registration transaction. `t/<guard_id>`: `{epoch, drawn_line, drawn_target, history: [(t, distance)] for the last 60 s, pending: [{index, liq_before, at, amount, request_id}], budget_used, last_fee_month}`. `i/<key>`: idempotency records.
 
 **One `check`, in order.**
 1. Skip if closed or expired. Read `clearinghouseState(hl_address)` **only** (weight 2): `mark = positionValue / |szi|`; distance per position `|liquidationPx − mark| / mark`; the guard's distance is the minimum over cross positions, or the isolated coin's. Maintenance leverage comes from Hyperliquid's `meta`, cached in sealed state and refreshed daily (weight 20). Never `metaAndAssetCtxs` per check.

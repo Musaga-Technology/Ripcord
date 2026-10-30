@@ -97,7 +97,9 @@ fn creates_a_guard_and_keeps_its_settings_sealed() {
     assert_eq!(out, json!({ "status": "pending" }));
     let stored: StoredGuard = vault::get(&host, &format!("s/{GID}")).unwrap().unwrap();
     assert_eq!(stored.settings, settings());
-    let raw = host.get_raw(&format!("s/{GID}")).unwrap().unwrap();
+    let key = vault::raw_key(&host, &format!("s/{GID}")).unwrap();
+    assert!(!key.contains(GID), "the operator can't tell which guard a record is");
+    let raw = host.get_raw(&key).unwrap().unwrap();
     assert!(
         !String::from_utf8_lossy(&raw)
             .to_lowercase()
@@ -125,7 +127,7 @@ fn refuses_settings_that_do_not_match_the_public_hashes() {
     input["account_commitment"] = json!("00".repeat(32));
     let out = run(&host, &input.to_string());
     assert_eq!(out["refused"], "settings do not match the public commitments");
-    assert!(host.get_raw(&format!("s/{GID}")).unwrap().is_none());
+    assert!(host.storage.borrow().is_empty());
 }
 
 #[test]
