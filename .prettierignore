@@ -1,0 +1,8 @@
+*.md
+docs/
+pnpm-lock.yaml
+checker/
+contracts/
+**/.next/
+**/node_modules/
+packages/shared/vectors/

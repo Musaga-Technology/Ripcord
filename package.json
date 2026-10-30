@@ -1,0 +1,29 @@
+{
+  "name": "ripcord",
+  "private": true,
+  "description": "Hidden margin for Hyperliquid, built on NEAR",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.13.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @ripcord/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "vectors": "python3 scripts/vectors.py",
+    "demo": "bash scripts/demo.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.5",
+    "eslint": "10.12.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.5"
+  }
+}

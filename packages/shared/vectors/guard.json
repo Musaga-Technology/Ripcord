@@ -1,0 +1,463 @@
+{
+ "distance": [
+  {
+   "liquidation_px": 1995.1,
+   "mark": 2411.8,
+   "distance_pct": 17.277552035823877
+  },
+  {
+   "liquidation_px": 98940.0,
+   "mark": 83000.0,
+   "distance_pct": 19.204819277108435
+  },
+  {
+   "liquidation_px": null,
+   "mark": 106.99,
+   "distance_pct": null
+  },
+  {
+   "liquidation_px": 2205.0,
+   "mark": 2205.0,
+   "distance_pct": 0.0
+  }
+ ],
+ "guard_distance": [
+  {
+   "positions": [
+    {
+     "coin": "ETH",
+     "szi": 12.4,
+     "position_value": 29906.32,
+     "liquidation_px": 1995.1,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "BTC",
+     "szi": -0.8,
+     "position_value": 66400.0,
+     "liquidation_px": 98940.0,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "HYPE",
+     "szi": 300.0,
+     "position_value": 24594.0,
+     "liquidation_px": 55.3,
+     "leverage_type": "isolated"
+    },
+    {
+     "coin": "SOL",
+     "szi": 140.0,
+     "position_value": 14978.6,
+     "liquidation_px": null,
+     "leverage_type": "cross"
+    }
+   ],
+   "isolated_coin": null,
+   "distance_pct": 17.27755203582386
+  },
+  {
+   "positions": [
+    {
+     "coin": "ETH",
+     "szi": 12.4,
+     "position_value": 29906.32,
+     "liquidation_px": 1995.1,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "BTC",
+     "szi": -0.8,
+     "position_value": 66400.0,
+     "liquidation_px": 98940.0,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "HYPE",
+     "szi": 300.0,
+     "position_value": 24594.0,
+     "liquidation_px": 55.3,
+     "leverage_type": "isolated"
+    },
+    {
+     "coin": "SOL",
+     "szi": 140.0,
+     "position_value": 14978.6,
+     "liquidation_px": null,
+     "leverage_type": "cross"
+    }
+   ],
+   "isolated_coin": "HYPE",
+   "distance_pct": 32.54452305440352
+  },
+  {
+   "positions": [
+    {
+     "coin": "ETH",
+     "szi": 12.4,
+     "position_value": 29906.32,
+     "liquidation_px": 1995.1,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "BTC",
+     "szi": -0.8,
+     "position_value": 66400.0,
+     "liquidation_px": 98940.0,
+     "leverage_type": "cross"
+    },
+    {
+     "coin": "HYPE",
+     "szi": 300.0,
+     "position_value": 24594.0,
+     "liquidation_px": 55.3,
+     "leverage_type": "isolated"
+    },
+    {
+     "coin": "SOL",
+     "szi": 140.0,
+     "position_value": 14978.6,
+     "liquidation_px": null,
+     "leverage_type": "cross"
+    }
+   ],
+   "isolated_coin": "DOGE",
+   "distance_pct": null
+  }
+ ],
+ "fall_rate": [
+  {
+   "history": [
+    [
+     0,
+     9.0
+    ],
+    [
+     20,
+     8.4
+    ],
+    [
+     40,
+     7.6
+    ],
+    [
+     55,
+     7.0
+    ]
+   ],
+   "now_t": 60,
+   "now_d": 6.8,
+   "v": 0.03666666666666667
+  },
+  {
+   "history": [
+    [
+     0,
+     9.0
+    ],
+    [
+     20,
+     8.4
+    ],
+    [
+     40,
+     7.6
+    ],
+    [
+     55,
+     7.0
+    ]
+   ],
+   "now_t": 130,
+   "now_d": 7.2,
+   "v": 0.0
+  },
+  {
+   "history": [
+    [
+     0,
+     5.0
+    ]
+   ],
+   "now_t": 0.5,
+   "now_d": 4.0,
+   "v": 0.0
+  },
+  {
+   "history": [
+    [
+     0,
+     9.0
+    ],
+    [
+     20,
+     8.4
+    ],
+    [
+     40,
+     7.6
+    ],
+    [
+     55,
+     7.0
+    ]
+   ],
+   "now_t": 60,
+   "now_d": 9.5,
+   "v": 0.0
+  }
+ ],
+ "should_fire": [
+  {
+   "distance": 4.9,
+   "drawn_line": 5.2,
+   "speed_aware": false,
+   "v": 0,
+   "fire": true
+  },
+  {
+   "distance": 6.0,
+   "drawn_line": 5.2,
+   "speed_aware": false,
+   "v": 0.05,
+   "fire": false
+  },
+  {
+   "distance": 6.0,
+   "drawn_line": 5.2,
+   "speed_aware": true,
+   "v": 0.05,
+   "fire": true
+  },
+  {
+   "distance": 6.0,
+   "drawn_line": 5.2,
+   "speed_aware": true,
+   "v": 0.01,
+   "fire": false
+  },
+  {
+   "distance": 5.2,
+   "drawn_line": 5.2,
+   "speed_aware": false,
+   "v": 0,
+   "fire": false
+  }
+ ],
+ "rescue_size": [
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 2205.0,
+   "szi": 12.4,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 5000,
+   "budget_left_usd": 5000,
+   "reserve_usd": 5000,
+   "size_usd": 1634.50476
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 2205.0,
+   "szi": 12.4,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 1500,
+   "budget_left_usd": 5000,
+   "reserve_usd": 5000,
+   "size_usd": 1500
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 2205.0,
+   "szi": 12.4,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 5000,
+   "budget_left_usd": 900,
+   "reserve_usd": 5000,
+   "size_usd": 900
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 83000.0,
+   "szi": -0.8,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 9000,
+   "budget_left_usd": 9000,
+   "reserve_usd": 9000,
+   "size_usd": 4131.408
+  },
+  {
+   "drawn_target": 5.0,
+   "distance": 4.95,
+   "mark": 2205.0,
+   "szi": 1.0,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 5000,
+   "budget_left_usd": 5000,
+   "reserve_usd": 5000,
+   "size_usd": null
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 2205.0,
+   "szi": 12.4,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 5000,
+   "budget_left_usd": 5000,
+   "reserve_usd": 4.0,
+   "size_usd": null
+  }
+ ],
+ "save_fee": [
+  {
+   "t": 1486.18,
+   "fee": 44.5854
+  },
+  {
+   "t": 50000,
+   "fee": 1500.0
+  },
+  {
+   "t": 60000,
+   "fee": 1550.0
+  },
+  {
+   "t": 5,
+   "fee": 0.15
+  }
+ ],
+ "round_credit": [
+  {
+   "x": 1486.18,
+   "credit": 1500.0
+  },
+  {
+   "x": 640,
+   "credit": 640.0
+  },
+  {
+   "x": 5.18,
+   "credit": 5.2
+  },
+  {
+   "x": 99.5,
+   "credit": 100.0
+  },
+  {
+   "x": 0.123,
+   "credit": 0.12
+  },
+  {
+   "x": 12.0,
+   "credit": 12.0
+  },
+  {
+   "x": 1949.99,
+   "credit": 1900.0
+  },
+  {
+   "x": 50000,
+   "credit": 50000.0
+  }
+ ],
+ "at_hour": [
+  {
+   "at_s": 1793541381,
+   "at_hour": 1793538000
+  },
+  {
+   "at_s": 1793541600,
+   "at_hour": 1793541600
+  },
+  {
+   "at_s": 1793541599,
+   "at_hour": 1793538000
+  }
+ ],
+ "latency_s": [
+  {
+   "seconds": 26.8,
+   "latency_s": 27
+  },
+  {
+   "seconds": 30.5,
+   "latency_s": 31
+  },
+  {
+   "seconds": 33.49,
+   "latency_s": 33
+  }
+ ],
+ "draw": [
+  {
+   "lo": 5,
+   "hi": 8,
+   "u": 0,
+   "value": 5
+  },
+  {
+   "lo": 5,
+   "hi": 8,
+   "u": 0.5,
+   "value": 6.5
+  },
+  {
+   "lo": 5,
+   "hi": 8,
+   "u": 0.999,
+   "value": 7.997
+  },
+  {
+   "lo": 9,
+   "hi": 13,
+   "u": 0.25,
+   "value": 10.0
+  }
+ ],
+ "settle": [
+  {
+   "szi": 12.4,
+   "liq_before": 2131.0,
+   "mark": 2120.0,
+   "liquidated": false,
+   "age_s": 3600,
+   "outcome": "saved"
+  },
+  {
+   "szi": 12.4,
+   "liq_before": 2131.0,
+   "mark": 2200.0,
+   "liquidated": false,
+   "age_s": 3600,
+   "outcome": "pending"
+  },
+  {
+   "szi": 12.4,
+   "liq_before": 2131.0,
+   "mark": 2200.0,
+   "liquidated": false,
+   "age_s": 86400,
+   "outcome": "early"
+  },
+  {
+   "szi": -0.8,
+   "liq_before": 90000.0,
+   "mark": 90500.0,
+   "liquidated": false,
+   "age_s": 10,
+   "outcome": "saved"
+  },
+  {
+   "szi": 12.4,
+   "liq_before": 2131.0,
+   "mark": 1900.0,
+   "liquidated": true,
+   "age_s": 100,
+   "outcome": "failed"
+  }
+ ]
+}

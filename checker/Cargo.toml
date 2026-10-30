@@ -1,0 +1,23 @@
+[package]
+name = "ripcord-checker"
+version = "0.1.0"
+edition = "2021"
+description = "Ripcord's guard checker: sealed settings, Hyperliquid reads and rescues, run in OutLayer's TEE"
+license = "MIT"
+publish = false
+
+[lib]
+name = "ripcord_checker"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+panic = "abort"

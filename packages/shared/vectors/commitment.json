@@ -1,0 +1,236 @@
+{
+ "canonical": [
+  {
+   "input": {
+    "b": 1,
+    "a": [
+     true,
+     false,
+     null
+    ]
+   },
+   "canonical": "{\"a\":[true,false,null],\"b\":\"1\"}"
+  },
+  {
+   "input": {
+    "x": 5.5,
+    "y": 0.1,
+    "z": 1e-06,
+    "w": 1500.0,
+    "v": -2.25,
+    "u": 0
+   },
+   "canonical": "{\"u\":\"0\",\"v\":\"-2.25\",\"w\":\"1500\",\"x\":\"5.5\",\"y\":\"0.1\",\"z\":\"0.000001\"}"
+  },
+  {
+   "input": {
+    "s": "quote \" backslash \\ tab \t newline \n bell \u0007 é ✓"
+   },
+   "canonical": "{\"s\":\"quote \\\" backslash \\\\ tab \\t newline \\n bell \\u0007 é ✓\"}"
+  },
+  {
+   "input": {
+    "addr": "0xAbCdEf0123456789aBcDeF0123456789ABCDEF01",
+    "not_addr": "0xABC"
+   },
+   "canonical": "{\"addr\":\"0xabcdef0123456789abcdef0123456789abcdef01\",\"not_addr\":\"0xABC\"}"
+  },
+  {
+   "input": {
+    "nested": {
+     "z": {
+      "k": [
+       1,
+       {
+        "b": 2,
+        "a": 3
+       }
+      ]
+     },
+     "a": []
+    }
+   },
+   "canonical": "{\"nested\":{\"a\":[],\"z\":{\"k\":[\"1\",{\"a\":\"3\",\"b\":\"2\"}]}}}"
+  },
+  {
+   "input": {
+    "owner": "0x9C4E7a1b2C3d4E5f60718293A4b5C6d7E8f941F2",
+    "hl_address": "0x15A6116AEaCaa68fD69A17e8aBB9E77e24159Fe3",
+    "account_salt": "7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44",
+    "preset": "balanced",
+    "line_range_pct": [
+     5,
+     8
+    ],
+    "target_range_pct": [
+     9,
+     13
+    ],
+    "speed_aware": false,
+    "max_rescue_usd": 1500,
+    "budget_usd": 4000,
+    "reserve_asset": "nep141:nbtc.bridge.near",
+    "cooldown_s": 60,
+    "isolated": null,
+    "close_hint": null,
+    "receipt_pk": "x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e",
+    "expires_at": "1795046400000000000"
+   },
+   "canonical": "{\"account_salt\":\"7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44\",\"budget_usd\":\"4000\",\"close_hint\":null,\"cooldown_s\":\"60\",\"expires_at\":\"1795046400000000000\",\"hl_address\":\"0x15a6116aeacaa68fd69a17e8abb9e77e24159fe3\",\"isolated\":null,\"line_range_pct\":[\"5\",\"8\"],\"max_rescue_usd\":\"1500\",\"owner\":\"0x9c4e7a1b2c3d4e5f60718293a4b5c6d7e8f941f2\",\"preset\":\"balanced\",\"receipt_pk\":\"x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e\",\"reserve_asset\":\"nep141:nbtc.bridge.near\",\"speed_aware\":false,\"target_range_pct\":[\"9\",\"13\"]}"
+  }
+ ],
+ "canonical_rejects": [
+  {
+   "input": {
+    "n": 1000000000000000.0
+   },
+   "why": "number out of range"
+  },
+  {
+   "input": {
+    "n": 1e-07
+   },
+   "why": "number out of range"
+  },
+  {
+   "input": {
+    "Bad": 1
+   },
+   "why": "key must match [a-z0-9_]+"
+  }
+ ],
+ "commitments": [
+  {
+   "name": "balanced",
+   "settings": {
+    "owner": "0x9C4E7a1b2C3d4E5f60718293A4b5C6d7E8f941F2",
+    "hl_address": "0x15A6116AEaCaa68fD69A17e8aBB9E77e24159Fe3",
+    "account_salt": "7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44",
+    "preset": "balanced",
+    "line_range_pct": [
+     5,
+     8
+    ],
+    "target_range_pct": [
+     9,
+     13
+    ],
+    "speed_aware": false,
+    "max_rescue_usd": 1500,
+    "budget_usd": 4000,
+    "reserve_asset": "nep141:nbtc.bridge.near",
+    "cooldown_s": 60,
+    "isolated": null,
+    "close_hint": null,
+    "receipt_pk": "x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e",
+    "expires_at": "1795046400000000000"
+   },
+   "salt": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+   "canonical": "{\"account_salt\":\"7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44\",\"budget_usd\":\"4000\",\"close_hint\":null,\"cooldown_s\":\"60\",\"expires_at\":\"1795046400000000000\",\"hl_address\":\"0x15a6116aeacaa68fd69a17e8abb9e77e24159fe3\",\"isolated\":null,\"line_range_pct\":[\"5\",\"8\"],\"max_rescue_usd\":\"1500\",\"owner\":\"0x9c4e7a1b2c3d4e5f60718293a4b5c6d7e8f941f2\",\"preset\":\"balanced\",\"receipt_pk\":\"x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e\",\"reserve_asset\":\"nep141:nbtc.bridge.near\",\"speed_aware\":false,\"target_range_pct\":[\"9\",\"13\"]}",
+   "commitment": "c97f4b1fbbe2340d4977154b9e75abe572469d9f1009f51fa7a87775e4bb9b0b",
+   "fingerprint": "C97F 4B1F ···· 9B0B",
+   "fingerprint_short": "C97F ···· 9B0B"
+  },
+  {
+   "name": "lean isolated",
+   "settings": {
+    "owner": "0x9C4E7a1b2C3d4E5f60718293A4b5C6d7E8f941F2",
+    "hl_address": "0x15A6116AEaCaa68fD69A17e8aBB9E77e24159Fe3",
+    "account_salt": "7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44",
+    "preset": "lean",
+    "line_range_pct": [
+     3.5,
+     5.5
+    ],
+    "target_range_pct": [
+     7,
+     10.25
+    ],
+    "speed_aware": true,
+    "max_rescue_usd": 1500,
+    "budget_usd": 4000,
+    "reserve_asset": "nep141:nbtc.bridge.near",
+    "cooldown_s": 60,
+    "isolated": {
+     "coin": "HYPE"
+    },
+    "close_hint": {
+     "chain": "btc",
+     "address": "bc1qexampleaddressxyz"
+    },
+    "receipt_pk": "x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e",
+    "expires_at": "1795046400000000000"
+   },
+   "salt": "bdf3868c256ce1b7b3ec04fc486ba96867051998c6d3cf82e492fdc50d5f0dda",
+   "canonical": "{\"account_salt\":\"7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44\",\"budget_usd\":\"4000\",\"close_hint\":{\"address\":\"bc1qexampleaddressxyz\",\"chain\":\"btc\"},\"cooldown_s\":\"60\",\"expires_at\":\"1795046400000000000\",\"hl_address\":\"0x15a6116aeacaa68fd69a17e8abb9e77e24159fe3\",\"isolated\":{\"coin\":\"HYPE\"},\"line_range_pct\":[\"3.5\",\"5.5\"],\"max_rescue_usd\":\"1500\",\"owner\":\"0x9c4e7a1b2c3d4e5f60718293a4b5c6d7e8f941f2\",\"preset\":\"lean\",\"receipt_pk\":\"x25519:7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e\",\"reserve_asset\":\"nep141:nbtc.bridge.near\",\"speed_aware\":true,\"target_range_pct\":[\"7\",\"10.25\"]}",
+   "commitment": "452b00c56709441d0f5e1ffed4d1de793ba65c034b207be2ca507b2e119b2fee",
+   "fingerprint": "452B 00C5 ···· 2FEE",
+   "fingerprint_short": "452B ···· 2FEE"
+  }
+ ],
+ "owners": [
+  {
+   "owner": "0x9C4E7a1b2C3d4E5f60718293A4b5C6d7E8f941F2",
+   "signature": "0xb42c5e9019e6a74fc003b6e63cf33c26048080fdecbf20638d2cb7a0d43912737c98838f10cc16d2e797ca96005cdf42e4aea7e9aaca033f1ccef54949e41de0a1",
+   "owner_salt": "b82efc65bf5d39b721a41267c3da3ecf7c24365eef1e21344737f906ca8f8592",
+   "owner_commitment": "cba391e5481962a102ca60f128c3e3902c93df3d430b19622937ef47d59aa3e7"
+  },
+  {
+   "owner": "ed25519:7Zo8xKX3yLnPmQrStUvWxYz123456789ABCDEFGHJKL",
+   "signature": "dc2c69719f60e93db776f0069861269abcd55d43eb19c41b22abd4df2f3e24832d35fd6dd649dbd712f2f0ff2423670955632dc77301c561be69071433d6439e",
+   "owner_salt": "4b5bee6646366ccb3884455efe2225660e846fbb34ea715e3502cdfe142cabb3",
+   "owner_commitment": "9484a8491ee187220c2d320691fbb66107f613e852d2670b01e1073960297e9a"
+  }
+ ],
+ "accounts": [
+  {
+   "hl_address": "0x15A6116AEaCaa68fD69A17e8aBB9E77e24159Fe3",
+   "account_salt": "7a008a939e32fc26d75bc749937a97e7b43ad2bf18ebd87b51b0e2e2d84b9e44",
+   "account_commitment": "69200069f57bdb3a372600c81d8ebd23595be276bde1890a304813b66ad807e8"
+  }
+ ],
+ "guard_ids": [
+  {
+   "bits": 0,
+   "guard_id": "g-aaaaaaaaaa"
+  },
+  {
+   "bits": 1,
+   "guard_id": "g-aaaaaaaaab"
+  },
+  {
+   "bits": 1125899906842623,
+   "guard_id": "g-7777777777"
+  },
+  {
+   "bits": 745416423244983,
+   "guard_id": "g-vf6per4bfx"
+  }
+ ],
+ "guard_id_checks": [
+  {
+   "s": "g-aaaaaaaaaa",
+   "valid": true
+  },
+  {
+   "s": "g-7f3a91c2ek",
+   "valid": false
+  },
+  {
+   "s": "g-AAAAAAAAAA",
+   "valid": false
+  },
+  {
+   "s": "g-aaaa",
+   "valid": false
+  },
+  {
+   "s": "g-aaaaaaaaa1",
+   "valid": false
+  },
+  {
+   "s": "x-aaaaaaaaaa",
+   "valid": false
+  }
+ ]
+}

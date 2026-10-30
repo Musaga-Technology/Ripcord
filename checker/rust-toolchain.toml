@@ -1,0 +1,4 @@
+# Stable for tests. The OutLayer build (Day 3) follows OutLayer's compiler notes for wasm32-wasip2.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
