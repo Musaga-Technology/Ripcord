@@ -232,5 +232,66 @@
    "s": "x-aaaaaaaaaa",
    "valid": false
   }
+ ],
+ "messages": [
+  {
+   "kind": "freeze",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "n1",
+   "message": "ripcord:freeze:g-vf6per4bfx:n1"
+  },
+  {
+   "kind": "unfreeze",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "n2",
+   "message": "ripcord:unfreeze:g-vf6per4bfx:n2"
+  },
+  {
+   "kind": "policy",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "p1",
+   "encrypted_policy": "AdTcezsumL154jqA07",
+   "message": "ripcord:policy:g-vf6per4bfx:c3962de3e9d988398718e8c1be139057499dde2c6c7a973b4418c86d110d6a58:p1"
+  },
+  {
+   "kind": "publish",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "p2",
+   "index": 0,
+   "proof": {
+    "at": 1793541381,
+    "hl_credit_usd": 1486.18,
+    "hl_tx": "0xabc"
+   },
+   "message": "ripcord:publish:g-vf6per4bfx:0:211328c272f966f80ce26417269196bfd1a671a929a6025ea0d047e104af16da:p2"
+  },
+  {
+   "kind": "close",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "c1",
+   "chain": "btc",
+   "address": "bc1qexample",
+   "message": "ripcord:close:g-vf6per4bfx:btc:bc1qexample:c1"
+  }
+ ],
+ "nep413": [
+  {
+   "message": "ripcord:freeze:g-vf6per4bfx:n1",
+   "nonce": "n1",
+   "recipient": "registry.testnet",
+   "hash": "6789e0d66a624fc9050b6b4a45a9d98ffa9412d810908d1e4ee0dc06073286ea"
+  },
+  {
+   "message": "ripcord:freeze:g-vf6per4bfx:n1",
+   "nonce": "n1",
+   "recipient": "other-registry.testnet",
+   "hash": "919f1e1288645791453039cbb923dc92b8497c51987bcdd8cfbb534e818dd742"
+  },
+  {
+   "message": "héllo ✓",
+   "nonce": "x",
+   "recipient": "r.near",
+   "hash": "f14b7b460a9a38ccbe6db0feef4c933b52f52015ee240b3a26361ceaf5026e03"
+  }
  ]
 }

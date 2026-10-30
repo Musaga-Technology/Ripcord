@@ -507,3 +507,40 @@ fn state_and_events_hold_no_address() {
                 .any(|s| s.len() >= 40 && s[..40].bytes().all(|b| b.is_ascii_hexdigit()))
     );
 }
+
+// ---------- lockstep with packages/shared and scripts/vectors.py ----------
+
+#[test]
+fn owner_messages_and_nep413_hashes_match_the_reference() {
+    ctx(STRANGER, NearToken::from_yoctonear(0));
+    let v: serde_json::Value =
+        serde_json::from_str(include_str!("../../../packages/shared/vectors/commitment.json")).unwrap();
+    for n in v["nep413"].as_array().unwrap() {
+        let (m, nonce, rcpt) = (
+            n["message"].as_str().unwrap(),
+            n["nonce"].as_str().unwrap(),
+            n["recipient"].as_str().unwrap(),
+        );
+        assert_eq!(
+            hex::encode(sig::nep413_hash(m, &env::sha256_array(nonce.as_bytes()), rcpt)),
+            n["hash"].as_str().unwrap()
+        );
+    }
+    for m in v["messages"].as_array().unwrap() {
+        let (gid, nonce) = (m["guard_id"].as_str().unwrap(), m["nonce"].as_str().unwrap());
+        let built = match m["kind"].as_str().unwrap() {
+            "publish" => {
+                let proof: Proof = serde_json::from_value(m["proof"].clone()).unwrap();
+                format!("ripcord:publish:{gid}:{}:{}:{nonce}", m["index"], proof_digest(&proof))
+            }
+            "policy" => {
+                let digest = hex::encode(env::sha256_array(m["encrypted_policy"].as_str().unwrap().as_bytes()));
+                format!("ripcord:policy:{gid}:{digest}:{nonce}")
+            }
+            "freeze" => format!("ripcord:freeze:{gid}:{nonce}"),
+            "unfreeze" => format!("ripcord:unfreeze:{gid}:{nonce}"),
+            _ => continue, // close is signed for the checker, not the registry
+        };
+        assert_eq!(built, m["message"].as_str().unwrap());
+    }
+}

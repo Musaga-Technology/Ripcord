@@ -145,6 +145,34 @@ def is_guard_id(s):
     return re.fullmatch(r'g-[a-z2-7]{10}', s) is not None
 
 
+# ---------- owner messages (docs/SPEC.md §2) ----------
+NEP413_TAG = 2 ** 31 + 413
+
+
+def nep413_hash(message, nonce, recipient):
+    """sha256(borsh(tag) ‖ borsh(Payload{message, nonce: sha256(nonce), recipient, callback_url: None}))."""
+    m, r = message.encode('utf-8'), recipient.encode('utf-8')
+    b = NEP413_TAG.to_bytes(4, 'little') + len(m).to_bytes(4, 'little') + m
+    b += hashlib.sha256(nonce.encode('utf-8')).digest() + len(r).to_bytes(4, 'little') + r + b'\x00'
+    return hashlib.sha256(b).hexdigest()
+
+
+def freeze_message(guard_id, nonce, frozen=True):
+    return f"ripcord:{'freeze' if frozen else 'unfreeze'}:{guard_id}:{nonce}"
+
+
+def policy_message(guard_id, encrypted_policy, nonce):
+    return f'ripcord:policy:{guard_id}:{sha256_hex(encrypted_policy)}:{nonce}'
+
+
+def publish_message(guard_id, index, proof, nonce):
+    return f'ripcord:publish:{guard_id}:{index}:{sha256_hex(canonical(proof))}:{nonce}'
+
+
+def close_message(guard_id, chain, address, nonce):
+    return f'ripcord:close:{guard_id}:{chain}:{address}:{nonce}'
+
+
 # ---------- guard logic ----------
 def distance_pct(liquidation_px, mark):
     if liquidation_px is None:
@@ -294,8 +322,23 @@ def vectors_commitment():
                  'account_commitment': account_commitment(SETTINGS['hl_address'], SALT_B)}]
     ids = [{'bits': b, 'guard_id': guard_id_from_bits(b)} for b in [0, 1, 2 ** 50 - 1, 0x2A5F3C91E04B7]]
     id_checks = [{'s': s, 'valid': is_guard_id(s)} for s in ['g-aaaaaaaaaa', 'g-7f3a91c2ek', 'g-AAAAAAAAAA', 'g-aaaa', 'g-aaaaaaaaa1', 'x-aaaaaaaaaa']]
+    proof = {'at': 1793541381, 'hl_credit_usd': 1486.18, 'hl_tx': '0xabc'}
+    messages = [
+        {'kind': 'freeze', 'guard_id': 'g-vf6per4bfx', 'nonce': 'n1', 'message': freeze_message('g-vf6per4bfx', 'n1')},
+        {'kind': 'unfreeze', 'guard_id': 'g-vf6per4bfx', 'nonce': 'n2', 'message': freeze_message('g-vf6per4bfx', 'n2', False)},
+        {'kind': 'policy', 'guard_id': 'g-vf6per4bfx', 'nonce': 'p1', 'encrypted_policy': 'AdTcezsumL154jqA07',
+         'message': policy_message('g-vf6per4bfx', 'AdTcezsumL154jqA07', 'p1')},
+        {'kind': 'publish', 'guard_id': 'g-vf6per4bfx', 'nonce': 'p2', 'index': 0, 'proof': proof,
+         'message': publish_message('g-vf6per4bfx', 0, proof, 'p2')},
+        {'kind': 'close', 'guard_id': 'g-vf6per4bfx', 'nonce': 'c1', 'chain': 'btc', 'address': 'bc1qexample',
+         'message': close_message('g-vf6per4bfx', 'btc', 'bc1qexample', 'c1')},
+    ]
+    nep413 = [{'message': m, 'nonce': n, 'recipient': r, 'hash': nep413_hash(m, n, r)}
+              for m, n, r in [('ripcord:freeze:g-vf6per4bfx:n1', 'n1', 'registry.testnet'),
+                              ('ripcord:freeze:g-vf6per4bfx:n1', 'n1', 'other-registry.testnet'),
+                              ('héllo ✓', 'x', 'r.near')]]
     return {'canonical': canon, 'canonical_rejects': rejects, 'commitments': commits, 'owners': owners,
-            'accounts': accounts, 'guard_ids': ids, 'guard_id_checks': id_checks}
+            'accounts': accounts, 'guard_ids': ids, 'guard_id_checks': id_checks, 'messages': messages, 'nep413': nep413}
 
 
 def vectors_guard():
