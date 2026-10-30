@@ -1,0 +1,149 @@
+# Ripcord — Design (v3: Vault)
+
+Design is a scored criterion. Treat it as a feature with build days (see BUILD_PLAN.md), not leftovers.
+Chosen Oct 21 2026 from three directions (canvas "Ripcord Directions": A Terminal, B Calm, **C Vault**). Every screen is drawn on the canvas "Ripcord Product" (revised Oct 21 for pay per save, isolated margin and guard health); this file is its written spec, so a change to one goes into the other.
+## 1. Concept: the guard is a card
+
+A guard is an object you own, shown as one premium card, the way a bank card is. Its texture is a **guilloche rosette generated from the guard's fingerprint**, like banknote security printing: no two guards look alike, and the same rosette appears wherever that guard does. The card shows what's yours and safe to show (position, distance from liquidation, status); what's sealed (reserve, rescue range) shows as `••••••`.
+
+Beside it sits **what a hunter sees**: the same position as Hyperliquid shows it to everyone, with the liquidation line drawn in red. The product is that contrast: a public target, and a defence behind it nobody can see.
+
+Rules of the look: quiet, a lot of space, one bold object per screen, very few words; dark is the signature, light its daylight twin (§2). Amber means *guarding*, red means *the public liquidation line*, green means *a rescue landed*. Nothing else gets colour. No gradients, no glow, no decorative chips or eyebrow labels.
+
+## 2. Tokens
+
+Two themes from one set of tokens: dark is the signature look, light its daylight twin. The app follows the system setting, with a toggle. **The guard card stays dark in both**, like a metal card on a desk: it is the one bold object and its rosette is drawn for a dark ground, so on the card every token keeps its dark value. The light values are drawn on the Product canvas (Oct 25: a light twin of every screen; the homepage's closing band uses the card's material, so it stays dark too). Judge them there before the Day 10 design pass.
+
+### Colour
+| Name | Dark | Light | Use |
+|---|---|---|---|
+| Ground | `#09090B` | `#F7F7F5` | Page background |
+| Panel | `#111114` | `#FFFFFF` | Side panels (hunter view, forms) |
+| Card | `#131316` | `#131316` | The guard card, dark in both themes |
+| Line | `#1F1F24` | `#E6E6E2` | Hairlines, panel borders |
+| Line 2 | `#26262C` | `#26262C` | Card border |
+| Line 3 | `#2E2E35` | `#D1D1CC` | Ghost buttons, chips |
+| Text | `#F4F4F5` | `#0B0B0D` | Primary text, primary button fill, price line |
+| Text 2 | `#D4D4D8` | `#3F3F46` | Secondary values (card labels keep the dark value) |
+| Muted | `#A1A1AA` | `#52525A` | Secondary text (≥ 7:1 on ground in both); the dot for a close call or an unguarded position |
+| Rosette | `#3A3A44` | `#3A3A44` | Rosette strokes, on the card |
+| Amber | `#E8A33D` | `#9A5B00` | Guarding: the card's status chip, the health line, guard badges, a rescue still settling; inner rosette, focus ring |
+| Red | `#F06459` | `#C2362B` | Public liquidation line, a paused guard, errors; distance bars under 5 % |
+| Green | `#4CC38A` | `#1D7F52` | Rescue landed, a save, verified ticks |
+
+Light values were picked for contrast on `#F7F7F5`: Text 2 9.7:1, Muted 7.2:1, Amber 5.1:1, Red 5.1:1, Green 4.7:1.
+
+### Type
+- **UI and display:** Instrument Sans 400/500/600/700 (Google Fonts). Display headlines 600, tracking −4 to −5 %, line-height ≈ 0.95. Sentence case.
+- **Machine strings only** (addresses, fingerprints, masked values): JetBrains Mono 400, letter-spacing 0.16–0.2 em for card-number style.
+- Scale: 13 · 15 · 17 · 20 · 28 · 36 · 48 · 56 · 76 · 112. The website's hero is 112 and its section headlines 56 (60 and 36 on phone); snap the canvas's in-between sizes (24, 30, 44) to the scale when building. Numbers that change use `tabular-nums`.
+
+### Shape and space
+- Radius: guard card 28 (22 on phone), panels 20, buttons and chips 999.
+- 4 px grid; generous: section gaps 40–56 px, card padding 32 (20 on phone).
+- The card keeps the bank-card ratio **1.586 : 1**.
+
+### The rosette
+SVG strokes (Rosette colour, 0.7 px; inner ring in Amber at 55 %), deterministic from the guard's commitment hash (petal count, phase, amplitude from hash bytes), centred toward the card's lower right so it is partly cropped. Same function everywhere: card, verify page, seal file icon, favicon, OG image. Renders without JS.
+
+## 3. Layout
+
+Website: max width 1240 px, left-aligned; the hero puts the headline on the left and the card, laid over "what a hunter sees", on the right. App: max width 1360 px; on Guard, "what a hunter sees" takes the wide column and the card with its sealed settings the narrow one, and the rescue history runs full width below. Phone: one column, the card first, the main action at the bottom above the tab bar (Guards · Ledger · Verify).
+
+```
+Ripcord   Guards  Ledger  Verify                                    0x9c4e…41f2
+
+ETH long · 10× cross             Top up reserve · Change range · Freeze reserve
+● Guarded · checked 41 s ago
+
+What a hunter sees                               ┌────────────────────────────┐
+Mark 2,411.80  Liq ─ 1,995.10  17.3%             │ ETH long · 10×   ● Guarded │
+┌──────────────────────────────────────┐         │                            │
+│ ~~~~~~~~~~~~~\        /~~~~~~~~~~~~~ │         │ 17.3%            (rosette) │
+│               \●     /               │         │ from liquidation           │
+│ ──────────────┐\_●_/                 │         │                            │
+│               └───┐                  │         │ 7F3A 91C2 ···· C91E •••••• │
+│                   └───────────────── │         └────────────────────────────┘
+└──────────────────────────────────────┘         Sealed settings   Hold to peek
+Rescue history: when · margin added · before → after · landed in · outcome · proof
+```
+
+## 4. Screens
+1. **Home** (website, desktop and phone), top to bottom:
+   - Hero: "Hidden margin.", one sentence, **Guard a position** · **Watch a rescue**, and the card laid over what a hunter sees.
+   - Four stats, each with its source and date: 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay; 53 of 53 without a guard), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
+   - "Your liquidation price is public.": an illustrated stack of liquidation levels, yours in red.
+   - **"The edge, right now."**: the five largest positions near liquidation in a scan of public Hyperliquid data (the 1,500 largest accounts, addresses left out), each with a distance bar, red under 5 %. On Oct 21 every position within 5 % was isolated. Re-run the scan (RESEARCH_NOTES, "Isolated margin among hunted positions") before the video and the submission, and keep its date on screen.
+   - Three steps: Seal, Fund, Guarded; an isolated position takes one approval on Hyperliquid first.
+   - "Watch the line move.": the rescue chart. Two rescues step the red line down, and only the first counts as a save.
+   - **"Paid only when it saves you."**: $0 for a close call, 3 % for a save, $1 a month per guard.
+   - "Built so you don't have to trust us.": Pays only you · Nobody can link it · A line nobody can learn · Code you can check · Freeze it yourself · We pay if we fail.
+   - Built on NEAR, five questions, and the closing band "Your line is public. Your defence isn't."
+2. **Guards** (dashboard) — a summary row (account value, guarded notional with "3 of 4", reserve `••••••`, rescues in 30 days and how many saved, median rescue time); every position with its guard (Guarded, Guarded · isolated, or a **Guard** button); beside them the selected guard's card, its health line, what a hunter saw today and recent activity. One line of evidence at the foot: "Watching prices every 3 s · enclave last checked 41 s ago · guard build 4e1d9a7 · verified".
+3. **Guard** — what a hunter sees (mark, public liquidation, distance, the chart with rescues marked) beside the card and its sealed settings (Hold to peek). Actions: Top up reserve · Change range · Freeze reserve · Close guard. Under the title, the health line "Guarded · checked 41 s ago"; when checks stop, the paused banner (§5) takes its place and the card's chip turns red: Paused. Rescue history: when, margin added, distance before → after (shown only to the owner), landed in, outcome (Saved and its fee · Settling and the time left · Close call, no fee), proof, and **Publish proof** for any rescue (§5).
+4. **New guard** (set up) — position (cross needs no approval; isolated takes one on Hyperliquid) → describe in plain words → read back → **Seal** → fund. The read-back puts the **reserve first** (asset, amount, how long; its size against the position's margin, the replay result at 2× and a one-tap "Use 0.078 BTC"), then **when to step in**: Safer, Balanced or Lean, each with its replay figures (share liquidated, early rescues a month). The choice marked for you follows the reserve: Lean at ≥ 1.5× margin, else Balanced. The honesty and fee lines (§5) sit above **Seal guard**. A live preview of the card sits beside the steps and seals itself at the end.
+5. **Hunt** — the simulator: chart, two buttons, four inline figures, a short public feed, reveal at the end.
+6. **Verify** — guard id + seal file → the card opens → three ticks: the settings match the seal; every rescue fired inside its drawn range, with each one's outcome; the guard runs the published code. Then **Our promise**: "No liquidation on this guard", or after a liquidation the answer to the compensation question: "Eligible: your line was crossed at 14:03:21 while guarded; no rescue fired." or the plain reason it isn't.
+7. **Ledger** — public totals (rescues, saves, margin added, median time to land, slowest 5 %); the make-good fund line (balance, 10 % of every save fee, where it earns at the live rate, e.g. "earning 10 % a year on Rhea", paid out, a link to its Trezu treasury, where anyone sees its members, votes and payouts); then every rescue: the hour, a rounded amount, latency, outcome (**Saved**, **Settling** or **Close call**, settled 24 h after landing), the guard's fingerprint and its receipt. Hyperliquid and NEAR links appear only where the owner published proof; Ripcord's own guards always do. No account, distance, range or reserve.
+
+## 5. Copy rules
+- Name things by what users understand: "Guard", "Reserve", "Rescue range", "Rescue", "Seal file". Not "intent", "TEE", "attestation", "confidential shard" in primary UI.
+- Few words. A screen gets one headline and at most one sentence under it.
+- Buttons say what happens: "Seal guard", "Fund reserve", "Close and return 0.05 BTC". A button and its toast use the same verb.
+- States: Sealing… → Waiting for reserve → Guarded → Rescuing… → Rescued → Settling (up to 24 h) → Saved or Close call → Closed. Off the happy path: Guard paused ("Checks stopped at 14:02. Your reserve is safe, but your position isn't protected until they resume."), or Rescues paused when the private route is down ("Rescues paused: the private route has been down since 14:23 (NEAR Intents). Your reserve is safe, but your position isn't protected until it's back."). A receipt's `outcome` reads: `pending` → Settling, `saved` → Saved, `early` → Close call, `failed` → Liquidated ("Liquidated. The price fell past the margin this rescue added. Verify says whether our promise covers it.").
+- Rescue outcomes, said plainly. Saved: "Saved. BTC fell past your old liquidation price ($91,139). Your reserve had moved it to $87,676, 38 s earlier." Close call: "Close call. BTC came within 3.1% of your old liquidation price. The $342 is still yours, as margin. No Ripcord fee."
+- Errors explain and direct: "Reserve not seen yet. BTC deposits need 1 confirmation, usually 10 minutes." No apologies.
+- Honesty line on set up: "A rescue takes under a minute. A move faster than that can still liquidate you."
+- Money, in the same words everywhere. Set up: "No Ripcord fee unless a rescue saves you, then 3% of it · $1 a month · about $0.32 network cost per rescue". Guard: "Ripcord charges only for saves: 3% of that rescue, 0.5% on any part above $50,000. A close call costs only the network fee."
+- Margin type, said once, under the position. Cross: "Cross margin, so no approval is needed. An isolated position takes one approval on Hyperliquid, so a rescue can reach it." Isolated: "Isolated margin, so this guard needs one approval on Hyperliquid. Its code only adds margin."
+- The promise: "If a guard misses because of us, our make-good fund pays back what the liquidation took, up to your reserve or $10,000, whichever is lower."
+- Frozen, said plainly: "Reserve frozen. Nothing can leave it, rescues included, until you unfreeze it. Its balance shows again when you do." (While frozen, OutLayer won't even read the balance.)
+- Ledger privacy, one line under the table: "Times are to the hour and amounts rounded, so a rescue can't be matched to an account. Owners can publish full proof." On Guard, **Publish proof** explains itself: "Shows this rescue's exact time, amount and Hyperliquid transaction on the public ledger. Anyone could then link it to your account."
+- Every number on a public page names its source and date: "Mainnet test rescues from a hidden reserve into Hyperliquid margin, Oct 21"; "Public Hyperliquid data, the 1,500 largest accounts by value, Oct 21, 2026. Addresses left out."; "Replay of ETH 10× longs and shorts held a week, Oct 2025 to Sep 2026". A speed is the measured range, never the best case alone. Example data says so ("Example data until launch"). In the UI a percent sign touches its number (9.3%).
+
+## 6. Quality floor
+Responsive to 360 px; both themes, following the system setting with a toggle; keyboard focus is a 2 px Amber ring; contrast AA in both themes (Muted on Ground ≥ 7:1 in each); `prefers-reduced-motion` turns every signature moment into a 120 ms cross-fade to the same end state.
+
+## 7. Demo video storyboard (≤ 2 min, made for the grand prize)
+Captions burned in (X autoplays muted), one idea per beat, real mainnet footage wherever possible, and an honest timer. One beat is a real mainnet rescue shown **unedited and in real time** (about 45 s, a visible clock; recorded Day 7): judges in other hackathons explicitly reward "a live, unedited demo".
+
+| Time | Beat | On screen | Caption |
+|---|---|---|---|
+| 0:00 | The hunt | A liquidation heatmap, then "The edge, right now" with real, dated data | "On Hyperliquid, everyone can see where your position dies." |
+| 0:07 | The stakes | A cascade replay running through clusters of red lines | "$3.21B was liquidated across crypto in one minute on Oct 10, 2025." |
+| 0:14 | Title | The card appears and its rosette prints itself | "Ripcord keeps a reserve nobody can see, and moves it in first." |
+| 0:20 | Setup, sped up | Real position → "Keep my ETH long alive through a 20% drop" → reserve first, then timing, marked "computed privately ✓" → **Seal** → fund with BTC from Bitcoin | "Say it in plain words. Only a fingerprint is public." |
+| 0:38 | The rescue, on mainnet | Split screen: Hyperliquid's public red line beside the sealed card. Margin pulled to 2% from liquidation, the timer runs, USDC lands, the line slides away; transaction links | "46 s, mainnet, from a reserve nobody can trace." (use the Day 7 measurement) |
+| 1:05 | The hunted whale | "The positions closest to the edge are isolated." One approval, then the same rescue on an isolated position | "Isolated positions too." |
+| 1:17 | Why hunters lose | "Learn the line": inferred trigger points scatter across the sealed range; the hunter's budget drains | "Every rescue redraws the line." |
+| 1:30 | Trust and business | Ledger: "Saved · 3% fee" and "Close call · no fee"; Verify's three green ticks; Freeze | "It can only pay you. Freeze it yourself. Paid only when it saves you." |
+| 1:45 | Close | The NEAR pieces in one picture, then "Your line is public. Your defence isn't." | "Built on NEAR." |
+
+Production: record the raw mainnet runs on Day 7 with a real clock in frame; the "Saved" entry is the controlled save, labelled as our own test; every number real and dated, replays labelled as replays; no jargon in captions until the close; no individuals named; a 16:9 cut for the submission and a 30–45 s vertical cut for X; the agents track gets its own 20-second clip of the sample agent hiring a guard.
+
+## 8. The breathtaking bar
+
+One bold object per screen, everything else quiet and exact. Expressive motion only in these four moments.
+
+### 8.1 Signature moments
+| Moment | What happens |
+|---|---|
+| **The seal** | On **Seal guard**, the rosette prints itself onto the card (strokes draw in, 600 ms), then each sealed value collapses into `••••••` (120 ms, staggered), then the fingerprint types in, one character per frame. |
+| **The card** | Every guard's rosette comes from its own hash. The same card appears on Home, Guards, Guard, New guard, Verify, the seal file icon and the share image. |
+| **The rescue** | On the hunter side the red liquidation line slides away from price (420 ms, the number ticks with tabular digits); on the card the distance counts back up and the status chip turns green "Rescued" for one beat, then back to amber. |
+| **Opening the envelope** | On Verify, a dark veil slides off the card at −12° (600 ms), the sealed values appear, and three ticks land 120 ms apart. |
+
+Motion tokens: `--dur-1: 120ms`, `--dur-2: 240ms`, `--dur-3: 420ms`, `--dur-4: 600ms`; `--ease: cubic-bezier(.2,.8,.2,1)`.
+
+### 8.2 Craft checklist (every screen, Days 10–11, at 360 and 1280, in both themes)
+- [ ] **Holds up beside the best.** Put the screenshot next to Phantom, Linear, Mercury and Hyperliquid at the same size. If it looks like a hackathon project next to them, it isn't done.
+- [ ] **One bold object per screen.** If two things compete for attention, one of them goes.
+- [ ] **Few words.** One headline, at most one sentence under it. No eyebrow labels, no decorative chips.
+- [ ] **Type:** tight display headlines; tabular numbers everywhere numbers change; `text-wrap: balance` on headlines, `pretty` on body.
+- [ ] **No layout shift:** numbers reserve their width; fonts preloaded with fallback metrics.
+- [ ] **Every state designed:** empty (one sentence + one action), loading (skeleton with final geometry), error (§5), success. No raw error strings, no `undefined`, no `NaN`.
+- [ ] **Real data only where it matters:** one position, real-looking amounts; nothing that looks like filler.
+- [ ] **Interaction:** hover, active, focus-visible and disabled states; 44 px touch targets; Escape closes overlays.
+- [ ] **AA contrast** verified with a tool.
+
+Score each screen 0–5 against this list in `docs/SCORECARD.md` notes; below 5 means another pass.

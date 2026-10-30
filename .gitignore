@@ -1,0 +1,68 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# rust
+target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# env & secrets — NEVER commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*-key.json
+reveal-keys/
+credentials/
+.near-credentials/
+
+# submission payload (contains personal data, per HACKATHON.md)
+submission.json
+
+# os / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# test & coverage
+coverage/
+.vitest/
+
+# private working docs: kept on disk, never committed (Jero, Oct 30).
+# Public docs: README, LICENSE, AGENTS.md, docs/ARCHITECTURE.md, docs/SPEC.md, docs/DESIGN.md, docs/EVIDENCE.md
+CLAUDE.md
+CLAUDE.local.md
+CLAUDE_CODE_KICKOFF.md
+HACKATHON.md
+docs/HACKATHON.md
+docs/PRD.md
+docs/RESEARCH_NOTES.md
+docs/BUILD_PLAN.md
+docs/SCORECARD.md
+docs/G5_TRADER_INTERVIEW.md
+docs/private/
+.claude/
+
+# more key and wallet file shapes
+*_key.json
+*.keystore
+*.p12
+owner.json
+policy.json
