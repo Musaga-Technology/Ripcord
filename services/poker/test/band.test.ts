@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { callReason, type WatchState } from '../src/band.js';
+import { callReason, type WatchState } from '../src/band';
 
 const base: WatchState = {
   distance: 40,
@@ -22,7 +22,9 @@ describe('when the poker wakes the checker', () => {
     expect(callReason({ ...base, distance: 20, lastCheckedDistance: 20.2 })).toBeNull());
   it('calls every 3 s while falling inside the band', () => {
     expect(callReason({ ...base, distance: 20, lastCheckedDistance: 20.2, falling: true, now: 2_000 })).toBeNull();
-    expect(callReason({ ...base, distance: 20, lastCheckedDistance: 20.2, falling: true, now: 3_000 })).toBe('band-falling');
+    expect(callReason({ ...base, distance: 20, lastCheckedDistance: 20.2, falling: true, now: 3_000 })).toBe(
+      'band-falling',
+    );
   });
   it('sends the hourly heartbeat', () => expect(callReason({ ...base, now: 3_600_000 })).toBe('heartbeat'));
   it('watches settlement near the pre-rescue liquidation price', () =>

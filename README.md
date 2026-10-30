@@ -32,8 +32,11 @@ Design notes, research and feasibility tests were prepared from Oct 20 (results 
 
 | Do | See |
 |---|---|
-| `bash scripts/demo.sh` | Installs, runs TS + Rust tests, builds the web app, ends with "✓ All green" |
-| _(fill in from Nov 6)_ open http://localhost:3000, **Guard a position** with the demo account | Positions with public liquidation prices; the defence line is sealed under a security tint |
+| `bash scripts/demo.sh` (needs Node 22; Python 3 and Rust optional) | Installs, checks that Python, TypeScript and Rust agree on every hash and guard decision, runs the fault-injection tests, builds the web app; every step ✓ |
+| `corepack pnpm dev`, open http://localhost:3000 | Your guards on an example account: ETH, BTC and HYPE guarded, SOL not; each guard is a card whose pattern is drawn from its commitment |
+| Click **Hunter's view** | The same position as anyone sees it on Hyperliquid: liquidation price public, guarded "Can't tell", range and reserve `••••••` |
+| Press and hold **Hold to peek** | Your sealed rescue range, top-up and reserve, only while held |
+| _(fill in from Nov 6)_ **Guard a position** with the demo account | Set a range, seal it, fund the reserve |
 | _(fill in from Nov 9)_ **Try to hunt one** | Hunt simulator: push price at a guarded position and watch hidden rescues move the line |
 | _(fill in from Nov 8)_ **Verify**, drop the demo seal file | Three green ticks: settings match the seal, rescues inside the line, code hash matches |
 
@@ -130,7 +133,14 @@ docs                     Architecture and trust model, interfaces (SPEC), design
 
 ## Built with
 
-Libraries and tools are listed here as they are added (HACKATHON.md Q-005): _(Day 1)_.
+Libraries and tools, as the hackathon rules ask (Q-005). All code in this repository is written for Ripcord from Oct 30; nothing is copied from earlier projects.
+
+- TypeScript 6, pnpm 12, Node 22; Next.js 16, React 19, Tailwind CSS 4 (web)
+- `@noble/hashes` (SHA-256 in the browser and Node)
+- Rust: `serde`, `serde_json`, `sha2`, `hex` (checker)
+- vitest, ESLint, Prettier; Python 3 standard library for the reference implementation (`scripts/vectors.py`)
+- Fonts: Instrument Sans, JetBrains Mono (Google Fonts)
+- Built with AI assistance (Claude Code), which the rules allow (Q-005)
 
 ## License
 

@@ -1,6 +1,6 @@
 // The guard's decisions as pure functions (docs/SPEC.md §3 "One check"). The checker runs the Rust twin
 // (checker/src/guard.rs) inside the enclave; the web app and the replay harness use this one. Distances are in %.
-import type { Outcome, Position } from './types.js';
+import type { Outcome, Position } from './types';
 
 export function distancePct(liquidationPx: number | null, mark: number): number | null {
   if (liquidationPx === null) return null;
@@ -37,7 +37,13 @@ export function fallRate(history: [number, number][], nowT: number, nowD: number
 }
 
 /** Fire below the drawn line, or (speed-aware) when the fall rate would cross it within the rescue time. */
-export function shouldFire(distance: number, drawnLine: number, speedAware: boolean, v: number, horizonS = 60): boolean {
+export function shouldFire(
+  distance: number,
+  drawnLine: number,
+  speedAware: boolean,
+  v: number,
+  horizonS = 60,
+): boolean {
   if (distance < drawnLine) return true;
   return speedAware && distance - v * horizonS < drawnLine;
 }

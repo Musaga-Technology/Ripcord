@@ -45,5 +45,12 @@ export function canonical(v: Json): string {
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
   const keys = Object.keys(v);
   for (const k of keys) if (!KEY.test(k)) throw new CanonicalError('key must match [a-z0-9_]+');
-  return '{' + keys.sort().map((k) => canonicalString(k) + ':' + canonical(v[k]!)).join(',') + '}';
+  return (
+    '{' +
+    keys
+      .sort()
+      .map((k) => canonicalString(k) + ':' + canonical(v[k]!))
+      .join(',') +
+    '}'
+  );
 }

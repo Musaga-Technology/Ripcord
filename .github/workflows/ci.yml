@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: python3 scripts/vectors.py --check
+      - run: pnpm lint
+      - run: pnpm -r test
+      - run: pnpm -r build
+
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: checker
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: bash scripts/demo.sh

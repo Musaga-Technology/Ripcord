@@ -336,15 +336,30 @@ def vectors_guard():
             'save_fee': fees, 'round_credit': rounding, 'at_hour': hours, 'latency_s': lats, 'draw': draws, 'settle': settles}
 
 
-def write(name, data):
-    path = os.path.join(OUT, name)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=1, ensure_ascii=False)
-        f.write('\n')
-    print('wrote', os.path.relpath(path))
+def render(data):
+    return json.dumps(data, indent=1, ensure_ascii=False) + '\n'
+
+
+def main(check):
+    os.makedirs(OUT, exist_ok=True)
+    stale = []
+    for name, data in [('commitment.json', vectors_commitment()), ('guard.json', vectors_guard())]:
+        path = os.path.join(OUT, name)
+        text = render(data)
+        if check:
+            with open(path, encoding='utf-8') as f:
+                if f.read() != text:
+                    stale.append(name)
+        else:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(text)
+            print('wrote', os.path.relpath(path))
+    if stale:
+        raise SystemExit('vectors differ from the reference implementation: ' + ', '.join(stale))
+    if check:
+        print('vectors match the reference implementation')
 
 
 if __name__ == '__main__':
-    os.makedirs(OUT, exist_ok=True)
-    write('commitment.json', vectors_commitment())
-    write('guard.json', vectors_guard())
+    import sys
+    main('--check' in sys.argv)

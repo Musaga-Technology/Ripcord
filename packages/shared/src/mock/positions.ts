@@ -1,9 +1,9 @@
 // Demo-mode data: one trader's Hyperliquid account as `clearinghouseState` would describe it, and the guards on
 // it. Matches the Product canvas (ETH long guarded, BTC short guarded, SOL unguarded, HYPE isolated guarded).
 // Commitments are computed from real (example) sealed settings, so cards and fingerprints are what a user sees.
-import { commitment, fingerprint } from '../commitment.js';
-import { guardDistance, markOf } from '../guard.js';
-import type { GuardSettings, Position } from '../types.js';
+import { commitment, fingerprint } from '../commitment';
+import { guardDistance, markOf } from '../guard';
+import type { GuardSettings, Position } from '../types';
 
 export const DEMO_TRADER = '0x9c4e7a1b2c3d4e5f60718293a4b5c6d7e8f941f2';
 
@@ -50,7 +50,14 @@ export interface DemoGuard {
   sealed: { reserve: string; range: string; target: string };
 }
 
-function guard(guardId: string, coin: string, label: string, s: GuardSettings, reserve: string, saltByte: number): DemoGuard {
+function guard(
+  guardId: string,
+  coin: string,
+  label: string,
+  s: GuardSettings,
+  reserve: string,
+  saltByte: number,
+): DemoGuard {
   const c = commitment(s, salt(saltByte));
   return {
     guardId,
@@ -69,8 +76,33 @@ function guard(guardId: string, coin: string, label: string, s: GuardSettings, r
 
 export const DEMO_GUARDS: DemoGuard[] = [
   guard('g-vf6per4bfx', 'ETH', 'ETH long · 10×', settings({}), '0.057 BTC', 0x11),
-  guard('g-k3m7xq2tpa', 'BTC', 'BTC short · 5×', settings({ preset: 'safer', line_range_pct: [7, 10], target_range_pct: [12, 16], reserve_asset: 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1' }), '4,200 USDC', 0x22),
-  guard('g-h2y6wnd4re', 'HYPE', 'HYPE long · 3× isolated', settings({ preset: 'lean', line_range_pct: [3.5, 5.5], target_range_pct: [7, 10], speed_aware: true, isolated: { coin: 'HYPE' } }), '9.8 SOL', 0x33),
+  guard(
+    'g-k3m7xq2tpa',
+    'BTC',
+    'BTC short · 5×',
+    settings({
+      preset: 'safer',
+      line_range_pct: [7, 10],
+      target_range_pct: [12, 16],
+      reserve_asset: 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1',
+    }),
+    '4,200 USDC',
+    0x22,
+  ),
+  guard(
+    'g-h2y6wnd4re',
+    'HYPE',
+    'HYPE long · 3× isolated',
+    settings({
+      preset: 'lean',
+      line_range_pct: [3.5, 5.5],
+      target_range_pct: [7, 10],
+      speed_aware: true,
+      isolated: { coin: 'HYPE' },
+    }),
+    '9.8 SOL',
+    0x33,
+  ),
 ];
 
 export interface DemoRow {

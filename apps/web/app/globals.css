@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+/* Tokens from docs/DESIGN.md §2. Light values on :root; dark when the system asks for it (unless the user chose
+   light) or when the user chose dark. The guard card keeps its dark values in both themes. */
+:root {
+  --ground: #f7f7f5;
+  --panel: #ffffff;
+  --line: #e6e6e2;
+  --line-3: #d1d1cc;
+  --text: #0b0b0d;
+  --text-2: #3f3f46;
+  --muted: #52525a;
+  --amber: #9a5b00;
+  --red: #c2362b;
+  --green: #1d7f52;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ground: #09090b;
+    --panel: #111114;
+    --line: #1f1f24;
+    --line-3: #2e2e35;
+    --text: #f4f4f5;
+    --text-2: #d4d4d8;
+    --muted: #a1a1aa;
+    --amber: #e8a33d;
+    --red: #f06459;
+    --green: #4cc38a;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --ground: #09090b;
+  --panel: #111114;
+  --line: #1f1f24;
+  --line-3: #2e2e35;
+  --text: #f4f4f5;
+  --text-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --amber: #e8a33d;
+  --red: #f06459;
+  --green: #4cc38a;
+  color-scheme: dark;
+}
+
+/* The card is a dark object on any ground (DESIGN §2). */
+.card-dark {
+  --card: #131316;
+  --card-line: #26262c;
+  --card-chip: #1c1c20;
+  --card-chip-line: #2e2e35;
+  --card-text: #f4f4f5;
+  --card-text-2: #d4d4d8;
+  --card-muted: #a1a1aa;
+  --card-rosette: #3a3a44;
+  --card-amber: #e8a33d;
+  --card-green: #4cc38a;
+  --card-red: #f06459;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-line-3: var(--line-3);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-green: var(--green);
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

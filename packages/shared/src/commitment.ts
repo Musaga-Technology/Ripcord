@@ -2,8 +2,8 @@
 // Salts are 64 lowercase hex characters; ‖ joins UTF-8 text. Mirrors checker/src/commitment.rs.
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
-import { canonical, type Json } from './canonical.js';
-import type { GuardSettings } from './types.js';
+import { canonical, type Json } from './canonical';
+import type { GuardSettings } from './types';
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ED25519 = /^ed25519:[1-9A-HJ-NP-Za-km-z]{32,44}$/;

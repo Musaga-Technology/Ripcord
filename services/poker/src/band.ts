@@ -38,10 +38,14 @@ export type CallReason = 'after-rescue' | 'settlement' | 'band-drop' | 'band-fal
 export function callReason(s: WatchState, c: BandConfig = DEFAULT_BAND): CallReason | null {
   const since = s.now - s.lastCheckAt;
   if (s.justRescued) return 'after-rescue';
-  if (s.pendingLiqBefore !== null && (Math.abs(s.mark - s.pendingLiqBefore) / s.pendingLiqBefore) * 100 <= c.settlementPct)
+  if (
+    s.pendingLiqBefore !== null &&
+    (Math.abs(s.mark - s.pendingLiqBefore) / s.pendingLiqBefore) * 100 <= c.settlementPct
+  )
     return 'settlement';
   const inBand = s.distance < c.bandPct;
-  if (inBand && (s.lastCheckedDistance === null || s.lastCheckedDistance - s.distance >= c.minDropPp)) return 'band-drop';
+  if (inBand && (s.lastCheckedDistance === null || s.lastCheckedDistance - s.distance >= c.minDropPp))
+    return 'band-drop';
   if (inBand && s.falling && since >= c.burstMs) return 'band-falling';
   if (since >= c.heartbeatMs) return 'heartbeat';
   return null;

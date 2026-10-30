@@ -1,7 +1,7 @@
 // T-SEC-09 (docs/SPEC.md §6): fault injection on the rescue path. Whatever the custody API does, a rescue is
 // paid at most once, a 503 never falls back to a public route, and every run ends in a known state.
 import { describe, expect, it } from 'vitest';
-import { MockCustody, rescue, simClock, type Fault } from '../src/mock/executor.js';
+import { MockCustody, rescue, simClock, type Fault } from '../src/mock/executor';
 
 const HL = '0x15a6116aeacaa68fd69a17e8abb9e77e24159fe3';
 const base = { guardId: 'g-vf6per4bfx', epoch: 3, amount: 1486.18, to: HL };
