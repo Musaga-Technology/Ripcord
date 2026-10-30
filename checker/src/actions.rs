@@ -1,7 +1,10 @@
 //! The checker's actions (docs/SPEC.md §3). Input is JSON on stdin, output is JSON on stdout (≤ 900 bytes) and
 //! carries a status, never a setting. Refusal reasons name the rule that failed, never the value.
+use crate::config::{NET, REGISTER_DEPOSIT, REGISTER_GAS};
+use crate::custody::Custody;
 use crate::host::Host;
-use crate::{policy, settings, vault};
+use crate::near_tx::{self, FunctionCall};
+use crate::{oneclick, policy, settings, vault};
 use ripcord_rules::commitment::{account_commitment, commitment, is_guard_id, owner_commitment};
 use ripcord_rules::seal;
 use ripcord_rules::types::GuardSettings;
@@ -16,6 +19,7 @@ pub const CHECKER_KEY: &str = "checker";
 pub enum Input {
     Pubkey,
     Create(CreateInput),
+    Fund(FundInput),
 }
 
 #[derive(Deserialize)]
@@ -27,6 +31,13 @@ pub struct CreateInput {
     pub expires_at: String,
     /// The sealed payload, hex: version ‖ ephemeral key ‖ nonce ‖ ciphertext (see `ripcord_rules::seal`).
     pub enc_settings: String,
+}
+
+#[derive(Deserialize)]
+pub struct FundInput {
+    pub guard_id: String,
+    /// The 1Click asset the owner sends from (e.g. USDC on Arbitrum); the amount is the sealed budget.
+    pub source_asset: String,
 }
 
 /// What the owner's device seals: the settings and the salts their commitments use.
@@ -43,6 +54,9 @@ pub struct StoredGuard {
     pub settings: GuardSettings,
     pub salt: String,
     pub commitment: String,
+    /// The `register_guard` transaction, once the guard's wallet policy is on chain.
+    #[serde(default)]
+    pub registered: Option<String>,
 }
 
 pub fn refuse(reason: &str) -> Value {
@@ -54,6 +68,7 @@ pub fn run(host: &dyn Host, input: &str) -> Value {
         Err(_) => refuse("input is not a known action"),
         Ok(Input::Pubkey) => pubkey(host).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Create(c)) => create(host, &c).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Fund(f)) => fund(host, &f).unwrap_or_else(|e| refuse(&e)),
     }
 }
 
@@ -63,7 +78,9 @@ pub fn pubkey(host: &dyn Host) -> Result<Value, String> {
     Ok(json!({ "enc_pk": hex::encode(enc_pk), "account": account }))
 }
 
-/// Opens the owner's sealed settings, checks them against the three public hashes, and seals them in the vault.
+/// Opens the owner's sealed settings, checks them against the three public hashes, seals them in the vault, then
+/// opens the guard's custody wallet and registers the guard with the wallet's policy. Safe to retry with the same
+/// input: each step is idempotent, and a guard already on chain is not registered twice.
 pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
     if !is_guard_id(&c.guard_id) {
         return Err("invalid guard_id".into());
@@ -84,22 +101,98 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
     settings::validate(&p.settings, host.now_ms())?;
 
     let key = format!("s/{}", c.guard_id);
-    if let Some(existing) = vault::get::<StoredGuard>(host, &key)? {
-        if existing.commitment != c.commitment {
-            return Err("guard_id already holds other settings".into());
+    let mut g = match vault::get::<StoredGuard>(host, &key)? {
+        Some(existing) if existing.commitment != c.commitment => {
+            return Err("guard_id already holds other settings".into())
         }
-        return Ok(json!({ "status": "pending" }));
+        Some(existing) => existing,
+        None => {
+            let g = StoredGuard {
+                settings: p.settings,
+                salt: p.salt,
+                commitment: c.commitment.clone(),
+                registered: None,
+            };
+            vault::put(host, &key, &g)?;
+            g
+        }
+    };
+    if g.registered.is_none() {
+        g.registered = Some(register(host, c, &g.settings)?);
+        vault::put(host, &key, &g)?;
     }
-    vault::put(
-        host,
-        &key,
-        &StoredGuard {
-            settings: p.settings,
-            salt: p.salt,
-            commitment: c.commitment.clone(),
-        },
-    )?;
     Ok(json!({ "status": "pending" }))
+}
+
+/// The guard's wallet (seed = guard id), its policy encrypted by OutLayer and signed by the wallet for the
+/// registry, and `register_guard` signed by the checker's own key. Returns the transaction hash.
+fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<String, String> {
+    let on_chain = near_tx::view(
+        host,
+        NET.rpc,
+        NET.registry,
+        "get_guard",
+        &json!({ "guard_id": c.guard_id }),
+    )?;
+    if !on_chain.is_null() {
+        return Ok("already registered".into());
+    }
+    let custody = Custody::new(host, NET.outlayer_api)?;
+    let wallet_id = custody.register(&c.guard_id)?;
+    let reserve = if s.reserve_asset == policy::USDC {
+        None
+    } else {
+        let t = oneclick::token(host, NET.oneclick, &s.reserve_asset)?;
+        Some(policy::ReserveUnits { per_usd: t.per_usd() })
+    };
+    let p = policy::build(s, NET.fee_wallet, reserve)?;
+    let encrypted = custody.encrypt_policy(&c.guard_id, &wallet_id, &p)?;
+    let (signature, wallet_pk) = custody.sign_policy(&c.guard_id, &encrypted, NET.registry)?;
+    let args = json!({
+        "guard_id": c.guard_id,
+        "commitment": c.commitment,
+        "owner_commitment": c.owner_commitment,
+        "account_commitment": c.account_commitment,
+        "expires_at": c.expires_at,
+        "wallet_pubkey": format!("ed25519:{wallet_pk}"),
+        "encrypted_policy": encrypted,
+        "wallet_signature": signature,
+    })
+    .to_string();
+    let pk = host.public_key(CHECKER_KEY)?;
+    let account = hex::encode(pk);
+    let (nonce, block_hash) = near_tx::access_key(host, NET.rpc, &account, &pk)?;
+    near_tx::send(
+        host,
+        NET.rpc,
+        CHECKER_KEY,
+        &FunctionCall {
+            signer_id: &account,
+            public_key: pk,
+            nonce,
+            receiver_id: NET.registry,
+            block_hash,
+            method: "register_guard",
+            args: args.as_bytes(),
+            gas: REGISTER_GAS,
+            deposit: REGISTER_DEPOSIT,
+        },
+    )
+}
+
+/// A one-time address on the owner's chain that funds the guard's confidential reserve with its budget. Only for
+/// a registered guard, so no money reaches a wallet before its policy does. The amount comes from the sealed
+/// settings, never from input; the output carries the address only.
+pub fn fund(host: &dyn Host, f: &FundInput) -> Result<Value, String> {
+    let g: StoredGuard = vault::get(host, &format!("s/{}", f.guard_id))?.ok_or("no such guard")?;
+    if g.registered.is_none() {
+        return Err("guard is not registered yet".into());
+    }
+    let t = oneclick::token(host, NET.oneclick, &f.source_asset)?;
+    let amount = ((g.settings.budget_usd * t.per_usd()).ceil() as u128).to_string();
+    let custody = Custody::new(host, NET.outlayer_api)?;
+    let address = custody.deposit_address(&f.guard_id, &f.source_asset, &amount)?;
+    Ok(json!({ "status": "pending", "deposit_address": address }))
 }
 
 /// The wallet policy for a stored guard (used by `create` once its custody wallet is open).

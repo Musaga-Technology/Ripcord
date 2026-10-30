@@ -58,12 +58,13 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 
 ## 3. Checker: `checker/` (Rust → wasm32-wasip2 on OutLayer)
 
-**Manifest.** `callers: {"direct": "deny", "contract": "deny"}` (HTTPS only, G7). Network: `api.hyperliquid.xyz`, `api.outlayer.ai`, one NEAR RPC for registry writes (**verify Day 3**: the checker signs NEAR transactions with its signing key and sends them over HTTPS). Signing key `checker` ed25519, `bind: project`. Encrypted storage. Every ungated version removed (`remove_version`). Output ≤ 900 bytes JSON.
+**Manifest.** `callers: {"direct": "deny", "contract": "deny"}` (HTTPS only, G7). Network: `api.hyperliquid.xyz`, `api.outlayer.ai`, one NEAR RPC for registry writes (the checker signs NEAR transactions with its signing key and sends them over HTTPS: `checker/src/near_tx.rs`), `1click.chaindefuser.com` for token prices. Signing key `checker` ed25519, `bind: project`. Encrypted storage. Every ungated version removed (`remove_version`). Output ≤ 900 bytes JSON.
 
 | Action | Input | Output |
 |---|---|---|
 | `pubkey` | — | `{enc_pk, account}`: the ECIES X25519 key the web app encrypts to, and the checker's NEAR account |
-| `create` | `{guard_id, commitment, owner_commitment, account_commitment, expires_at, enc_settings}` | `{status: "pending", fund: {chain, address}}` after: decrypt; recompute all three hashes (reject a mismatch); seal; open the guard's custody wallet (`wallet_id = f(checker account, guard_id)`); build the policy (below) → `/encrypt-policy`, `/sign-policy` with `caller` = registry → `register_guard`; ask the wallet for a private deposit address (`/confidential/deposit/cross-chain`) |
+| `create` | `{guard_id, commitment, owner_commitment, account_commitment, expires_at, enc_settings}` | `{status: "pending"}` after: decrypt; recompute all three hashes (reject a mismatch); seal; open the guard's custody wallet (`wallet_id = f(checker account, guard_id)`); build the policy (below) → `/encrypt-policy`, `/sign-policy` with `caller` = registry → `register_guard`, signed by the checker's own key. Retry-safe: a guard already on chain is not registered twice |
+| `fund` | `{guard_id, source_asset}` | `{status: "pending", deposit_address}`: a private deposit address from the guard's wallet (`/confidential/deposit/cross-chain`) for the sealed budget in `source_asset` (1Click price); refused until the guard is registered, so no money reaches a wallet before its policy does |
 | `check` | `{guard_id}` | `{status: guarding | rescued | pending | skipped}`, nothing else (rule 4) |
 | `close` | `{guard_id, chain, address, nonce, sig}` | `{status: "closed"}`; owner signs `ripcord:close:<guard_id>:<chain>:<address>:<nonce>`; the address must be on the policy (if not, `policy` first) |
 | `policy` | `{guard_id, close: {chain, address}}` | `{encrypted_policy, wallet_signature}` for an owner-signed `update_policy` |
@@ -119,7 +120,7 @@ Checker call: `POST https://api.outlayer.ai/call/<owner>/<project>` with `X-Paym
 | Tool | Input | Output |
 |---|---|---|
 | `guard_position` | `{hl_address, reserve: {asset, amount}, preset?: "safer" \| "balanced" \| "lean", expires_days?: 1–90}` | `{guard_id, fingerprint, status: "pending", fund: {chain, address}, seal_file}` |
-| `fund_reserve` | `{guard_id}` | `{fund: {chain, address, min_amount}}` |
+| `fund_reserve` | `{guard_id, source_asset}` | `{fund: {chain, address, min_amount}}` (checker `fund`) |
 | `guard_status` | `{guard_id}` | `{status, last_check_at, rescues, outcomes: {saved, early, settling}, frozen}` |
 | `close_guard` | `{guard_id, to: {chain, address}}` | `{status: "closed"}` or `{sign_url}` |
 

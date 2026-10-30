@@ -152,3 +152,23 @@ pub fn send(host: &dyn Host, url: &str, key_path: &str, call: &FunctionCall) -> 
         None => Ok(bs58_encode(&digest)),
     }
 }
+
+/// A contract view call; `None` when the method returns null.
+pub fn view(host: &dyn Host, url: &str, contract: &str, method: &str, args: &Value) -> Result<Value, String> {
+    use base64::Engine;
+    let r = rpc(
+        host,
+        url,
+        "query",
+        json!({ "request_type": "call_function", "finality": "final", "account_id": contract,
+                "method_name": method,
+                "args_base64": base64::engine::general_purpose::STANDARD.encode(args.to_string()) }),
+    )?;
+    let bytes: Vec<u8> = r["result"]
+        .as_array()
+        .ok_or("view returned no result")?
+        .iter()
+        .map(|b| b.as_u64().unwrap_or(0) as u8)
+        .collect();
+    serde_json::from_slice(&bytes).map_err(|_| format!("{method} returned non-JSON"))
+}
