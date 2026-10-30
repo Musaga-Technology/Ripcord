@@ -11,3 +11,18 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 hex.workspace = true
+x25519-dalek = { version = "2.0.1", optional = true, features = ["static_secrets"] }
+hkdf = { version = "0.12", optional = true }
+chacha20poly1305 = { version = "0.10", optional = true, default-features = false, features = ["alloc"] }
+
+[features]
+# Sealing settings to the enclave key: the checker needs it, the contract doesn't.
+seal = ["dep:x25519-dalek", "dep:hkdf", "dep:chacha20poly1305"]
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[[test]]
+name = "seal"
+required-features = ["seal"]
+

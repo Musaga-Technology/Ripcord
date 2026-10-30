@@ -11,4 +11,4 @@ name = "ripcord_checker"
 path = "src/lib.rs"
 
 [dependencies]
-ripcord-rules = { path = "../crates/rules" }
+ripcord-rules = { path = "../crates/rules", features = ["seal"] }

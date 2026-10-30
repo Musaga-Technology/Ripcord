@@ -4,4 +4,6 @@
 pub mod canonical;
 pub mod commitment;
 pub mod guard;
+#[cfg(feature = "seal")]
+pub mod seal;
 pub mod types;

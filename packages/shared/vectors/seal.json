@@ -1,0 +1,27 @@
+{
+ "recipient_secret": "52961bb7bb2de7f24327b85144ec6ddaf8e76a8cbdfe6aba85db622164f2b20d",
+ "recipient_pk": "6afb5ee9c85e9eee8c110362d6d46f45b8b53ed2510c0f8fe3f10bccb5175f65",
+ "cases": [
+  {
+   "guard_id": "g-vf6per4bfx",
+   "plaintext": "{\"salt\":\"ab\",\"settings\":{\"preset\":\"balanced\"}}",
+   "eph_secret": "95ed02f60dcc2ce868abe0fd5c22a07699cbcd72dec559131caf3b65182b8135",
+   "nonce": "8765af12127d28f373dd3ee3",
+   "envelope": "01e24356549af6f0081c545f537c1130a645c10d3ce6d495aa450804af1bc48f468765af12127d28f373dd3ee3dcea14bc41ca366812d4f42fbd60410e0f3311c585cbb9e7deb195ccf19c0f8f6e70752007f6d510b82e69c9d92a5459bad77f9d199a4c014da6aa9fc486"
+  },
+  {
+   "guard_id": "g-k3m7xq2tpa",
+   "plaintext": "",
+   "eph_secret": "7cdbf947ebd4bb507979da5aa58d35c7b44bdeac3e8f0ecca7c377ec300dd4f7",
+   "nonce": "431dc07d8d1442804a9c9944",
+   "envelope": "01240e82de09b67542424e254db0f1ceca76030090c5947de610e1fd1036070803431dc07d8d1442804a9c9944e3866b2b3720371d9b8af017950732ad"
+  },
+  {
+   "guard_id": "g-h2y6wnd4re",
+   "plaintext": "é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ é ✓ ",
+   "eph_secret": "0dc73e94bf79c3dec5a5f2221958697fce58994c8e8f029a760b2082f3cf329a",
+   "nonce": "4c858e0004fe2c0c3d3ee0b9",
+   "envelope": "0128e18c014c0909f1b72f1fb95b3e93a44c4e0d8897ffd43287086d9c301420784c858e0004fe2c0c3d3ee0b9060f25305a2fb55bb5b18c2227b0f0daa350620b76e9e8b2525038283fa84ea086fc7ac2ebb3c3fe536b3183a8fb175c583ff8e812194fb1c9b384e04f42a5a2db2ec6260f32f7f6e4724765b3d94cf096b8f00e900689ae323b68c03b4ef5b66d73db2827c5cc2595d8b9becd396822b2d704b1520b1ba9d39bb3939dd14e7fcb41c4da576a5af4ecced2d8e008062f1e9248f33f6cce7925d2761064582fdabae0b4854a72b1cbd14af0a101558fa9ad1c176485c41635ec3c10a80d5877b80516cee826079d6b9d0c8af576ce78ba05c7c32130e0bda5ad5bb10c656658b5283308d209611305e1915887c42d53adc2e938a4a59f90e85fbcc4ca83ff6062e3f6c1fcb3f8da7b0154e48a96f99980b5ee1f709e48ba9c3e371179297adadcf955fdcb8c695eb4"
+  }
+ ]
+}
