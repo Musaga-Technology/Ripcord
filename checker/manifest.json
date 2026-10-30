@@ -1,0 +1,17 @@
+{
+  "display": { "name": "Ripcord checker" },
+  "operations": ["pubkey", "create", "fund"],
+  "capabilities": {
+    "network": [
+      "api.hyperliquid.xyz",
+      "api.outlayer.ai",
+      "testnet-api.outlayer.ai",
+      "rpc.mainnet.near.org",
+      "rpc.testnet.near.org",
+      "1click.chaindefuser.com"
+    ]
+  },
+  "signing_keys": [{ "path": "checker", "type": "ed25519" }],
+  "encryption_keys": [{ "path": "seal" }, { "path": "vault" }],
+  "callers": { "direct": "deny", "contract": "deny" }
+}

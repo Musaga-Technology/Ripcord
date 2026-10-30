@@ -1,6 +1,6 @@
-# Stable for tests and the NEAR contract (near-sdk 5.29 needs rustc 1.95+). The checker's OutLayer build
-# (Day 3) adds wasm32-wasip2 and follows OutLayer's compiler notes.
+# Stable for tests, the NEAR contract (near-sdk 5.29 needs rustc 1.95+) and clippy on the checker's enclave
+# code. The published enclave binary is built with Rust 1.85 by checker/build.sh, per OutLayer's compiler notes.
 [toolchain]
 channel = "stable"
 components = ["rustfmt", "clippy"]
-targets = ["wasm32-unknown-unknown"]
+targets = ["wasm32-unknown-unknown", "wasm32-wasip2"]

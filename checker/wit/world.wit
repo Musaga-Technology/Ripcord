@@ -1,0 +1,9 @@
+// The host interfaces the checker imports. The packages under deps/ are OutLayer's own definitions, as published
+// in its signing-keys, encryption-keys and storage docs (Oct 2026); HTTPS comes through wasi:http.
+package ripcord:checker;
+
+world checker {
+    import outlayer:signing-keys/api@0.1.0;
+    import outlayer:encryption-keys/api@0.1.0;
+    import near:storage/api@0.2.0;
+}

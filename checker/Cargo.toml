@@ -10,6 +10,15 @@ publish.workspace = true
 name = "ripcord_checker"
 path = "src/lib.rs"
 
+# The enclave binary: `cargo build -p ripcord-checker --release --target wasm32-wasip2 --features outlayer`.
+[[bin]]
+name = "ripcord-checker"
+path = "src/main.rs"
+required-features = ["outlayer"]
+
+[features]
+outlayer = ["dep:wit-bindgen", "dep:wasi-http-client", "dep:wasi"]
+
 [dependencies]
 ripcord-rules = { path = "../crates/rules", features = ["seal"] }
 serde.workspace = true
@@ -17,6 +26,9 @@ serde_json.workspace = true
 sha2.workspace = true
 hex.workspace = true
 base64 = "0.22"
+wit-bindgen = { version = "0.36", optional = true }
+wasi-http-client = { version = "0.2", optional = true }
+wasi = { version = "0.13", optional = true }
 
 [dev-dependencies]
 ed25519-dalek = "2"
