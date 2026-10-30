@@ -10,13 +10,15 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 | `guard_id` | `"g-"` + 10 lowercase base32 characters (50 random bits) |
 | canonical JSON | keys sorted, no whitespace, numbers as decimal strings, EVM addresses lowercase |
 | `commitment` | `sha256(canonical(GuardSettings) ‖ salt)`, hex; `salt` = 32 random bytes |
-| `owner` | an EVM address (`0x…` lowercase, signs EIP-191) or an ed25519 public key (`ed25519:<base58>`, signs NEP-413). Never a NEAR account name: a contract can't look up an account's keys |
+| `owner` | an ed25519 public key (`ed25519:<base58>`, signs NEP-413) or an EVM address (`0x…` lowercase, signs EIP-191). Never a NEAR account name: a contract can't look up an account's keys. **Default: an owner key the app generates at setup**, separate from the trading address, kept in the seal file, so an owner-signed action (freeze, proof, policy) reveals nothing about which trading account is guarded. Optional: the trading wallet itself as owner (simpler; a freeze then shows that account is guarded, said in the UI). Decided Oct 30 |
 | `owner_salt` | `sha256(owner's signature over "ripcord:owner-salt:v1")`: deterministic for ed25519 and RFC 6979 wallets, so the app can find an owner's guards without the seal file |
 | `owner_commitment` | `sha256(owner ‖ owner_salt)`, hex |
 | `account_commitment` | `sha256(lowercase(hl_address) ‖ account_salt)`, hex; `account_salt` = 32 random bytes, sealed |
 | fingerprint | first 4 and last 4 bytes of `commitment`, uppercase hex, as printed on the card |
 
 **`GuardSettings`** (sealed, committed): `owner`, `hl_address`, `account_salt`, `preset` (`safer | balanced | lean`), `line_range_pct [lo, hi]`, `target_range_pct [lo, hi]`, `speed_aware` (default true for Lean, false otherwise), `max_rescue_usd` (≥ 5), `budget_usd`, `reserve_asset` (1Click asset id), `cooldown_s` (60), `isolated` (`{coin}` or null), `close_hint` (`{chain, address}` or null), `receipt_pk` (X25519, the owner's), `expires_at` (ns).
+
+**Seal file** (the owner's copy, Day 6): the owner key's secret, the salts, the settings and the guard id, encrypted with a passphrase the user chooses (scrypt → ChaCha20-Poly1305). It is the key to the reserve, so: a close pays by default to the guard's own Hyperliquid address (pay-to-self); a different close address can be named at setup, or added later with an owner-signed `update_policy` that takes effect only after 24 h, which leaves time to freeze if the seal file was stolen.
 
 **Enums.** Registry status `Pending → Guarding → Closed | Expired`. "Paused" (watchdog) and "Frozen" (`outlayer.near` flag) are derived, never stored. Rescue outcome `pending → saved | early | failed` within 24 h.
 
