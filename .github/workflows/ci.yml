@@ -25,15 +25,13 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: checker
     steps:
       - uses: actions/checkout@v4
       - run: rustup show
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build -p guard-registry --release --target wasm32-unknown-unknown
 
   demo:
     runs-on: ubuntu-latest

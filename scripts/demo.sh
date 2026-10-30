@@ -29,9 +29,10 @@ else
 fi
 run $PNPM --filter @ripcord/shared test && ok "TypeScript: canonical JSON, commitments, guard decisions, fault injection"
 if command -v cargo >/dev/null; then
-  run cargo test --quiet --manifest-path checker/Cargo.toml && ok "Rust (checker): the same vectors"
+  run cargo test --quiet -p ripcord-rules && ok "Rust (shared by the checker and the registry): the same vectors"
+  run cargo test --quiet -p guard-registry && ok "NEAR contract: owner signatures (EVM and NEAR keys), replays refused, rounded receipts, no address in state or events"
 else
-  skip "cargo not found; install Rust from https://rustup.rs to run the checker's tests"
+  skip "cargo not found; install Rust from https://rustup.rs to run the Rust and contract tests"
 fi
 
 step "Pokers decide when to wake the checker (docs/SPEC.md §4)"

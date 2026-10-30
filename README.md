@@ -126,6 +126,7 @@ Beyond save fees:
 apps/web                 Next.js app (App Router, Tailwind v4)
 packages/shared          Types, JSON schemas, commitment + guard logic (shared by web and poker)
 services/poker           Watches public Hyperliquid state; asks the checker to check guards near liquidation
+crates/rules             Rust rules shared by the checker and the contract (tested against the same vectors)
 contracts/guard-registry NEAR contract: guard registry and wallet-policy controller (Rust)
 checker                  OutLayer TEE program: sealed guards, Hyperliquid reads, rescues (Rust → WASI P2)
 docs                     Architecture and trust model, interfaces (SPEC), design, evidence

@@ -9,12 +9,12 @@ Notes for coding agents and reviewers working with this repository.
 **Tests.**
 ```
 pnpm install && pnpm -r test && pnpm -r build
-cargo test --manifest-path contracts/guard-registry/Cargo.toml
-cargo test --manifest-path checker/Cargo.toml
+cargo test --workspace            # shared rules, checker, guard-registry contract
+cargo build -p guard-registry --release --target wasm32-unknown-unknown
 ```
 
 **Where the evidence is.** The README's "Built on NEAR" table links each NEAR piece to its code (`file:line`) and to a test or mainnet transaction. `docs/EVIDENCE.md` maps every claim in the README to a test, file or transaction. Design and trust model: `docs/ARCHITECTURE.md`; exact interfaces: `docs/SPEC.md`; product design: `docs/DESIGN.md`.
 
-**Layout.** `apps/web` (Next.js app), `packages/shared` (types, commitment and guard logic shared by web and poker), `services/poker` (public-data watcher), `contracts/guard-registry` (NEAR contract), `checker` (the program sealed in OutLayer's TEE).
+**Layout.** `apps/web` (Next.js app), `packages/shared` (types, commitment and guard logic shared by web and poker), `services/poker` (public-data watcher), `crates/rules` (the Rust rules shared by checker and contract), `contracts/guard-registry` (NEAR contract), `checker` (the program sealed in OutLayer's TEE).
 
 **Secrets.** None are committed. `.env.example` lists the variables; demo mode needs none of them.
