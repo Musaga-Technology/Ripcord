@@ -49,6 +49,18 @@ function saveState(s: State): void {
 
 const provider = new JsonRpcProvider({ url: RPC });
 
+/** The parts of a NEAR RPC transaction result this script reads. */
+interface Outcome {
+  id: string;
+  outcome: { gas_burnt: number | string; status?: { Failure?: unknown } };
+}
+interface TxResult {
+  transaction_outcome: Outcome;
+  receipts_outcome: Outcome[];
+}
+/** OutLayer API answers: flat JSON objects of strings. */
+type Body = Record<string, string | undefined>;
+
 function registryAccount(): Account {
   const id = readState().registry;
   if (!id) throw new Error('no registry account yet: run `account` first');
@@ -59,29 +71,35 @@ function registryAccount(): Account {
 const view = <T>(contractId: string, method: string, args: Record<string, unknown> = {}) =>
   provider.callFunction<T & object>({ contractId, method, args, finality: 'final' } as never) as Promise<T>;
 
-async function outlayer(method: 'GET' | 'POST', path: string, body?: unknown): Promise<[number, any]> {
+async function outlayer(method: 'GET' | 'POST', path: string, body?: unknown): Promise<[number, Body]> {
   const key = wallet?.api_key;
   const res = await fetch(OUTLAYER_API + path, {
     method,
     headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? null : JSON.stringify(body),
   });
   const text = await res.text();
   try {
     return [res.status, JSON.parse(text)];
   } catch {
-    return [res.status, text];
+    return [res.status, { text }];
   }
 }
 
 /** Calls the registry and reports gas; returns the error text when the transaction or a receipt failed. */
 async function call(acc: Account, methodName: string, args: object, deposit = 0n, gas = 100n * TGAS) {
   try {
-    const r: any = await acc.callFunctionRaw({ contractId: acc.accountId, methodName, args, deposit, gas });
+    const r = (await acc.callFunctionRaw({
+      contractId: acc.accountId,
+      methodName,
+      args,
+      deposit,
+      gas,
+    })) as unknown as TxResult;
     const outcomes = [r.transaction_outcome, ...r.receipts_outcome];
-    const tgas = outcomes.reduce((s: number, o: any) => s + Number(o.outcome.gas_burnt), 0) / 1e12;
-    const failure = outcomes.map((o: any) => o.outcome.status?.Failure).find(Boolean);
-    return { ok: !failure, tgas, tx: r.transaction_outcome.id as string, error: failure ? JSON.stringify(failure) : '' };
+    const tgas = outcomes.reduce((s: number, o) => s + Number(o.outcome.gas_burnt), 0) / 1e12;
+    const failure = outcomes.map((o) => o.outcome.status?.Failure).find(Boolean);
+    return { ok: !failure, tgas, tx: r.transaction_outcome.id, error: failure ? JSON.stringify(failure) : '' };
   } catch (e) {
     return { ok: false, tgas: 0, tx: '', error: String((e as Error).message ?? e).slice(0, 300) };
   }
@@ -117,8 +135,12 @@ async function createAccount(): Promise<void> {
 async function deploy(): Promise<void> {
   const acc = registryAccount();
   const code = new Uint8Array(readFileSync(WASM));
-  const r: any = await acc.deployContract(code);
-  check(`deployed ${code.length.toLocaleString()} bytes to ${acc.accountId}`, !!r.transaction_outcome, r.transaction_outcome?.id);
+  const r = (await acc.deployContract(code)) as unknown as TxResult;
+  check(
+    `deployed ${code.length.toLocaleString()} bytes to ${acc.accountId}`,
+    !!r.transaction_outcome,
+    r.transaction_outcome?.id,
+  );
   try {
     await view(acc.accountId, 'config');
     console.log('already initialised');
@@ -133,6 +155,7 @@ async function e2e(): Promise<void> {
   const registry = acc.accountId;
   const [code, w] = await outlayer('POST', '/register', {});
   check('a fresh OutLayer testnet wallet', code === 200, `${code}`);
+  if (!w.wallet_id || !w.api_key) throw new Error('OutLayer did not return a wallet');
   wallet = { wallet_id: w.wallet_id, api_key: w.api_key };
 
   // The guard wallet's policy, encrypted by OutLayer and signed by the wallet for this registry as `caller`.
@@ -144,7 +167,10 @@ async function e2e(): Promise<void> {
     },
   };
   const [c1, enc] = await outlayer('POST', '/wallet/v1/encrypt-policy', { wallet_id: wallet!.wallet_id, ...policy });
-  const [c2, sig] = await outlayer('POST', '/wallet/v1/sign-policy', { encrypted_data: enc.encrypted_base64, caller: registry });
+  const [c2, sig] = await outlayer('POST', '/wallet/v1/sign-policy', {
+    encrypted_data: enc.encrypted_base64,
+    caller: registry,
+  });
   check('policy encrypted and signed by the wallet for the registry', c1 === 200 && c2 === 200, `${c1}/${c2}`);
   const walletPubkey = `ed25519:${sig.public_key_hex}`;
 
@@ -189,7 +215,9 @@ async function e2e(): Promise<void> {
     200n * TGAS,
   );
   check(`register_guard ${guardId}`, reg.ok, reg.error || `${reg.tgas.toFixed(1)} Tgas, tx ${reg.tx}`);
-  const wp = await view<{ owner: string; frozen: boolean } | null>(OUTLAYER, 'get_wallet_policy', { wallet_pubkey: walletPubkey });
+  const wp = await view<{ owner: string; frozen: boolean } | null>(OUTLAYER, 'get_wallet_policy', {
+    wallet_pubkey: walletPubkey,
+  });
   check('the registry is the wallet policy controller on OutLayer', wp?.owner === registry, `owner ${wp?.owner}`);
   const guard = await view<{ status: string } | null>(registry, 'get_guard', { guard_id: guardId });
   check('the guard is stored as hashes, status Pending', guard?.status === 'Pending');
@@ -198,8 +226,16 @@ async function e2e(): Promise<void> {
   check('status Guarding', st.ok, st.error);
 
   await outlayer('POST', '/wallet/v1/invalidate-cache', { wallet_id: wallet!.wallet_id });
-  const [c3, t1] = await outlayer('POST', '/wallet/v1/transfer', { chain: 'near', to: 'someone-else.testnet', amount: '1000' });
-  check('an unlisted recipient is refused (T-SEC-03)', c3 === 403 && t1?.error === 'policy_denied', `${c3} ${t1?.error}`);
+  const [c3, t1] = await outlayer('POST', '/wallet/v1/transfer', {
+    chain: 'near',
+    to: 'someone-else.testnet',
+    amount: '1000',
+  });
+  check(
+    'an unlisted recipient is refused (T-SEC-03)',
+    c3 === 403 && t1?.error === 'policy_denied',
+    `${c3} ${t1?.error}`,
+  );
 
   const signed = (frozen: boolean, nonce: string) => {
     const msg = freezeMessage(guardId, nonce, frozen);
@@ -213,10 +249,18 @@ async function e2e(): Promise<void> {
   check('OutLayer shows the wallet frozen', frozen?.frozen === true);
   await outlayer('POST', '/wallet/v1/invalidate-cache', { wallet_id: wallet!.wallet_id });
   const [c4, t2] = await outlayer('POST', '/wallet/v1/transfer', { chain: 'near', to: ALLOWED, amount: '1000' });
-  check('a frozen wallet refuses even an allowed recipient (T-SEC-05)', c4 === 403 && t2?.error === 'wallet_frozen', `${c4} ${t2?.error}`);
+  check(
+    'a frozen wallet refuses even an allowed recipient (T-SEC-05)',
+    c4 === 403 && t2?.error === 'wallet_frozen',
+    `${c4} ${t2?.error}`,
+  );
 
   const replay = await call(acc, 'freeze_guard', signed(true, nonce));
-  check('the same signature again is refused (T-SEC-06)', !replay.ok && replay.error.includes('nonce already used'), replay.ok ? 'accepted' : 'nonce already used');
+  check(
+    'the same signature again is refused (T-SEC-06)',
+    !replay.ok && replay.error.includes('nonce already used'),
+    replay.ok ? 'accepted' : 'nonce already used',
+  );
 
   const un = await call(acc, 'unfreeze_guard', signed(false, bytesToHex(random(8))));
   const after = await view<{ frozen: boolean }>(OUTLAYER, 'get_wallet_policy', { wallet_pubkey: walletPubkey });

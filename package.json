@@ -12,7 +12,7 @@
     "dev": "pnpm --filter @ripcord/web dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "eslint . && prettier --check .",
+    "lint": "eslint . && prettier --check . && tsc -p scripts/tsconfig.json",
     "format": "prettier --write .",
     "vectors": "python3 scripts/vectors.py",
     "demo": "bash scripts/demo.sh",
