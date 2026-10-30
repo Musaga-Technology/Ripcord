@@ -1,15 +1,15 @@
 //! Golden vectors from scripts/vectors.py, the same files packages/shared tests against: TypeScript, Rust and
 //! Python must agree on every hash and guard decision.
-use ripcord_checker::canonical::canonical;
-use ripcord_checker::commitment::*;
-use ripcord_checker::guard::*;
-use ripcord_checker::types::{GuardSettings, Outcome, Position};
+use ripcord_rules::canonical::canonical;
+use ripcord_rules::commitment::*;
+use ripcord_rules::guard::*;
+use ripcord_rules::types::{GuardSettings, Outcome, Position};
 use serde_json::Value;
 
 fn load(name: &str) -> Value {
     let text = match name {
-        "commitment" => include_str!("../../packages/shared/vectors/commitment.json"),
-        _ => include_str!("../../packages/shared/vectors/guard.json"),
+        "commitment" => include_str!("../../../packages/shared/vectors/commitment.json"),
+        _ => include_str!("../../../packages/shared/vectors/guard.json"),
     };
     serde_json::from_str(text).expect("vectors parse")
 }

@@ -1,0 +1,6 @@
+# Stable for tests and the NEAR contract (near-sdk 5.29 needs rustc 1.95+). The checker's OutLayer build
+# (Day 3) adds wasm32-wasip2 and follows OutLayer's compiler notes.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

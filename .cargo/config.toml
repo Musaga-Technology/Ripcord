@@ -1,0 +1,3 @@
+# NEAR runtimes accept the MVP wasm feature set only; strip symbols to keep the contract small.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-s", "-C", "target-cpu=mvp"]

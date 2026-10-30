@@ -1,6 +1,3 @@
-//! Ripcord's checker. Day 1: the shared rules (canonical JSON, commitments, guard decisions) that must agree
-//! byte for byte with `packages/shared` and `scripts/vectors.py`; the OutLayer binary comes on Day 3.
-pub mod canonical;
-pub mod commitment;
-pub mod guard;
-pub mod types;
+//! Ripcord's checker. The shared rules live in `crates/rules`; the OutLayer binary (create, check, close)
+//! comes on Day 3.
+pub use ripcord_rules::{canonical, commitment, guard, types};
