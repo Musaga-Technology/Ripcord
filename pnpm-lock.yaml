@@ -194,6 +194,12 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
 
+  services/poker:
+    dependencies:
+      '@ripcord/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
 packages:
 
   '@cacheable/memory@2.2.0':
