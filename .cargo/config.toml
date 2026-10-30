@@ -1,3 +1,4 @@
-# NEAR runtimes accept the MVP wasm feature set only; strip symbols to keep the contract small.
+# NEAR contracts: `--cfg near` makes near-sdk call the host (panic messages, hashing, logs) instead of its local
+# fallbacks, as cargo-near does; NEAR runtimes accept the MVP wasm feature set only; strip symbols to keep it small.
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "link-arg=-s", "-C", "target-cpu=mvp"]
+rustflags = ["--cfg", "near", "-C", "link-arg=-s", "-C", "target-cpu=mvp"]
