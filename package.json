@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "vectors": "python3 scripts/vectors.py",
     "demo": "bash scripts/demo.sh",
-    "testnet:registry": "tsx scripts/testnet/registry.ts"
+    "testnet:registry": "tsx scripts/testnet/registry.ts",
+    "testnet:checker": "tsx scripts/testnet/checker.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
