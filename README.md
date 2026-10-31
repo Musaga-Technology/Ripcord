@@ -138,11 +138,10 @@ docs                     Architecture and trust model, interfaces (SPEC), design
 Libraries and tools, as the hackathon rules ask (Q-005). All code in this repository is written for Ripcord from Oct 30; nothing is copied from earlier projects.
 
 - TypeScript 6, pnpm 12, Node 22; Next.js 16, React 19, Tailwind CSS 4 (web)
-- `@noble/hashes` (SHA-256 in the browser and Node)
-- Rust: `serde`, `serde_json`, `sha2`, `hex` (checker)
-- vitest, ESLint, Prettier; Python 3 standard library for the reference implementation (`scripts/vectors.py`)
+- `@noble/hashes`, `@noble/curves`, `@noble/ciphers` (SHA-256, X25519, ChaCha20-Poly1305 in the browser and Node); `near-api-js` (testnet script and reference transactions)
+- Rust: `serde`, `serde_json`, `sha2`, `hex`, `base64`; `x25519-dalek`, `hkdf`, `chacha20poly1305` (sealing); `near-sdk` (registry contract); `wit-bindgen`, `wasi-http-client`, `wasi` (checker on OutLayer)
+- vitest, ESLint, Prettier, tsx; Python 3 standard library for the reference implementation (`scripts/vectors.py`)
 - Fonts: Instrument Sans, JetBrains Mono (Google Fonts)
-- Built with AI assistance (Claude Code), which the rules allow (Q-005)
 
 ## License
 
