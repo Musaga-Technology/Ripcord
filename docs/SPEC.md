@@ -107,8 +107,8 @@ No `approval` block. The fee wallet's recipient format for `/confidential/transf
 
 | Endpoint | Does |
 |---|---|
-| `POST /v1/watch {guard_id, hl_address, account_salt, nonce, sig}` | registers an address; checks `sha256(lowercase(hl_address) ‖ account_salt)` against the registry's `account_commitment`; stored encrypted at rest |
-| `DELETE /v1/watch/{guard_id}` (signed) | stops watching (also on `guard_closed`) |
+| `PUT /v1/watch/{guard_id} {hl_address, account_salt}` | registers an address; `sha256(lowercase(hl_address) ‖ account_salt)` must equal the registry's `account_commitment`, and only the owner's device holds the salt, so that is the proof (no separate signature); stored AES-256-GCM-encrypted at rest |
+| `DELETE /v1/watch/{guard_id} {hl_address, account_salt}` | stops watching, with the same proof (also on `guard_closed`) |
 | `GET /v1/health/{guard_id}` | `{last_check_at, checks_24h}`, no address. The app shows "Guard paused" when `last_check_at` is older than 2× the heartbeat |
 
 Checker call: `POST https://api.outlayer.ai/call/<owner>/<project>` with `X-Payment-Key`, body `{action: "check", guard_id}`, 30 s timeout; duplicates are harmless. Two pokers on different providers, each independent. Payment key monitor: `GET /public/payment-keys/<owner>/<nonce>/balance`, alert under 7 days of runway. `claim_check_fee` with a function-call key. Logs: guard id, status, timing; never an address.

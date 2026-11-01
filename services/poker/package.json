@@ -6,7 +6,8 @@
   "description": "Watches public Hyperliquid state and wakes the sealed checker for guards near liquidation",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/main.ts"
   },
   "dependencies": {
     "@ripcord/shared": "workspace:*"
