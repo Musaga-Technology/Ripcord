@@ -6,7 +6,7 @@
 // here so nothing outside this repository runs. Keys stay outside the repository and are never printed: the ops
 // account's key in ~/.near-credentials/testnet/<account>.json, the payment key in ~/.ripcord/paykey-testnet.
 //
-// usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create
+// usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create | check
 // (`bash checker/build.sh` first for deploy)
 import { createCipheriv, createHash, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync } from 'node:crypto';
 import { randomBytes } from 'node:crypto';
@@ -47,6 +47,7 @@ interface State {
   wasm_url?: string;
   wasm_hash?: string;
   mainnet_uploader?: string;
+  last_guard?: string;
   checker_account?: string;
   enc_pk?: string;
 }
@@ -361,6 +362,7 @@ async function create(): Promise<void> {
   };
   const out = await callChecker(input);
   check(`created ${guardId} through the enclave`, out.status === 'pending', JSON.stringify(out));
+  if (out.status === 'pending') saveState({ last_guard: guardId });
   const text = JSON.stringify(out).toLowerCase();
   check(
     'the output carries no setting',
@@ -442,12 +444,41 @@ async function mainnetHost(): Promise<void> {
   await setVersion(url, hash);
 }
 
+/** The enclave reads Hyperliquid itself; this guard's account holds nothing, so it arms and guards. */
+async function checkStage(): Promise<void> {
+  const s = readState();
+  if (!s.last_guard || !s.registry) throw new Error('run `create` first');
+  const out = await callChecker({ action: 'check', guard_id: s.last_guard });
+  check(`checked ${s.last_guard} inside the enclave`, out.status === 'guarding', JSON.stringify(out));
+  check('the output is a bare status', Object.keys(out).join() === 'status');
+  const g = await view<{ status: string; arm_count: number } | null>(s.registry, 'get_guard', {
+    guard_id: s.last_guard,
+  });
+  check(
+    'the enclave armed it and set it guarding on the registry',
+    g?.status === 'Guarding' && g.arm_count >= 1,
+    JSON.stringify({ status: g?.status, arm_count: g?.arm_count }),
+  );
+  const again = await callChecker({ action: 'check', guard_id: s.last_guard });
+  const g2 = await view<{ arm_count: number } | null>(s.registry, 'get_guard', { guard_id: s.last_guard });
+  check('a second check keeps the same draw', again.status === 'guarding' && g2?.arm_count === g?.arm_count);
+}
+
 const stage = process.argv[2];
-const run = { account: createAccount, deploy, 'mainnet-host': mainnetHost, paykey, pubkey, wire, create }[
-  stage as 'create'
-];
+const run = {
+  account: createAccount,
+  deploy,
+  'mainnet-host': mainnetHost,
+  paykey,
+  pubkey,
+  wire,
+  create,
+  check: checkStage,
+}[stage as 'create'];
 if (!run) {
-  console.log('usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create');
+  console.log(
+    'usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create | check',
+  );
   process.exit(2);
 }
 await run();
