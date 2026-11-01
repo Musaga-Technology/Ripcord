@@ -35,8 +35,17 @@ else
   skip "cargo not found; install Rust from https://rustup.rs to run the Rust and contract tests"
 fi
 
+step "The sealed checker, as it runs in OutLayer's TEE (docs/SPEC.md §3), against a mock host"
+if command -v cargo >/dev/null; then
+  run cargo test --quiet -p ripcord-checker --test create && ok "settings open only inside the enclave, for their guard, matching all three public hashes; the guard's own wallet is opened and registered with a transaction of hashes only"
+  run cargo test --quiet -p ripcord-checker --test check && ok "arms with a draw sealed to the owner, fires only below the line, pays only the owner within the caps, cooldown, budget, 503 pauses, bare status"
+  run cargo test --quiet -p ripcord-checker --test near_tx && ok "signs its own NEAR transactions, byte for byte with near-api-js"
+else
+  skip "cargo not found; the checker's tests need Rust"
+fi
+
 step "Pokers decide when to wake the checker (docs/SPEC.md §4)"
-run $PNPM --filter @ripcord/poker test && ok "band, drop, burst, heartbeat, settlement and after-rescue rules"
+run $PNPM --filter @ripcord/poker test && ok "band, cadence, rate limit, settlement watch; an address is watched only with the owner's salt; encrypted at rest"
 
 step "A rescue is never paid twice (T-SEC-09, proven by packages/shared/test/executor.test.ts above)"
 ok "502 retried with the same key · 503 pauses with no public fallback · busy waits · refund re-fires · slow credit waits"
