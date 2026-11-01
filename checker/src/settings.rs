@@ -6,6 +6,12 @@ fn is_address(s: &str) -> bool {
     s.len() == 42 && s.starts_with("0x") && s[2..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// The owner's X25519 key for sealed receipts and draws: `x25519:` + 64 hex characters.
+pub fn receipt_key(s: &GuardSettings) -> Option<[u8; 32]> {
+    let h = s.receipt_pk.strip_prefix("x25519:")?;
+    hex::decode(h).ok()?.try_into().ok()
+}
+
 pub fn validate(s: &GuardSettings, now_ms: u64) -> Result<(), &'static str> {
     let [lo, hi] = s.line_range_pct;
     let [tlo, thi] = s.target_range_pct;
@@ -23,6 +29,9 @@ pub fn validate(s: &GuardSettings, now_ms: u64) -> Result<(), &'static str> {
     }
     if s.cooldown_s < 30 {
         return Err("cooldown must be at least 30 s");
+    }
+    if receipt_key(s).is_none() {
+        return Err("receipt_pk must be x25519: and 32 bytes of hex");
     }
     if s.reserve_asset.is_empty() || !s.reserve_asset.contains(':') {
         return Err("reserve_asset must be a 1Click asset id");

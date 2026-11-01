@@ -33,7 +33,7 @@ fn settings() -> GuardSettings {
         cooldown_s: 60,
         isolated: None,
         close_hint: None,
-        receipt_pk: "x25519:5e5e".into(),
+        receipt_pk: format!("x25519:{}", "5e".repeat(32)),
         expires_at: "1795046400000000000".into(),
     }
 }
@@ -152,6 +152,10 @@ fn refuses_unsafe_settings() {
             "max rescue must be at least $5 and within the budget",
         ),
         (|s| s.cooldown_s = 5, "cooldown must be at least 30 s"),
+        (
+            |s| s.receipt_pk = "x25519:5e5e".into(),
+            "receipt_pk must be x25519: and 32 bytes of hex",
+        ),
     ];
     for (change, why) in cases {
         let mut s = settings();
@@ -179,7 +183,7 @@ fn outputs_never_carry_a_setting() {
             "nbtc",
             SALT,
             OWNER_SALT,
-            "5e5e",
+            "5e5e5e5e5e5e",
         ] {
             assert!(!text.contains(secret), "{text} leaks {secret}");
         }
@@ -292,7 +296,7 @@ fn the_registry_transaction_carries_hashes_only() {
     assert_eq!(args["commitment"], commitment(&settings(), SALT).unwrap());
     // The keys above already rule out amounts; these are the values that could slip into a hash's place.
     let text = tx.to_lowercase();
-    for secret in [&HL[2..].to_lowercase(), SALT, OWNER_SALT, "9c4e7a1b", "5e5e"] {
+    for secret in [&HL[2..].to_lowercase(), SALT, OWNER_SALT, "9c4e7a1b", "5e5e5e5e5e5e"] {
         assert!(!text.contains(secret), "transaction leaks {secret}");
     }
 }
