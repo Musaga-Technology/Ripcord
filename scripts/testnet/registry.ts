@@ -150,8 +150,22 @@ async function deploy(): Promise<void> {
   }
 }
 
+/** The registry's checker is the enclave's account once `testnet:checker wire` ran: borrow the role, then give it back. */
 async function e2e(): Promise<void> {
   const acc = registryAccount();
+  const { checker } = await view<{ checker: string }>(acc.accountId, 'config');
+  if (checker !== acc.accountId) await call(acc, 'set_checker', { checker: acc.accountId });
+  try {
+    await e2eSteps(acc);
+  } finally {
+    if (checker !== acc.accountId) {
+      const back = await call(acc, 'set_checker', { checker });
+      check('checker role handed back to the enclave account', back.ok, back.error);
+    }
+  }
+}
+
+async function e2eSteps(acc: Account): Promise<void> {
   const registry = acc.accountId;
   const [code, w] = await outlayer('POST', '/register', {});
   check('a fresh OutLayer testnet wallet', code === 200, `${code}`);
