@@ -3,11 +3,10 @@
 use crate::config::{NET, REGISTER_DEPOSIT, REGISTER_GAS};
 use crate::custody::Custody;
 use crate::host::Host;
-use crate::near_tx::{self, FunctionCall};
-use crate::{oneclick, policy, settings, vault};
+use crate::{check, oneclick, policy, registry, settings, vault};
 use ripcord_rules::commitment::{account_commitment, commitment, is_guard_id, owner_commitment};
 use ripcord_rules::seal;
-use ripcord_rules::types::GuardSettings;
+use ripcord_rules::types::{CheckStatus, GuardSettings};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -20,6 +19,7 @@ pub enum Input {
     Pubkey,
     Create(CreateInput),
     Fund(FundInput),
+    Check { guard_id: String },
 }
 
 #[derive(Deserialize)]
@@ -69,6 +69,10 @@ pub fn run(host: &dyn Host, input: &str) -> Value {
         Ok(Input::Pubkey) => pubkey(host).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Create(c)) => create(host, &c).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Fund(f)) => fund(host, &f).unwrap_or_else(|e| refuse(&e)),
+        // A check answers with its status alone, even when it fails (rule 4).
+        Ok(Input::Check { guard_id }) => {
+            json!({ "status": check::check(host, &guard_id).unwrap_or(CheckStatus::Skipped) })
+        }
     }
 }
 
@@ -127,13 +131,7 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
 /// The guard's wallet (seed = guard id), its policy encrypted by OutLayer and signed by the wallet for the
 /// registry, and `register_guard` signed by the checker's own key. Returns the transaction hash.
 fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<String, String> {
-    let on_chain = near_tx::view(
-        host,
-        NET.rpc,
-        NET.registry,
-        "get_guard",
-        &json!({ "guard_id": c.guard_id }),
-    )?;
+    let on_chain = registry::view(host, "get_guard", &json!({ "guard_id": c.guard_id }))?;
     if !on_chain.is_null() {
         return Ok("already registered".into());
     }
@@ -157,27 +155,8 @@ fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<Strin
         "wallet_pubkey": format!("ed25519:{wallet_pk}"),
         "encrypted_policy": encrypted,
         "wallet_signature": signature,
-    })
-    .to_string();
-    let pk = host.public_key(CHECKER_KEY)?;
-    let account = hex::encode(pk);
-    let (nonce, block_hash) = near_tx::access_key(host, NET.rpc, &account, &pk)?;
-    near_tx::send(
-        host,
-        NET.rpc,
-        CHECKER_KEY,
-        &FunctionCall {
-            signer_id: &account,
-            public_key: pk,
-            nonce,
-            receiver_id: NET.registry,
-            block_hash,
-            method: "register_guard",
-            args: args.as_bytes(),
-            gas: REGISTER_GAS,
-            deposit: REGISTER_DEPOSIT,
-        },
-    )
+    });
+    registry::call(host, "register_guard", &args, REGISTER_GAS, REGISTER_DEPOSIT)
 }
 
 /// A one-time address on the owner's chain that funds the guard's confidential reserve with its budget. Only for

@@ -138,3 +138,38 @@ impl<'a> Custody<'a> {
             .ok_or_else(|| "deposit: no address".into())
     }
 }
+
+/// What OutLayer answered a rescue withdraw.
+#[derive(Debug, PartialEq)]
+pub enum Withdraw {
+    /// Taken (or already taken under this key): the request to poll.
+    Accepted(String),
+    /// 502: an upstream hiccup; the same key is safe to send again.
+    Retry,
+    /// 503: confidential intents are off on this deployment (OutLayer's testnet); never fall back to public.
+    Unavailable,
+}
+
+impl Custody<'_> {
+    /// Confidential balance → `to` on Hyperliquid, as USDC credited to the account. `key` makes a retry harmless.
+    pub fn withdraw(&self, seed: &str, to: &str, amount: &str, token: &str, key: &str) -> Result<Withdraw, String> {
+        let t = self.token(seed)?;
+        let body = json!({ "chain": "hypercore", "to": to, "amount": amount, "token": token });
+        let (code, v) = self.request(
+            "POST",
+            "/wallet/v1/confidential/withdraw",
+            Some(&t),
+            Some(&body),
+            Some(key),
+        )?;
+        match code {
+            200..=299 => v["request_id"]
+                .as_str()
+                .map(|r| Withdraw::Accepted(r.into()))
+                .ok_or_else(|| "withdraw: no request_id".into()),
+            502 => Ok(Withdraw::Retry),
+            503 => Ok(Withdraw::Unavailable),
+            _ => Err(format!("withdraw: HTTP {code}")),
+        }
+    }
+}

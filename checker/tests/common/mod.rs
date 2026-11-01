@@ -1,5 +1,5 @@
-//! A fake network for the checker's tests: OutLayer's custody API, NEAR RPC (view, access key, send_tx) and
-//! 1Click's token list, answering the shapes the checker reads. Every request body is kept for assertions.
+//! A fake network for the checker's tests: OutLayer's custody API, NEAR RPC (view, access key, send_tx), 1Click's
+//! token list and Hyperliquid's `clearinghouseState`, answering the shapes the checker reads. Every request body is kept for assertions.
 #![allow(dead_code)]
 use base64::Engine;
 use ripcord_checker::config::NET;
@@ -18,6 +18,27 @@ pub struct Net {
     pub txs: Vec<Vec<u8>>,
     /// Answer `send_tx` with a receipt failure.
     pub fail_tx: bool,
+    /// Registry methods called, in order (`register_guard`, `record_arm`, `set_status`).
+    pub methods: Vec<String>,
+    /// What Hyperliquid answers for `clearinghouseState`.
+    pub hl_state: Value,
+    /// The HTTP status OutLayer answers a withdraw with (0 means 200).
+    pub withdraw_code: u16,
+    /// Bodies of accepted withdraws.
+    pub withdraws: Vec<Value>,
+}
+
+/// One position as Hyperliquid's `clearinghouseState` lists it (numbers as strings).
+pub fn position(coin: &str, szi: f64, mark: f64, liq: Option<f64>, max_lev: u32, kind: &str) -> Value {
+    json!({ "type": "oneWay", "position": {
+        "coin": coin, "szi": szi.to_string(), "leverage": { "type": kind, "value": 5 },
+        "positionValue": (szi.abs() * mark).to_string(), "liquidationPx": liq.map(|l| l.to_string()),
+        "maxLeverage": max_lev, "marginUsed": "0", "entryPx": mark.to_string(),
+    } })
+}
+
+pub fn state(positions: Vec<Value>) -> Value {
+    json!({ "assetPositions": positions, "marginSummary": {}, "crossMarginSummary": {}, "withdrawable": "0", "time": 0 })
 }
 
 pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
@@ -63,18 +84,29 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                     let text = String::from_utf8_lossy(&tx).into_owned();
                     let mut net = n.borrow_mut();
                     net.txs.push(tx);
+                    let method = ["register_guard", "record_arm", "set_status"]
+                        .into_iter()
+                        .find(|m| text.contains(m))
+                        .unwrap_or("?");
                     if net.fail_tx {
                         json!({ "transaction_outcome": { "outcome": { "status": { "SuccessReceiptId": "x" } } },
                                 "receipts_outcome": [{ "outcome": { "status": { "Failure": { "ActionError": "guard_id already registered" } } } }] })
                     } else {
+                        net.methods.push(method.to_string());
                         let gid = text.split("\"guard_id\":\"").nth(1).unwrap().split('"').next().unwrap();
-                        net.registered.push(gid.to_string());
+                        if method == "register_guard" {
+                            net.registered.push(gid.to_string());
+                        }
                         json!({ "transaction_outcome": { "outcome": { "status": { "SuccessReceiptId": "x" } } }, "receipts_outcome": [] })
                     }
                 }
                 _ => return (400, b"{}".to_vec()),
             };
             return ok(json!({ "jsonrpc": "2.0", "id": "ripcord", "result": result }));
+        }
+        if url == format!("{}/info", NET.hyperliquid) {
+            let st = n.borrow().hl_state.clone();
+            return ok(if st.is_null() { state(vec![]) } else { st });
         }
         if url.starts_with(NET.oneclick) && path == "v0/tokens" {
             return ok(json!([
@@ -95,6 +127,17 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                 }
                 "wallet/v1/confidential/deposit/cross-chain" => {
                     ok(json!({ "intent_id": "i-1", "deposit_address": "0xDEP0517", "amount": req["amount"] }))
+                }
+                "wallet/v1/confidential/withdraw" => {
+                    let mut net = n.borrow_mut();
+                    match net.withdraw_code {
+                        0 | 200 => {
+                            net.withdraws.push(req);
+                            let id = format!("req-{}", net.withdraws.len());
+                            ok(json!({ "request_id": id, "status": "pending_deposit" }))
+                        }
+                        code => (code, b"{}".to_vec()),
+                    }
                 }
                 _ => (404, b"{}".to_vec()),
             };
