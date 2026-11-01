@@ -6,7 +6,7 @@
 // here so nothing outside this repository runs. Keys stay outside the repository and are never printed: the ops
 // account's key in ~/.near-credentials/testnet/<account>.json, the payment key in ~/.ripcord/paykey-testnet.
 //
-// usage: corepack pnpm testnet:checker account | deploy | paykey | pubkey | wire | create
+// usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create
 // (`bash checker/build.sh` first for deploy)
 import { createCipheriv, createHash, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync } from 'node:crypto';
 import { randomBytes } from 'node:crypto';
@@ -27,11 +27,14 @@ const RPC = 'https://rpc.testnet.near.org';
 const OUTLAYER = 'outlayer.testnet';
 const OUTLAYER_API = 'https://testnet-api.outlayer.ai';
 const FASTFS = 'https://test.fastfs.io';
+const MAINNET_FASTFS = 'https://main.fastfs.io';
+const MAINNET_RPC = 'https://rpc.mainnet.near.org';
 const PROJECT = 'checker';
 const WASM = 'target/outlayer/wasm32-wasip2/release/ripcord-checker.wasm';
 const USDC_TEST = 'usdc.fakes.testnet';
 const USDC = 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
 const CREDS = join(homedir(), '.near-credentials', 'testnet');
+const MAINNET_CREDS = join(homedir(), '.near-credentials', 'mainnet');
 const DIR = join(homedir(), '.ripcord');
 const STATE = join(DIR, 'testnet.json');
 const PAYKEY = join(DIR, 'paykey-testnet');
@@ -43,6 +46,7 @@ interface State {
   ops?: string;
   wasm_url?: string;
   wasm_hash?: string;
+  mainnet_uploader?: string;
   checker_account?: string;
   enc_pk?: string;
 }
@@ -184,23 +188,35 @@ async function deploy(): Promise<void> {
       up.tx || up.error,
     );
   }
-  let served = false;
-  for (let i = 0; i < 20 && !served; i++) {
-    const r = await fetch(url);
-    served =
-      r.ok &&
-      createHash('sha256')
-        .update(new Uint8Array(await r.arrayBuffer()))
-        .digest('hex') === hash;
-    if (!served) await new Promise((ok) => setTimeout(ok, 3000));
-  }
   // The worker downloads and hash-checks the file at run time, so a slow FastFS indexer only delays the first call.
-  if (served) check('FastFS serves the same bytes', true, url);
+  if (await serves(url, hash)) check('FastFS serves the same bytes', true, url);
   else console.log(`… FastFS is not serving it yet (${url}); the project is created anyway`);
   saveState({ wasm_url: url, wasm_hash: hash });
+  await setVersion(url, hash);
+}
 
+async function serves(url: string, hash: string): Promise<boolean> {
+  for (let i = 0; i < 20; i++) {
+    const r = await fetch(url).catch(() => null);
+    if (
+      r?.ok &&
+      createHash('sha256')
+        .update(new Uint8Array(await r.arrayBuffer()))
+        .digest('hex') === hash
+    )
+      return true;
+    await new Promise((ok) => setTimeout(ok, 3000));
+  }
+  return false;
+}
+
+/** Creates the project, or adds and activates a version: the wasm at `url`, pinned to its sha256. */
+async function setVersion(url: string, hash: string): Promise<void> {
+  const acc = ops();
   const source = { WasmUrl: { url, hash, build_target: 'wasm32-wasip2' } };
-  const existing = await view<object | null>(OUTLAYER, 'get_project', { project_id: `${acc.accountId}/${PROJECT}` });
+  const existing = await view<{ active_version: string } | null>(OUTLAYER, 'get_project', {
+    project_id: `${acc.accountId}/${PROJECT}`,
+  });
   const r = existing
     ? await send(acc, OUTLAYER, 'add_version', { project_name: PROJECT, source, set_active: true }, NEAR / 10n)
     : await send(acc, OUTLAYER, 'create_project', { name: PROJECT, source }, NEAR / 10n);
@@ -209,6 +225,12 @@ async function deploy(): Promise<void> {
     r.ok,
     r.tx || r.error,
   );
+  // Every published version stays callable by its key, so the one replaced goes.
+  const old = existing?.active_version;
+  if (r.ok && old && old !== hash) {
+    const rm = await send(acc, OUTLAYER, 'remove_version', { project_name: PROJECT, version_key: old }, 0n, 30n * TGAS);
+    check(`removed the previous version ${old.slice(0, 12)}…`, rm.ok, rm.tx || rm.error);
+  }
 }
 
 /** OutLayer's keystore ECIES v1: X25519 + HKDF-SHA256 (no salt, "outlayer-keystore-v1") + ChaCha20-Poly1305. */
@@ -344,11 +366,21 @@ async function create(): Promise<void> {
     'the output carries no setting',
     ![settings.hl_address.slice(2), salt, ownerSalt, '1500', '4000'].some((x) => text.includes(x)),
   );
-  const guard = await view<{ status: string } | null>(s.registry, 'get_guard', { guard_id: guardId });
+  const guard = await view<{ status: string; wallet_pubkey: string } | null>(s.registry, 'get_guard', {
+    guard_id: guardId,
+  });
   check(
     'the registry holds the guard, registered by the enclave account',
     guard?.status === 'Pending',
     JSON.stringify(guard),
+  );
+  const policy = guard
+    ? await view<{ owner: string } | null>(OUTLAYER, 'get_wallet_policy', { wallet_pubkey: guard.wallet_pubkey })
+    : null;
+  check(
+    "the guard's own wallet has the registry as its policy controller",
+    policy?.owner === s.registry,
+    policy?.owner,
   );
   const again = await callChecker(input);
   check('a retry is harmless', again.status === 'pending', JSON.stringify(again));
@@ -360,10 +392,62 @@ async function create(): Promise<void> {
   );
 }
 
+/**
+ * The same wasm on mainnet FastFS, for when the testnet host is down (it was, Oct 31 – Nov 1): any HTTPS URL works,
+ * since the version pins the sha256. Uploaded by a fresh implicit mainnet account that holds a few cents of NEAR and
+ * nothing else; its key stays in ~/.near-credentials/mainnet. One upload costs about 0.001 NEAR.
+ */
+async function mainnetHost(): Promise<void> {
+  let id = readState().mainnet_uploader;
+  if (!id) {
+    const kp = KeyPair.fromRandom('ed25519');
+    id = hex(kp.getPublicKey().data);
+    mkdirSync(MAINNET_CREDS, { recursive: true });
+    writeFileSync(
+      join(MAINNET_CREDS, `${id}.json`),
+      JSON.stringify({ account_id: id, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }),
+      { mode: 0o600 },
+    );
+    saveState({ mainnet_uploader: id });
+  }
+  const mainnet = new JsonRpcProvider({ url: MAINNET_RPC });
+  const funded = await mainnet.viewAccount({ accountId: id } as never).catch(() => null);
+  if (!funded) {
+    console.log(`Send 0.05 NEAR on mainnet to this implicit account, then run this stage again:\n  ${id}`);
+    process.exit(1);
+  }
+  const creds = JSON.parse(readFileSync(join(MAINNET_CREDS, `${id}.json`), 'utf8'));
+  const uploader = new Account(id, mainnet, creds.private_key as KeyPairString);
+  const wasm = new Uint8Array(readFileSync(WASM));
+  const hash = createHash('sha256').update(wasm).digest('hex');
+  const url = `${MAINNET_FASTFS}/${id}/outlayer.near/${hash}.wasm`;
+  if (!(await serves(url, hash))) {
+    const up = await send(
+      uploader,
+      'outlayer.near',
+      '__fastdata_fastfs',
+      fastfsSimple(`${hash}.wasm`, 'application/wasm', wasm),
+      0n,
+      1n,
+    );
+    check(
+      `uploaded ${wasm.length.toLocaleString()} bytes to mainnet FastFS (the call reverts by design)`,
+      !!up.tx,
+      up.tx || up.error,
+    );
+    if (!(await serves(url, hash))) return check('mainnet FastFS serves the same bytes', false, url);
+  }
+  check('mainnet FastFS serves the same bytes', true, url);
+  saveState({ wasm_url: url, wasm_hash: hash });
+  await setVersion(url, hash);
+}
+
 const stage = process.argv[2];
-const run = { account: createAccount, deploy, paykey, pubkey, wire, create }[stage as 'create'];
+const run = { account: createAccount, deploy, 'mainnet-host': mainnetHost, paykey, pubkey, wire, create }[
+  stage as 'create'
+];
 if (!run) {
-  console.log('usage: corepack pnpm testnet:checker account | deploy | paykey | pubkey | wire | create');
+  console.log('usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create');
   process.exit(2);
 }
 await run();
