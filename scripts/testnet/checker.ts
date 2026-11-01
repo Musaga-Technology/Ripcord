@@ -326,13 +326,12 @@ async function wire(): Promise<void> {
   check('registry config names the enclave account', cfg.checker === s.checker_account);
 }
 
-async function create(): Promise<void> {
-  const s = readState();
-  if (!s.enc_pk || !s.registry) throw new Error('run `pubkey` and `wire` first');
+/** A guard's settings for `hl`, sealed to the enclave the way the browser does, and the create call around them. */
+function guardInput(encPk: string, hl: string) {
   const owner = KeyPair.fromRandom('ed25519').getPublicKey().toString();
   const settings: GuardSettings = {
     owner,
-    hl_address: '0x' + hex(random(20)),
+    hl_address: hl,
     account_salt: hex(random(32)),
     preset: 'balanced',
     line_range_pct: [5, 8],
@@ -358,8 +357,15 @@ async function create(): Promise<void> {
     owner_commitment: ownerCommitment(owner, ownerSalt),
     account_commitment: accountCommitment(settings.hl_address, settings.account_salt),
     expires_at: settings.expires_at,
-    enc_settings: hex(seal(Buffer.from(s.enc_pk, 'hex'), payload, guardId, random)),
+    enc_settings: hex(seal(Buffer.from(encPk, 'hex'), payload, guardId, random)),
   };
+  return { guardId, settings, salt, ownerSalt, input };
+}
+
+async function create(): Promise<void> {
+  const s = readState();
+  if (!s.enc_pk || !s.registry) throw new Error('run `pubkey` and `wire` first');
+  const { guardId, settings, salt, ownerSalt, input } = guardInput(s.enc_pk, '0x' + hex(random(20)));
   const out = await callChecker(input);
   check(`created ${guardId} through the enclave`, out.status === 'pending', JSON.stringify(out));
   if (out.status === 'pending') saveState({ last_guard: guardId });
@@ -464,6 +470,70 @@ async function checkStage(): Promise<void> {
   check('a second check keeps the same draw', again.status === 'guarding' && g2?.arm_count === g?.arm_count);
 }
 
+/**
+ * A real poker against the live registry and enclave: a guard for our own Hyperliquid test wallet
+ * (TEST_WALLET_ADDRESS in .env), registered with the poker by its address and salt; the poker's first pass calls the
+ * enclave, which reads Hyperliquid itself.
+ */
+async function pokerStage(): Promise<void> {
+  const s = readState();
+  if (!s.enc_pk || !s.registry || !s.ops) throw new Error('run `pubkey` and `wire` first');
+  const env = readFileSync('.env', 'utf8');
+  const hl = /^TEST_WALLET_ADDRESS=(0x[0-9a-fA-F]{40})\s*$/m.exec(env)?.[1];
+  if (!hl) throw new Error('TEST_WALLET_ADDRESS is not set in .env');
+  const g = guardInput(s.enc_pk, hl);
+  const created = await callChecker(g.input);
+  check(`created ${g.guardId} for our own test wallet`, created.status === 'pending', JSON.stringify(created));
+
+  const { Watcher } = await import('../../services/poker/src/watch');
+  const { Store } = await import('../../services/poker/src/store');
+  const { server } = await import('../../services/poker/src/server');
+  const { hyperliquid } = await import('../../services/poker/src/hl');
+  const { checker, registry } = await import('../../services/poker/src/clients');
+  const statuses: string[] = [];
+  const toChecker = checker({
+    api: OUTLAYER_API,
+    project: `${s.ops}/${PROJECT}`,
+    paymentKey: readFileSync(PAYKEY, 'utf8').trim(),
+  });
+  const watcher = new Watcher(hyperliquid(), async (id) => {
+    const st = await toChecker(id);
+    statuses.push(st);
+    return st;
+  });
+  const store = new Store(join(DIR, 'poker-testnet.json'), hex(random(32)));
+  const srv = server(watcher, store, registry(RPC, s.registry));
+  await new Promise<void>((ok) => srv.listen(0, ok));
+  const base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+  try {
+    const put = (salt: string) =>
+      fetch(`${base}/v1/watch/${g.guardId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ hl_address: hl, account_salt: salt }),
+      });
+    check('the poker refuses a salt that does not match the registry', (await put(hex(random(32)))).status === 403);
+    check(
+      "and watches with the owner's salt (matched against the live registry)",
+      (await put(g.settings.account_salt)).status === 200,
+    );
+    const calls = await watcher.tick(Date.now());
+    check(
+      'its first pass calls the enclave',
+      calls.length === 1,
+      JSON.stringify(calls.map((c) => [c.reason, c.status, c.ms])),
+    );
+    check('which read Hyperliquid and answered guarding', statuses[0] === 'guarding', statuses[0]);
+    const h = (await (await fetch(`${base}/v1/health/${g.guardId}`)).json()) as Record<string, unknown>;
+    check(
+      'health shows the check, and no address',
+      h.checks_24h === 1 && !JSON.stringify(h).includes('0x'),
+      JSON.stringify(h),
+    );
+  } finally {
+    srv.close();
+  }
+}
+
 const stage = process.argv[2];
 const run = {
   account: createAccount,
@@ -474,10 +544,11 @@ const run = {
   wire,
   create,
   check: checkStage,
+  poker: pokerStage,
 }[stage as 'create'];
 if (!run) {
   console.log(
-    'usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create | check',
+    'usage: corepack pnpm testnet:checker account | deploy | mainnet-host | paykey | pubkey | wire | create | check | poker',
   );
   process.exit(2);
 }
