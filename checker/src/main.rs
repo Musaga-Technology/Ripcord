@@ -81,7 +81,7 @@ impl Host for OutLayer {
             _ => return Err(format!("unsupported method {method}")),
         };
         rb = rb
-            .header("User-Agent", "ripcord-checker/0.1")
+            .header("User-Agent", concat!("ripcord-checker/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(5));
         for (k, v) in headers {
             rb = rb.header(*k, v.clone());

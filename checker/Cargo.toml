@@ -1,6 +1,6 @@
 [package]
 name = "ripcord-checker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Ripcord's guard checker: sealed settings, Hyperliquid reads and rescues, run in OutLayer's TEE"
 edition.workspace = true
 license.workspace = true
