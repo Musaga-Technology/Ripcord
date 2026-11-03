@@ -50,6 +50,12 @@ pub const MAX_REFIRES: u32 = 2;
 /// The $1 monthly guard fee, in USDC units.
 pub const MONTHLY_FEE_UNITS: u128 = 1_000_000;
 
+/// The hourly dry-run canary: on OutLayer's testnet confidential intents always answer 503, so there a canary
+/// could only ever report the guard paused.
+pub fn canary_on() -> bool {
+    !NET.outlayer_api.contains("testnet")
+}
+
 /// Fees are charged only to a set fee wallet: 64 hex characters, not all zeros.
 pub fn fees_on(fee_wallet: &str) -> bool {
     fee_wallet.len() == 64 && fee_wallet.bytes().all(|b| b.is_ascii_hexdigit()) && fee_wallet.bytes().any(|b| b != b'0')

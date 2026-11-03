@@ -210,6 +210,20 @@ impl Custody<'_> {
         self.act(seed, "/wallet/v1/confidential/transfer", &body, key)
     }
 
+    /// The same withdraw previewed: nothing is signed or sent. True when the route answers.
+    pub fn withdraw_works(&self, seed: &str, to: &str, amount: &str, token: &str) -> Result<bool, String> {
+        let t = self.token(seed)?;
+        let body = json!({ "chain": "hypercore", "to": to, "amount": amount, "token": token });
+        let (code, _) = self.request(
+            "POST",
+            "/wallet/v1/confidential/withdraw/dry-run",
+            Some(&t),
+            Some(&body),
+            None,
+        )?;
+        Ok((200..300).contains(&code))
+    }
+
     pub fn status(&self, seed: &str, request_id: &str) -> Result<Request, String> {
         let t = self.token(seed)?;
         let v = self.ok(

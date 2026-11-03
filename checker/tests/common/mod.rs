@@ -26,6 +26,8 @@ pub struct Net {
     pub withdraw_code: u16,
     /// Bodies of accepted withdraws.
     pub withdraws: Vec<Value>,
+    /// The HTTP status a withdraw dry run answers (0 means 200).
+    pub dry_run_code: u16,
     /// What polling a request answers, one per poll in order; `success` once they run out.
     pub polls: std::collections::VecDeque<&'static str>,
     /// Bodies of accepted swaps and transfers.
@@ -154,6 +156,10 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                         code => (code, b"{}".to_vec()),
                     }
                 }
+                "wallet/v1/confidential/withdraw/dry-run" => match n.borrow().dry_run_code {
+                    0 | 200 => ok(json!({ "amount_out": req["amount"], "min_amount_out": req["amount"] })),
+                    code => (code, b"{}".to_vec()),
+                },
                 "wallet/v1/confidential/swap" => {
                     let mut net = n.borrow_mut();
                     let id = format!("swap-{}", net.swaps.len() + 1);

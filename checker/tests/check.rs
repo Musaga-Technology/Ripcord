@@ -81,12 +81,13 @@ fn keys(host: &MockHost, path: &str) -> Vec<String> {
 
 const FEE_WALLET: &str = "fe1e0000000000000000000000000000000000000000000000000000000000fe";
 
+fn check_with(host: &MockHost, fee_wallet: &str, canary: bool) -> String {
+    let o = ripcord_checker::check::Opts { fee_wallet, canary };
+    format!("{:?}", ripcord_checker::check::check_with(host, GID, &o).unwrap()).to_lowercase()
+}
+
 fn check_fees(host: &MockHost) -> String {
-    format!(
-        "{:?}",
-        ripcord_checker::check::check_with(host, GID, FEE_WALLET).unwrap()
-    )
-    .to_lowercase()
+    check_with(host, FEE_WALLET, false)
 }
 
 /// A long BTC position at $80,000, its liquidation price `liq`; 40× max leverage.
@@ -497,4 +498,25 @@ fn months_follow_the_calendar() {
     assert_eq!(month_of(1_793_491_140_000), "2026-10"); // Oct 31 2026 23:59 UTC
     assert_eq!(month_of(1_793_491_200_000), "2026-11"); // Nov 1 2026 00:00 UTC
     assert_eq!(month_of(951_825_600_000), "2000-02"); // Feb 29 2000
+}
+
+#[test]
+fn an_hourly_canary_pauses_a_guard_whose_route_is_down() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(70_000.0); // far: no rescue
+    net.borrow_mut().dry_run_code = 503;
+    create(&host, &settings());
+    assert_eq!(check_with(&host, "", true), "skipped", "paused, not guarding");
+    net.borrow_mut().dry_run_code = 200;
+    assert_eq!(check_with(&host, "", true), "guarding");
+    host.now_ms += 60_000;
+    assert_eq!(check_with(&host, "", true), "guarding");
+    let runs = net
+        .borrow()
+        .requests
+        .iter()
+        .filter(|(u, _)| u.ends_with("/withdraw/dry-run"))
+        .count();
+    assert_eq!(runs, 2, "until it passes, then once an hour");
+    assert!(net.borrow().withdraws.is_empty(), "a canary sends nothing");
 }

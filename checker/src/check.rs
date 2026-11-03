@@ -7,7 +7,7 @@
 //! send the same key again next time, `processing` is read, never resubmitted, a refund fires again under a fresh
 //! key, and 503 pauses with no public fallback.
 use crate::actions::StoredGuard;
-use crate::config::{fees_on, HISTORY_S, HORIZON_S, MAX_REFIRES, MONTHLY_FEE_UNITS, NET};
+use crate::config::{canary_on, fees_on, HISTORY_S, HORIZON_S, MAX_REFIRES, MONTHLY_FEE_UNITS, NET};
 use crate::custody::{Custody, Op, Request};
 use crate::host::Host;
 use crate::registry::{self, TGAS};
@@ -41,6 +41,9 @@ pub struct Track {
     /// The month ("YYYY-MM") whose $1 guard fee has been charged.
     #[serde(default)]
     pub fee_month: Option<String>,
+    /// When the hourly dry-run canary last passed.
+    #[serde(default)]
+    pub canary_ms: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -315,12 +318,26 @@ fn settle_and_record(
     Ok(())
 }
 
-pub fn check(host: &dyn Host, guard_id: &str) -> Result<CheckStatus, String> {
-    check_with(host, guard_id, NET.fee_wallet)
+/// What a build decides for every guard: where fees go, and whether the hourly canary runs.
+pub struct Opts<'a> {
+    pub fee_wallet: &'a str,
+    pub canary: bool,
 }
 
-/// `check`, with the fee wallet given (tests set one; the enclave uses the one compiled in).
-pub fn check_with(host: &dyn Host, guard_id: &str, fee_wallet: &str) -> Result<CheckStatus, String> {
+pub fn check(host: &dyn Host, guard_id: &str) -> Result<CheckStatus, String> {
+    check_with(
+        host,
+        guard_id,
+        &Opts {
+            fee_wallet: NET.fee_wallet,
+            canary: canary_on(),
+        },
+    )
+}
+
+/// `check` with the build's choices given (tests set them; the enclave uses the ones compiled in).
+pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStatus, String> {
+    let fee_wallet = o.fee_wallet;
     if !is_guard_id(guard_id) {
         return Err("invalid guard_id".into());
     }
@@ -350,6 +367,7 @@ pub fn check_with(host: &dyn Host, guard_id: &str, fee_wallet: &str) -> Result<C
                 budget_used_usd: 0.0,
                 receipts: 0,
                 fee_month: None,
+                canary_ms: 0,
             };
             vault::put(host, &key, &t)?;
             t
@@ -428,6 +446,14 @@ pub fn check_with(host: &dyn Host, guard_id: &str, fee_wallet: &str) -> Result<C
     }
 
     if !should_fire(distance, t.line, s.speed_aware, v, HORIZON_S) {
+        // Hourly, preview a $5 rescue: a guard whose route is down says so ("paused") instead of claiming to guard.
+        if o.canary && now.saturating_sub(t.canary_ms) >= 3_600_000 {
+            if !custody.withdraw_works(guard_id, &s.hl_address, "5000000", policy::USDC)? {
+                vault::put(host, &key, &t)?;
+                return Ok(CheckStatus::Skipped);
+            }
+            t.canary_ms = now;
+        }
         vault::put(host, &key, &t)?;
         return Ok(CheckStatus::Guarding);
     }
