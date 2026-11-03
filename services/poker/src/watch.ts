@@ -19,6 +19,8 @@ export interface Timing {
   minCheckMs: number;
   /** How long a pending rescue's pre-rescue liquidation price is watched for a settlement call. */
   settlementWatchMs: number;
+  /** A rescue still in flight after this long raises an alert (the credit watchdog, ARCHITECTURE §8). */
+  creditWatchdogMs: number;
 }
 
 export const DEFAULT_TIMING: Timing = {
@@ -27,6 +29,7 @@ export const DEFAULT_TIMING: Timing = {
   stateInsideMs: 10_000,
   minCheckMs: 3_000,
   settlementWatchMs: 86_400_000,
+  creditWatchdogMs: 90_000,
 };
 
 interface Tracked {
@@ -39,6 +42,8 @@ interface Tracked {
   pending: { coin: string; liq: number; until: number } | null;
   justRescued: boolean;
   checks: number[];
+  /** When the rescue now in flight fired. */
+  inFlightSince: number | null;
 }
 
 export interface Call {
@@ -46,6 +51,8 @@ export interface Call {
   reason: CallReason;
   status: string;
   ms: number;
+  /** Set when a rescue has been in flight longer than the credit watchdog allows. */
+  alert?: string;
 }
 
 export class Watcher {
@@ -72,6 +79,7 @@ export class Watcher {
       pending: null,
       justRescued: false,
       checks: [],
+      inFlightSince: null,
     });
   }
 
@@ -141,13 +149,17 @@ export class Watcher {
     t.lastCheckAt = now;
     t.lastCheckedDistance = at?.distance ?? null;
     t.checks = t.checks.filter((c) => now - c < 86_400_000).concat(now);
-    if (reason === 'after-rescue') t.justRescued = false;
     if (status === 'rescued') {
+      t.inFlightSince ??= now;
       // The liquidation price before the rescue was public: watch the mark near it to settle the rescue.
       if (at) t.pending = { coin: at.coin, liq: at.liq, until: now + this.timing.settlementWatchMs };
-      t.justRescued = true;
       t.stateAt = -Infinity;
-    }
-    return { guardId: t.guard.guardId, reason, status, ms: Date.now() - started };
+    } else if (status !== 'pending') t.inFlightSince = null;
+    // The checker records a credit on a later check, so keep calling while a rescue is in flight.
+    t.justRescued = t.inFlightSince !== null;
+    const late = t.inFlightSince !== null && now - t.inFlightSince > this.timing.creditWatchdogMs;
+    const call: Call = { guardId: t.guard.guardId, reason, status, ms: Date.now() - started };
+    if (late) call.alert = `rescue in flight for ${Math.round((now - t.inFlightSince!) / 1000)} s`;
+    return call;
   }
 }

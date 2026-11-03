@@ -75,6 +75,17 @@ describe('the poker watch loop', () => {
     expect((await s.w.tick(6_000)).map((c) => c.reason)).toEqual(['settlement']);
   });
 
+  it('alerts when a rescue is still in flight after 90 s', async () => {
+    const s = setup(76_000, 80_000, 'rescued');
+    await s.w.tick(0);
+    s.setAnswer('pending');
+    const alerts: (string | undefined)[] = [];
+    for (let t = 10_000; t <= 100_000; t += 10_000) alerts.push(...(await s.w.tick(t)).map((c) => c.alert));
+    expect(alerts.filter(Boolean)).toEqual(['rescue in flight for 100 s']);
+    s.setAnswer('guarding');
+    expect((await s.w.tick(110_000)).map((c) => c.alert)).toEqual([undefined]);
+  });
+
   it('reports health without an address, and survives a failing checker', async () => {
     const { m, hl } = fakeHl(60_000, 80_000);
     const w = new Watcher(hl, async () => {

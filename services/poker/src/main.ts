@@ -39,7 +39,10 @@ setInterval(
       .tick(Date.now())
       .then((calls) => {
         // Guard ids, reasons, statuses and timings only: never an address.
-        for (const c of calls) console.log(`${c.guardId} ${c.reason} → ${c.status} in ${c.ms} ms`);
+        for (const c of calls) {
+          console.log(`${c.guardId} ${c.reason} → ${c.status} in ${c.ms} ms`);
+          if (c.alert) console.log(`ALERT ${c.guardId}: ${c.alert}`);
+        }
       })
       .catch((e: unknown) => console.log(`tick failed: ${(e as Error).message}`))
       .finally(() => (busy = false));
