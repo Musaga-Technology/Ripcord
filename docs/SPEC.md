@@ -16,7 +16,7 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 | `account_commitment` | `sha256(lowercase(hl_address) ‖ account_salt)`, hex; `account_salt` = 32 random bytes, sealed |
 | fingerprint | first 4 and last 4 bytes of `commitment`, uppercase hex, as printed on the card |
 
-**`GuardSettings`** (sealed, committed): `owner`, `hl_address`, `account_salt`, `preset` (`safer | balanced | lean`), `line_range_pct [lo, hi]`, `target_range_pct [lo, hi]`, `speed_aware` (default true for Lean, false otherwise), `max_rescue_usd` (≥ 5), `budget_usd`, `reserve_asset` (1Click asset id), `cooldown_s` (60), `isolated` (`{coin}` or null), `close_hint` (`{chain, address}` or null), `receipt_pk` (X25519, the owner's), `expires_at` (ns).
+**`GuardSettings`** (sealed, committed): `owner`, `hl_address`, `account_salt`, `preset` (`safer | balanced | lean`), `line_range_pct [lo, hi]`, `target_range_pct [lo, hi]`, `speed_aware` (default true for every preset; Nov 3, from the 1-minute crash replays), `max_rescue_usd` (≥ 5), `budget_usd`, `reserve_asset` (1Click asset id), `cooldown_s` (60), `isolated` (`{coin}` or null), `close_hint` (`{chain, address}` or null), `receipt_pk` (X25519, the owner's), `expires_at` (ns).
 
 **Seal file** (the owner's copy, Day 6): the owner key's secret, the salts, the settings and the guard id, encrypted with a passphrase the user chooses (scrypt → ChaCha20-Poly1305). It is the key to the reserve, so: a close pays by default to the guard's own Hyperliquid address (pay-to-self); a different close address can be named at setup, or added later with an owner-signed `update_policy` that takes effect only after 24 h, which leaves time to freeze if the seal file was stolen.
 
@@ -144,4 +144,4 @@ No tool takes a rescue recipient or edits the allowlist: rescues always pay the 
 | T-PRIV-02 | public receipts are rounded (hour, 2 significant figures) | contract unit |
 | T-PRIV-03 | checker output is only a status | checker unit |
 | T-PRIV-04 | the line can't be learned: replayed rescues scatter across the sealed range | replay harness ("learn the line") |
-| T-REL-01 | cascades: Lean with speed-aware rescues where upfront margin would have saved | replay harness (1-second fixtures) |
+| T-REL-01 | cascades: Balanced with speed-aware loses no position that the same reserve posted upfront saves (within one, Oct 10 2025); speed-aware never worse than plain | replay harness, `crates/replay/tests/crash.rs`, CI |
