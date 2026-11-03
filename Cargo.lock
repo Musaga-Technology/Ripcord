@@ -2073,6 +2073,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ripcord-replay"
+version = "0.1.0"
+dependencies = [
+ "ripcord-rules",
+]
+
+[[package]]
 name = "ripcord-rules"
 version = "0.1.0"
 dependencies = [

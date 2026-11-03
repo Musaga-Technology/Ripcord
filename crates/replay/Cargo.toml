@@ -1,0 +1,10 @@
+[package]
+name = "ripcord-replay"
+version = "0.1.0"
+description = "Crash replay harness: real price paths through the guard's own rules, against posting the reserve upfront"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ripcord-rules = { path = "../rules" }
