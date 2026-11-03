@@ -26,7 +26,7 @@ function settings(overrides: Partial<GuardSettings>): GuardSettings {
     preset: 'balanced',
     line_range_pct: [5, 8],
     target_range_pct: [9, 13],
-    speed_aware: false,
+    speed_aware: true,
     max_rescue_usd: 1500,
     budget_usd: 4000,
     reserve_asset: 'nep141:nbtc.bridge.near',
