@@ -155,40 +155,66 @@ async function createAccount(): Promise<void> {
   if (res.ok) saveState({ ops: id });
 }
 
-/** FastFS (borsh enum variant 0, Simple): relative_path, Some({mime_type, content}). Recorded by a call that reverts. */
-function fastfsSimple(path: string, mime: string, content: Uint8Array): Uint8Array {
-  const str = (s: string) => {
-    const b = Buffer.from(s);
-    const len = Buffer.alloc(4);
-    len.writeUInt32LE(b.length);
-    return Buffer.concat([len, b]);
-  };
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(content.length);
-  return new Uint8Array(Buffer.concat([Buffer.from([0]), str(path), Buffer.from([1]), str(mime), len, content]));
+const borshStr = (s: string) => Buffer.concat([u32(Buffer.byteLength(s)), Buffer.from(s)]);
+function u32(n: number): Buffer {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(n);
+  return b;
+}
+
+/**
+ * FastFS payloads, as OutLayer's CLI writes them: up to 1 MB, one `Simple` (borsh variant 0: relative_path,
+ * Some({mime_type, content})); larger, 1 MB `Partial` chunks (variant 1: relative_path, offset, full_size, mime_type,
+ * content_chunk, nonce). Each is recorded by a call that reverts by design.
+ */
+function fastfsPayloads(path: string, mime: string, content: Uint8Array): Uint8Array[] {
+  const CHUNK = 1 << 20;
+  if (content.length <= CHUNK) {
+    const body = [Buffer.from([0]), borshStr(path), Buffer.from([1]), borshStr(mime), u32(content.length), content];
+    return [new Uint8Array(Buffer.concat(body))];
+  }
+  const nonce = Math.floor(Date.now() / 1000) - 1_769_376_240;
+  const out: Uint8Array[] = [];
+  for (let off = 0; off < content.length; off += CHUNK) {
+    const chunk = content.subarray(off, off + CHUNK);
+    const body = [
+      Buffer.from([1]),
+      borshStr(path),
+      u32(off),
+      u32(content.length),
+      borshStr(mime),
+      u32(chunk.length),
+      chunk,
+      u32(nonce),
+    ];
+    out.push(new Uint8Array(Buffer.concat(body)));
+  }
+  return out;
+}
+
+/** Uploads `wasm` to FastFS through `receiver`; true when every chunk reached the chain. */
+async function upload(acc: Account, receiver: string, hash: string, wasm: Uint8Array, where: string): Promise<boolean> {
+  const parts = fastfsPayloads(`${hash}.wasm`, 'application/wasm', wasm);
+  let ok = true;
+  for (const [i, p] of parts.entries()) {
+    const up = await send(acc, receiver, '__fastdata_fastfs', p, 0n, 1n);
+    const label = parts.length > 1 ? ` (chunk ${i + 1}/${parts.length})` : '';
+    check(
+      `uploaded ${wasm.length.toLocaleString()} bytes to ${where}${label} (the call reverts by design)`,
+      !!up.tx,
+      up.tx || up.error,
+    );
+    ok &&= !!up.tx;
+  }
+  return ok;
 }
 
 async function deploy(): Promise<void> {
   const acc = ops();
   const wasm = new Uint8Array(readFileSync(WASM));
-  if (wasm.length > 1 << 20) throw new Error('over 1 MB: FastFS needs chunked upload');
   const hash = createHash('sha256').update(wasm).digest('hex');
   const url = `${FASTFS}/${acc.accountId}/${OUTLAYER}/${hash}.wasm`;
-  if (readState().wasm_hash !== hash) {
-    const up = await send(
-      acc,
-      OUTLAYER,
-      '__fastdata_fastfs',
-      fastfsSimple(`${hash}.wasm`, 'application/wasm', wasm),
-      0n,
-      1n,
-    );
-    check(
-      `uploaded ${wasm.length.toLocaleString()} bytes to FastFS (the call reverts by design)`,
-      !!up.tx,
-      up.tx || up.error,
-    );
-  }
+  if (readState().wasm_hash !== hash) await upload(acc, OUTLAYER, hash, wasm, 'FastFS');
   // The worker downloads and hash-checks the file at run time, so a slow FastFS indexer only delays the first call.
   if (await serves(url, hash)) check('FastFS serves the same bytes', true, url);
   else console.log(`… FastFS is not serving it yet (${url}); the project is created anyway`);
@@ -430,19 +456,7 @@ async function mainnetHost(): Promise<void> {
   const hash = createHash('sha256').update(wasm).digest('hex');
   const url = `${MAINNET_FASTFS}/${id}/outlayer.near/${hash}.wasm`;
   if (!(await serves(url, hash))) {
-    const up = await send(
-      uploader,
-      'outlayer.near',
-      '__fastdata_fastfs',
-      fastfsSimple(`${hash}.wasm`, 'application/wasm', wasm),
-      0n,
-      1n,
-    );
-    check(
-      `uploaded ${wasm.length.toLocaleString()} bytes to mainnet FastFS (the call reverts by design)`,
-      !!up.tx,
-      up.tx || up.error,
-    );
+    await upload(uploader, 'outlayer.near', hash, wasm, 'mainnet FastFS');
     if (!(await serves(url, hash))) return check('mainnet FastFS serves the same bytes', false, url);
   }
   check('mainnet FastFS serves the same bytes', true, url);
