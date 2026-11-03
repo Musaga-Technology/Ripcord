@@ -139,37 +139,100 @@ impl<'a> Custody<'a> {
     }
 }
 
-/// What OutLayer answered a rescue withdraw.
+/// What OutLayer answered an action (withdraw, swap, transfer): every one is asynchronous and keyed.
 #[derive(Debug, PartialEq)]
-pub enum Withdraw {
+pub enum Op {
     /// Taken (or already taken under this key): the request to poll.
     Accepted(String),
     /// 502: an upstream hiccup; the same key is safe to send again.
     Retry,
     /// 503: confidential intents are off on this deployment (OutLayer's testnet); never fall back to public.
     Unavailable,
+    /// 409 `wallet_busy`: another operation on this wallet is in flight; try again once it settles.
+    Busy,
+}
+
+/// A request's state from `GET /wallet/v1/requests/{id}`.
+#[derive(Debug, PartialEq)]
+pub enum Request {
+    /// `processing` or `pending_deposit`: still settling.
+    Pending,
+    /// The realized `amount_out` (only final at `success`) and, for a withdraw, the delivery tx on Hyperliquid.
+    Success {
+        amount_out: Option<String>,
+        dest_tx: Option<String>,
+    },
+    /// Refunded inside the confidential balance: safe to fire again.
+    Refunded,
+    Failed,
 }
 
 impl Custody<'_> {
-    /// Confidential balance → `to` on Hyperliquid, as USDC credited to the account. `key` makes a retry harmless.
-    pub fn withdraw(&self, seed: &str, to: &str, amount: &str, token: &str, key: &str) -> Result<Withdraw, String> {
+    fn act(&self, seed: &str, path: &str, body: &Value, key: &str) -> Result<Op, String> {
         let t = self.token(seed)?;
-        let body = json!({ "chain": "hypercore", "to": to, "amount": amount, "token": token });
-        let (code, v) = self.request(
-            "POST",
-            "/wallet/v1/confidential/withdraw",
-            Some(&t),
-            Some(&body),
-            Some(key),
-        )?;
+        let (code, v) = self.request("POST", path, Some(&t), Some(body), Some(key))?;
         match code {
             200..=299 => v["request_id"]
                 .as_str()
-                .map(|r| Withdraw::Accepted(r.into()))
-                .ok_or_else(|| "withdraw: no request_id".into()),
-            502 => Ok(Withdraw::Retry),
-            503 => Ok(Withdraw::Unavailable),
-            _ => Err(format!("withdraw: HTTP {code}")),
+                .map(|r| Op::Accepted(r.into()))
+                .ok_or_else(|| "no request_id".into()),
+            409 => Ok(Op::Busy),
+            502 => Ok(Op::Retry),
+            503 => Ok(Op::Unavailable),
+            _ => Err(format!("{path}: HTTP {code}")),
         }
+    }
+
+    /// Confidential balance → `to` on Hyperliquid, credited as USDC to the account. `key` makes a retry harmless.
+    pub fn withdraw(&self, seed: &str, to: &str, amount: &str, token: &str, key: &str) -> Result<Op, String> {
+        let body = json!({ "chain": "hypercore", "to": to, "amount": amount, "token": token });
+        self.act(seed, "/wallet/v1/confidential/withdraw", &body, key)
+    }
+
+    /// A non-USDC reserve becomes USDC inside the confidential balance first; refused below `min_out`.
+    pub fn swap(
+        &self,
+        seed: &str,
+        token_in: &str,
+        token_out: &str,
+        amount_in: &str,
+        min_out: &str,
+        key: &str,
+    ) -> Result<Op, String> {
+        let body =
+            json!({ "token_in": token_in, "token_out": token_out, "amount_in": amount_in, "min_amount_out": min_out });
+        self.act(seed, "/wallet/v1/confidential/swap", &body, key)
+    }
+
+    /// A private transfer to another confidential identity (`to`: its 64-hex intents id). Fees go this way.
+    pub fn transfer(&self, seed: &str, to: &str, amount: &str, token: &str, key: &str) -> Result<Op, String> {
+        let body = json!({ "to": to, "amount": amount, "token": token });
+        self.act(seed, "/wallet/v1/confidential/transfer", &body, key)
+    }
+
+    pub fn status(&self, seed: &str, request_id: &str) -> Result<Request, String> {
+        let t = self.token(seed)?;
+        let v = self.ok(
+            "request",
+            self.request(
+                "GET",
+                &format!("/wallet/v1/requests/{request_id}"),
+                Some(&t),
+                None,
+                None,
+            )?,
+        )?;
+        let r = &v["result"];
+        Ok(match v["status"].as_str().unwrap_or("") {
+            "success" => Request::Success {
+                amount_out: r["amount_out"].as_str().map(String::from),
+                dest_tx: r["swap_details"]["destinationChainTxHashes"][0]
+                    .as_str()
+                    .map(String::from),
+            },
+            "refunded" => Request::Refunded,
+            "failed" => Request::Failed,
+            _ => Request::Pending,
+        })
     }
 }

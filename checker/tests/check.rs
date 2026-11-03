@@ -69,6 +69,26 @@ fn track(host: &MockHost) -> Track {
     vault::get(host, &format!("t/{GID}")).unwrap().unwrap()
 }
 
+/// The idempotency keys sent to OutLayer paths ending in `path`, in order.
+fn keys(host: &MockHost, path: &str) -> Vec<String> {
+    host.headers
+        .borrow()
+        .iter()
+        .filter(|(u, _)| u.ends_with(path))
+        .filter_map(|(_, h)| h.iter().find(|(k, _)| k == "X-Idempotency-Key").map(|(_, v)| v.clone()))
+        .collect()
+}
+
+const FEE_WALLET: &str = "fe1e0000000000000000000000000000000000000000000000000000000000fe";
+
+fn check_fees(host: &MockHost) -> String {
+    format!(
+        "{:?}",
+        ripcord_checker::check::check_with(host, GID, FEE_WALLET).unwrap()
+    )
+    .to_lowercase()
+}
+
 /// A long BTC position at $80,000, its liquidation price `liq`; 40× max leverage.
 fn btc(liq: f64) -> Value {
     state(vec![position("BTC", 1.0, 80_000.0, Some(liq), 40, "cross")])
@@ -147,9 +167,11 @@ fn one_rescue_per_epoch_then_re_arms_after_the_cooldown() {
     create(&host, &settings());
     assert_eq!(check(&host)["status"], "rescued");
     host.now_ms += 30_000;
-    assert_eq!(check(&host)["status"], "guarding", "inside the 60 s cooldown");
-    assert_eq!(net.borrow().withdraws.len(), 1);
+    assert_eq!(check(&host)["status"], "guarding", "credited: the 60 s cooldown starts");
     host.now_ms += 31_000;
+    assert_eq!(check(&host)["status"], "guarding", "still inside the cooldown");
+    assert_eq!(net.borrow().withdraws.len(), 1);
+    host.now_ms += 30_000;
     assert_eq!(
         check(&host)["status"],
         "rescued",
@@ -181,11 +203,13 @@ fn an_outage_pauses_and_never_falls_back() {
     net.borrow_mut().withdraw_code = 503;
     create(&host, &settings());
     assert_eq!(check(&host)["status"], "skipped", "confidential unavailable: paused");
+    assert!(track(&host).rescues.is_empty(), "nothing held while paused");
     net.borrow_mut().withdraw_code = 502;
-    assert_eq!(check(&host)["status"], "pending", "upstream hiccup: retried next check");
-    assert!(track(&host).rescues.is_empty() && net.borrow().withdraws.is_empty());
+    assert_eq!(check(&host)["status"], "pending", "upstream hiccup: held under its key");
     net.borrow_mut().withdraw_code = 200;
-    assert_eq!(check(&host)["status"], "rescued");
+    assert_eq!(check(&host)["status"], "pending", "sent again under the same key");
+    assert_eq!(net.borrow().withdraws.len(), 1);
+    assert_eq!(keys(&host, "/confidential/withdraw"), vec![format!("{GID}-0"); 3]);
     let paths: Vec<String> = net
         .borrow()
         .requests
@@ -290,4 +314,187 @@ fn reads_hyperliquid_clearinghouse_state() {
         ps[3].position.leverage_type,
         ripcord_checker::types::LeverageType::Isolated
     );
+}
+
+#[test]
+fn records_the_credit_as_a_rounded_public_receipt_and_a_sealed_exact_one() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    check(&host); // fires
+    net.borrow_mut().polls.push_back("pending_deposit");
+    host.now_ms += 10_000;
+    assert_eq!(
+        check(&host)["status"],
+        "pending",
+        "still settling: read, never resubmitted"
+    );
+    host.now_ms += 17_000;
+    assert_eq!(check(&host)["status"], "guarding", "credited");
+    assert_eq!(net.borrow().withdraws.len(), 1);
+    let n = net.borrow();
+    let r = tx_args(&n.txs, "record_rescue", 0);
+    assert_eq!(r["public"]["credit_usd"], 1500.0);
+    assert_eq!(r["public"]["at_hour"].as_u64().unwrap() % 3600, 0, "a whole hour");
+    assert_eq!(r["public"]["latency_s"], 27);
+    let sealed = hex::decode(r["sealed"].as_str().unwrap()).unwrap();
+    let exact: Value = serde_json::from_slice(&open(&RECEIPT_SECRET, &sealed, GID).unwrap()).unwrap();
+    assert_eq!(
+        (exact["amount_usd"].as_f64(), exact["hl_tx"].as_str()),
+        (Some(1500.0), Some("0xhlreq-1"))
+    );
+    assert!(
+        !r.to_string().to_lowercase().contains(&HL[2..].to_lowercase()),
+        "no address in the transaction"
+    );
+}
+
+#[test]
+fn a_refund_fires_again_under_a_fresh_key_then_gives_the_budget_back() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    check(&host);
+    net.borrow_mut().polls.extend(["refunded", "refunded", "refunded"]);
+    for _ in 0..3 {
+        host.now_ms += 5_000;
+        check(&host);
+    }
+    // Given up after two refires, the budget comes back and a new epoch fires again: the position is still at risk.
+    let k = keys(&host, "/confidential/withdraw");
+    assert_eq!(
+        k,
+        [
+            format!("{GID}-0"),
+            format!("{GID}-0-r1"),
+            format!("{GID}-0-r2"),
+            format!("{GID}-1")
+        ]
+    );
+    let t = track(&host);
+    assert_eq!(t.rescues[0].stage, ripcord_checker::check::Stage::Failed);
+    assert_eq!(
+        t.budget_used_usd, 1500.0,
+        "only the new rescue holds budget; the refunded one costs nothing"
+    );
+}
+
+#[test]
+fn a_busy_wallet_waits_and_sends_the_same_key() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    net.borrow_mut().withdraw_code = 409;
+    create(&host, &settings());
+    assert_eq!(check(&host)["status"], "pending");
+    net.borrow_mut().withdraw_code = 200;
+    host.now_ms += 3_000;
+    assert_eq!(check(&host)["status"], "pending");
+    assert_eq!(
+        keys(&host, "/confidential/withdraw"),
+        [format!("{GID}-0"), format!("{GID}-0")]
+    );
+    assert_eq!(net.borrow().withdraws.len(), 1);
+}
+
+#[test]
+fn a_wnear_reserve_swaps_to_usdc_inside_the_confidential_balance_first() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    let mut s = settings();
+    s.reserve_asset = "nep141:wrap.near".into();
+    create(&host, &s);
+    assert_eq!(check(&host)["status"], "rescued");
+    let swap = net.borrow().swaps[0].clone();
+    assert_eq!(
+        (swap["token_in"].as_str(), swap["token_out"].as_str()),
+        (Some("nep141:wrap.near"), Some(policy::USDC))
+    );
+    assert_eq!(swap["min_amount_out"], "1470000000", "98 % of the $1,500 rescue");
+    // $1,500 × 1.03 at $2.50 a NEAR: 618 NEAR, to f64 precision.
+    let sold: f64 = swap["amount_in"].as_str().unwrap().parse().unwrap();
+    assert!((sold / 1e24 - 618.0).abs() < 1e-6, "{sold}");
+    assert!(
+        net.borrow().withdraws.is_empty(),
+        "nothing leaves before the swap fills"
+    );
+    host.now_ms += 10_000;
+    assert_eq!(check(&host)["status"], "pending", "the fill goes to Hyperliquid");
+    assert_eq!(net.borrow().withdraws[0]["amount"], "1470000000");
+    assert_eq!(keys(&host, "/confidential/withdraw"), [format!("{GID}-0-w")]);
+}
+
+#[test]
+fn a_save_pays_its_fee_and_is_recorded() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    check_fees(&host); // fires (and charges this month's $1)
+    host.now_ms += 20_000;
+    check_fees(&host); // credited
+    host.now_ms += 10_000;
+    net.borrow_mut().hl_state = state(vec![position("BTC", 1.0, 75_900.0, Some(70_000.0), 40, "cross")]);
+    check_fees(&host); // saved
+    let n = net.borrow();
+    let fees: Vec<(&str, &str)> = n
+        .transfers
+        .iter()
+        .map(|t| (t["to"].as_str().unwrap(), t["amount"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        fees,
+        [(FEE_WALLET, "1000000"), (FEE_WALLET, "45000000")],
+        "$1 this month, then 3 % of $1,500"
+    );
+    let o = tx_args(&n.txs, "record_outcome", 0);
+    assert_eq!((o["index"].as_u64(), o["outcome"].as_str()), (Some(0), Some("Saved")));
+    assert_eq!(o["saved_at_hour"].as_u64().unwrap() % 3600, 0);
+    drop(n);
+    assert_eq!(keys(&host, "/confidential/transfer")[1], format!("{GID}-fee-0"));
+}
+
+#[test]
+fn an_unneeded_rescue_is_early_and_free() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    check_fees(&host);
+    host.now_ms += 20_000;
+    check_fees(&host);
+    net.borrow_mut().hl_state = state(vec![position("BTC", 1.0, 90_000.0, Some(70_000.0), 40, "cross")]);
+    host.now_ms += 86_400_000;
+    check_fees(&host);
+    let n = net.borrow();
+    assert_eq!(tx_args(&n.txs, "record_outcome", 0)["outcome"], "Early");
+    assert!(
+        n.transfers.iter().all(|t| t["amount"] == "1000000"),
+        "monthly fees only, no save fee"
+    );
+}
+
+#[test]
+fn the_monthly_fee_is_charged_once_a_month_and_never_without_a_fee_wallet() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(70_000.0); // far: no rescue
+    let mut s = settings();
+    s.expires_at = "1830297600000000000".into(); // 2028, so the guard outlives the month
+    create(&host, &s);
+    check(&host); // the compiled-in fee wallet is unset: no fees
+    assert!(net.borrow().transfers.is_empty());
+    check_fees(&host);
+    host.now_ms += 3_600_000;
+    check_fees(&host);
+    assert_eq!(net.borrow().transfers.len(), 1);
+    host.now_ms += 31 * 86_400_000;
+    check_fees(&host);
+    let k = keys(&host, "/confidential/transfer");
+    assert_eq!(k.len(), 2);
+    assert!(k[0].starts_with(&format!("{GID}-month-")) && k[0] != k[1], "{k:?}");
+}
+
+#[test]
+fn months_follow_the_calendar() {
+    use ripcord_checker::check::month_of;
+    assert_eq!(month_of(1_793_491_140_000), "2026-10"); // Oct 31 2026 23:59 UTC
+    assert_eq!(month_of(1_793_491_200_000), "2026-11"); // Nov 1 2026 00:00 UTC
+    assert_eq!(month_of(951_825_600_000), "2000-02"); // Feb 29 2000
 }

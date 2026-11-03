@@ -27,12 +27,17 @@ pub trait Host {
     fn now_ms(&self) -> u64;
 }
 
+/// A request as the mock host saw it: its url and headers.
+pub type Sent = (String, Vec<(String, String)>);
+
 /// An in-memory host for tests: deterministic keys from a seed, a scripted HTTP responder, a fixed clock.
 pub struct MockHost {
     pub seed: [u8; 32],
     pub storage: RefCell<HashMap<String, Vec<u8>>>,
     pub now_ms: u64,
     pub calls: RefCell<Vec<String>>,
+    /// Each request's (url, headers), so tests can see idempotency keys.
+    pub headers: RefCell<Vec<Sent>>,
     #[allow(clippy::type_complexity)]
     pub responder: Box<dyn Fn(&str, &str, Option<&[u8]>) -> (u16, Vec<u8>)>,
 }
@@ -44,6 +49,7 @@ impl MockHost {
             storage: RefCell::new(HashMap::new()),
             now_ms: 1_793_541_381_000,
             calls: RefCell::new(Vec::new()),
+            headers: RefCell::new(Vec::new()),
             responder: Box::new(|_, _, _| (404, b"{}".to_vec())),
         }
     }
@@ -124,10 +130,12 @@ impl Host for MockHost {
         &self,
         method: &str,
         url: &str,
-        _headers: &[(&str, String)],
+        headers: &[(&str, String)],
         body: Option<&[u8]>,
     ) -> Result<(u16, Vec<u8>), String> {
         self.calls.borrow_mut().push(format!("{method} {url}"));
+        let h = headers.iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
+        self.headers.borrow_mut().push((url.to_string(), h));
         Ok((self.responder)(method, url, body))
     }
 

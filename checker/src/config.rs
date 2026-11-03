@@ -6,7 +6,7 @@ pub struct Network {
     pub rpc: &'static str,
     /// The guard registry contract, which becomes each guard wallet's policy controller.
     pub registry: &'static str,
-    /// Ripcord's fee wallet: the only recipient besides the owner's own addresses.
+    /// Ripcord's fee wallet (a 64-hex intents id): the only recipient besides the owner's own addresses.
     pub fee_wallet: &'static str,
     pub oneclick: &'static str,
     pub hyperliquid: &'static str,
@@ -25,9 +25,11 @@ pub const NET: Network = Network {
         Some(v) => v,
         None => "ripcord-registry-db06d339.testnet",
     },
+    // Ripcord's fee wallet's confidential identity: its 64-hex intents id. Unset (zeros) means no fee is charged,
+    // so a build that forgets it can't send fees anywhere.
     fee_wallet: match option_env!("RIPCORD_FEE_WALLET") {
         Some(v) => v,
-        None => "ripcord-registry-db06d339.testnet",
+        None => "0000000000000000000000000000000000000000000000000000000000000000",
     },
     oneclick: "https://1click.chaindefuser.com",
     hyperliquid: "https://api.hyperliquid.xyz",
@@ -42,3 +44,13 @@ pub const REGISTER_GAS: u64 = 200_000_000_000_000;
 /// (docs/SPEC.md §3: 60 s until the measured p95 replaces it).
 pub const HISTORY_S: f64 = 60.0;
 pub const HORIZON_S: f64 = 60.0;
+
+/// How many times a refunded rescue is fired again under a fresh key before the guard gives up on it.
+pub const MAX_REFIRES: u32 = 2;
+/// The $1 monthly guard fee, in USDC units.
+pub const MONTHLY_FEE_UNITS: u128 = 1_000_000;
+
+/// Fees are charged only to a set fee wallet: 64 hex characters, not all zeros.
+pub fn fees_on(fee_wallet: &str) -> bool {
+    fee_wallet.len() == 64 && fee_wallet.bytes().all(|b| b.is_ascii_hexdigit()) && fee_wallet.bytes().any(|b| b != b'0')
+}

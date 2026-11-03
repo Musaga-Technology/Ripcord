@@ -26,6 +26,13 @@ pub struct Net {
     pub withdraw_code: u16,
     /// Bodies of accepted withdraws.
     pub withdraws: Vec<Value>,
+    /// What polling a request answers, one per poll in order; `success` once they run out.
+    pub polls: std::collections::VecDeque<&'static str>,
+    /// Bodies of accepted swaps and transfers.
+    pub swaps: Vec<Value>,
+    pub transfers: Vec<Value>,
+    /// Accepted requests: id → the amount a success delivers.
+    pub pending: std::collections::HashMap<String, String>,
 }
 
 /// One position as Hyperliquid's `clearinghouseState` lists it (numbers as strings).
@@ -84,10 +91,16 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                     let text = String::from_utf8_lossy(&tx).into_owned();
                     let mut net = n.borrow_mut();
                     net.txs.push(tx);
-                    let method = ["register_guard", "record_arm", "set_status"]
-                        .into_iter()
-                        .find(|m| text.contains(m))
-                        .unwrap_or("?");
+                    let method = [
+                        "register_guard",
+                        "record_arm",
+                        "record_rescue",
+                        "record_outcome",
+                        "set_status",
+                    ]
+                    .into_iter()
+                    .find(|m| text.contains(m))
+                    .unwrap_or("?");
                     if net.fail_tx {
                         json!({ "transaction_outcome": { "outcome": { "status": { "SuccessReceiptId": "x" } } },
                                 "receipts_outcome": [{ "outcome": { "status": { "Failure": { "ActionError": "guard_id already registered" } } } }] })
@@ -132,11 +145,40 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                     let mut net = n.borrow_mut();
                     match net.withdraw_code {
                         0 | 200 => {
+                            let id = format!("req-{}", net.withdraws.len() + 1);
+                            net.pending
+                                .insert(id.clone(), req["amount"].as_str().unwrap().to_string());
                             net.withdraws.push(req);
-                            let id = format!("req-{}", net.withdraws.len());
                             ok(json!({ "request_id": id, "status": "pending_deposit" }))
                         }
                         code => (code, b"{}".to_vec()),
+                    }
+                }
+                "wallet/v1/confidential/swap" => {
+                    let mut net = n.borrow_mut();
+                    let id = format!("swap-{}", net.swaps.len() + 1);
+                    net.pending
+                        .insert(id.clone(), req["min_amount_out"].as_str().unwrap().to_string());
+                    net.swaps.push(req);
+                    ok(json!({ "request_id": id, "status": "pending_deposit" }))
+                }
+                "wallet/v1/confidential/transfer" => {
+                    let mut net = n.borrow_mut();
+                    let id = format!("xfer-{}", net.transfers.len() + 1);
+                    net.transfers.push(req);
+                    ok(json!({ "request_id": id, "status": "pending_deposit" }))
+                }
+                p if p.starts_with("wallet/v1/requests/") => {
+                    let mut net = n.borrow_mut();
+                    let id = &p["wallet/v1/requests/".len()..];
+                    let Some(amount) = net.pending.get(id).cloned() else {
+                        return (404, b"{}".to_vec());
+                    };
+                    match net.polls.pop_front().unwrap_or("success") {
+                        "success" => ok(json!({ "status": "success", "result": {
+                            "amount_out": amount,
+                            "swap_details": { "destinationChainTxHashes": [format!("0xhl{id}")] } } })),
+                        other => ok(json!({ "status": other, "result": {} })),
                     }
                 }
                 _ => (404, b"{}".to_vec()),

@@ -76,8 +76,8 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 2. Settle pending rescues: `saved` if the mark is past `liq_before`; `failed` if the position was liquidated; `early` after 24 h. A crossing missed between checks counts as early, in the owner's favour.
 3. Trigger: fire if `distance < drawn_line`, or, with `speed_aware`, `distance − v × H < drawn_line`, where `v` is the fall rate over the last 60 s (≥ 0) and `H` = 60 s (later the measured p95).
 4. Size `T = (drawn_target − distance)/100 × mark × |szi| × (1 − l × side)`; clamp to `max_rescue_usd`, the remaining budget and the reserve; skip below $5.
-5. Rescue: `/confidential/swap` if the reserve isn't USDC → `/confidential/withdraw {chain: "hypercore", to: hl_address, amount, token}` with `X-Idempotency-Key: <guard_id>-<epoch>`; store the request, return `rescued` (don't wait for the credit). Next check: read the request (`success` gives `amount_out` and the Hyperliquid tx), record the receipt and latency; for an isolated guard, sign `updateIsolatedMargin` with `expiresAfter` = now + 60 s.
-6. After `cooldown_s`: `epoch += 1`, draw a new line and target inside the sealed ranges with enclave randomness, `record_arm`.
+5. Rescue: `/confidential/swap {token_in: reserve, token_out: USDC, amount_in: 1.03 × the rescue at the 1Click price, min_amount_out: 98 %}` if the reserve isn't USDC → `/confidential/withdraw {chain: "hypercore", to: hl_address, amount, token}` with `X-Idempotency-Key: <guard_id>-<epoch>` (`-w` after a swap); store the request, return `rescued` (don't wait for the credit). Later checks read `GET /wallet/v1/requests/{id}` and answer `pending` while it settles: `success` gives `amount_out` and the Hyperliquid tx (`swap_details.destinationChainTxHashes`); then `record_rescue` with the hour and the credit to 2 significant figures in public and the exact amount, time and Hyperliquid tx sealed to `receipt_pk`. `refunded` fires again at once under `<guard_id>-<epoch>-r<n>` (at most twice), then gives the budget back; 502 and 409 `wallet_busy` send the same key on the next check. For an isolated guard, sign `updateIsolatedMargin` with `expiresAfter` = now + 60 s.
+6. After `cooldown_s` from the credit: `epoch += 1`, draw a new line and target inside the sealed ranges with enclave randomness, `record_arm`.
 7. Fees: on `saved`, `/confidential/transfer` of `3 % × min(T, 50,000) + 0.5 % × max(T − 50,000, 0)` to the fee wallet (key `<guard_id>-fee-<index>`), then `record_outcome`. On the first heartbeat of each month, $1 (key `<guard_id>-month-<YYYY-MM>`).
 8. Errors follow ARCHITECTURE §8 (502 retry with the same key, `processing` poll, `wallet_busy` poll, 503 → degraded). Logs hold guard ids, statuses and timings only.
 
@@ -95,7 +95,7 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
   "capabilities": { "confidential": { "allowed": true }, "evm_sign": { "allowed": "<isolated guard>", "raw_tx": false }, "solana_sign": { "allowed": false } }
 }
 ```
-No `approval` block. The fee wallet's recipient format for `/confidential/transfer` is **verify Day 5**.
+No `approval` block. The fee wallet is a confidential identity: `/confidential/transfer` takes `{to, amount, token}` with `to` = the recipient's 64-hex intents id (verified Nov 3 in OutLayer's confidential docs), so `RIPCORD_FEE_WALLET` is that id, compiled in; unset (zeros), no fee is charged.
 
 ## 4. Pokers: `services/poker/` (Node)
 
