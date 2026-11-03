@@ -44,6 +44,13 @@ else
   skip "cargo not found; the checker's tests need Rust"
 fi
 
+step "Real crashes through the guard's own rules (crates/replay)"
+if command -v cargo >/dev/null; then
+  run cargo test --quiet -p ripcord-replay && ok "Oct 10 2025: every unguarded long liquidated; Balanced with the speed-aware trigger matches posting the reserve upfront"
+else
+  skip "cargo not found; the replay harness needs Rust"
+fi
+
 step "Pokers decide when to wake the checker (docs/SPEC.md §4)"
 run $PNPM --filter @ripcord/poker test && ok "band, cadence, rate limit, settlement watch; an address is watched only with the owner's salt; encrypted at rest"
 
