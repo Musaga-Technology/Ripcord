@@ -20,6 +20,7 @@ import {
   ownerCommitment,
   ownerSalt,
   rescueSize,
+  speedTarget,
   roundCredit,
   saveFee,
   settle,
@@ -72,6 +73,9 @@ describe('guard decisions', () => {
   );
   it.each(guardV.should_fire)('fire %#', (f) =>
     expect(shouldFire(f.distance, f.drawn_line, f.speed_aware, f.v)).toBe(f.fire),
+  );
+  it.each(guardV.speed_target)('speed target %#', (t) =>
+    close(speedTarget(t.drawn_target, t.speed_aware, t.v), t.target),
   );
   it.each(guardV.rescue_size)('rescue size %#', (s) => close(rescueSize(s), s.size_usd));
   it.each(guardV.save_fee)('save fee $t', (f) => close(saveFee(f.t), f.fee));

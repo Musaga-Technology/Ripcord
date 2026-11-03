@@ -48,6 +48,16 @@ export function shouldFire(
   return speedAware && distance - v * horizonS < drawnLine;
 }
 
+/**
+ * A speed-aware rescue tops up past the drawn target by this many times the fall expected while the credit lands
+ * (tuned on Oct 2025 – Jun 2026 replays: fewer liquidations and fewer, larger rescues than topping up to the target).
+ */
+export const SPEED_BOOST = 3;
+
+export function speedTarget(drawnTarget: number, speedAware: boolean, v: number, horizonS = 60): number {
+  return drawnTarget + (speedAware ? SPEED_BOOST * v * horizonS : 0);
+}
+
 export interface SizeInput {
   drawn_target: number;
   distance: number;

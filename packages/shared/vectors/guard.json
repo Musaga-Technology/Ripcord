@@ -244,6 +244,32 @@
    "fire": false
   }
  ],
+ "speed_target": [
+  {
+   "drawn_target": 11.0,
+   "speed_aware": true,
+   "v": 0.05,
+   "target": 20.0
+  },
+  {
+   "drawn_target": 11.0,
+   "speed_aware": false,
+   "v": 0.05,
+   "target": 11.0
+  },
+  {
+   "drawn_target": 11.0,
+   "speed_aware": true,
+   "v": 0.0,
+   "target": 11.0
+  },
+  {
+   "drawn_target": 9.5,
+   "speed_aware": true,
+   "v": 0.0125,
+   "target": 11.75
+  }
+ ],
  "rescue_size": [
   {
    "drawn_target": 11.0,

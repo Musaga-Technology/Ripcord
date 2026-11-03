@@ -119,6 +119,15 @@ fn guard_decisions() {
         );
         assert_eq!(fire, r["fire"].as_bool().unwrap());
     }
+    for r in v["speed_target"].as_array().unwrap() {
+        let t = speed_target(
+            f(&r["drawn_target"]),
+            r["speed_aware"].as_bool().unwrap(),
+            f(&r["v"]),
+            60.0,
+        );
+        close(Some(t), Some(f(&r["target"])));
+    }
     for r in v["rescue_size"].as_array().unwrap() {
         let i = SizeInput {
             drawn_target: f(&r["drawn_target"]),

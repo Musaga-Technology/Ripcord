@@ -212,6 +212,15 @@ def should_fire(distance, drawn_line, speed_aware, v, horizon_s=60):
     return bool(speed_aware) and distance - v * horizon_s < drawn_line
 
 
+# A speed-aware rescue tops up past the drawn target by SPEED_BOOST times the fall expected while the credit lands
+# (tuned on Oct 2025 – Jun 2026 replays: fewer liquidations and fewer, larger rescues than topping up to the target).
+SPEED_BOOST = 3
+
+
+def speed_target(drawn_target, speed_aware, v, horizon_s=60):
+    return drawn_target + (SPEED_BOOST * v * horizon_s if speed_aware else 0)
+
+
 def rescue_size(drawn_target, distance, mark, szi, maint_frac, max_rescue_usd, budget_left_usd, reserve_usd):
     side = 1 if szi > 0 else -1
     t = (drawn_target - distance) / 100 * mark * abs(szi) * (1 - maint_frac * side)
@@ -360,6 +369,8 @@ def vectors_guard():
     fires = [{'distance': d, 'drawn_line': l, 'speed_aware': sa, 'v': v, 'fire': should_fire(d, l, sa, v)}
              for d, l, sa, v in [(4.9, 5.2, False, 0), (6.0, 5.2, False, 0.05), (6.0, 5.2, True, 0.05),
                                  (6.0, 5.2, True, 0.01), (5.2, 5.2, False, 0)]]
+    targets = [{'drawn_target': t, 'speed_aware': sa, 'v': v, 'target': speed_target(t, sa, v)}
+               for t, sa, v in [(11.0, True, 0.05), (11.0, False, 0.05), (11.0, True, 0.0), (9.5, True, 0.0125)]]
     sizes = [dict(zip(['drawn_target', 'distance', 'mark', 'szi', 'maint_frac', 'max_rescue_usd', 'budget_left_usd', 'reserve_usd'], a))
              for a in [(11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 5000, 5000), (11.0, 4.9, 2205.0, 12.4, 0.02, 1500, 5000, 5000),
                        (11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 900, 5000), (11.0, 4.9, 83000.0, -0.8, 0.02, 9000, 9000, 9000),
@@ -375,7 +386,7 @@ def vectors_guard():
                for z, lb, m, lq, a in [(12.4, 2131.0, 2120.0, False, 3600), (12.4, 2131.0, 2200.0, False, 3600),
                                        (12.4, 2131.0, 2200.0, False, 86400), (-0.8, 90000.0, 90500.0, False, 10),
                                        (12.4, 2131.0, 1900.0, True, 100)]]
-    return {'distance': distance, 'guard_distance': guard_d, 'fall_rate': falls, 'should_fire': fires, 'rescue_size': sizes,
+    return {'distance': distance, 'guard_distance': guard_d, 'fall_rate': falls, 'should_fire': fires, 'speed_target': targets, 'rescue_size': sizes,
             'save_fee': fees, 'round_credit': rounding, 'at_hour': hours, 'latency_s': lats, 'draw': draws, 'settle': settles}
 
 

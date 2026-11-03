@@ -8,7 +8,9 @@ use crate::host::Host;
 use crate::registry::{self, TGAS};
 use crate::{hl, policy, settings, vault};
 use ripcord_rules::commitment::is_guard_id;
-use ripcord_rules::guard::{distance_pct, draw, fall_rate, mark_of, rescue_size, settle, should_fire, SizeInput};
+use ripcord_rules::guard::{
+    distance_pct, draw, fall_rate, mark_of, rescue_size, settle, should_fire, speed_target, SizeInput,
+};
 use ripcord_rules::seal;
 use ripcord_rules::types::{CheckStatus, LeverageType, Outcome};
 use serde::{Deserialize, Serialize};
@@ -162,7 +164,8 @@ pub fn check(host: &dyn Host, guard_id: &str) -> Result<CheckStatus, String> {
     }
     let budget_left = (s.budget_usd - t.budget_used_usd).max(0.0);
     let size = rescue_size(&SizeInput {
-        drawn_target: t.target,
+        // Fast falls get a bigger top-up: past the target by the fall expected while the credit lands.
+        drawn_target: speed_target(t.target, s.speed_aware, v, HORIZON_S),
         distance,
         mark: mark_of(&p.position),
         szi: p.position.szi,

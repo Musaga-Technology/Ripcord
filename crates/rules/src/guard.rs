@@ -47,6 +47,14 @@ pub fn should_fire(distance: f64, drawn_line: f64, speed_aware: bool, v: f64, ho
     distance < drawn_line || (speed_aware && distance - v * horizon_s < drawn_line)
 }
 
+/// A speed-aware rescue tops up past the drawn target by this many times the fall expected while the credit lands
+/// (tuned on Oct 2025 – Jun 2026 replays: fewer liquidations and fewer, larger rescues than topping up to the target).
+pub const SPEED_BOOST: f64 = 3.0;
+
+pub fn speed_target(drawn_target: f64, speed_aware: bool, v: f64, horizon_s: f64) -> f64 {
+    drawn_target + if speed_aware { SPEED_BOOST * v * horizon_s } else { 0.0 }
+}
+
 pub struct SizeInput {
     pub drawn_target: f64,
     pub distance: f64,
