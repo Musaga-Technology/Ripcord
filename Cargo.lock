@@ -2058,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "ripcord-checker"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -2067,6 +2067,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "sha3 0.10.9",
  "wasi 0.13.3+wasi-0.2.2",
  "wasi-http-client",
  "wit-bindgen",

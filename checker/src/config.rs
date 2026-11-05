@@ -47,6 +47,9 @@ pub const HORIZON_S: f64 = 60.0;
 
 /// How many times a refunded rescue is fired again under a fresh key before the guard gives up on it.
 pub const MAX_REFIRES: u32 = 2;
+/// How many times a credited rescue tries to move its margin into an isolated position before it stops: about two
+/// minutes of checks. The USDC stays in the owner's account either way.
+pub const MAX_MARGIN_TRIES: u32 = 40;
 /// The $1 monthly guard fee, in USDC units.
 pub const MONTHLY_FEE_UNITS: u128 = 1_000_000;
 

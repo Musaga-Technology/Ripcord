@@ -7,7 +7,8 @@
 //! send the same key again next time, `processing` is read, never resubmitted, a refund fires again under a fresh
 //! key, and 503 pauses with no public fallback.
 use crate::actions::StoredGuard;
-use crate::config::{canary_on, fees_on, HISTORY_S, HORIZON_S, MAX_REFIRES, MONTHLY_FEE_UNITS, NET};
+use crate::agent::{self, Moved};
+use crate::config::{canary_on, fees_on, HISTORY_S, HORIZON_S, MAX_MARGIN_TRIES, MAX_REFIRES, MONTHLY_FEE_UNITS, NET};
 use crate::custody::{Custody, Op, Request};
 use crate::host::Host;
 use crate::registry::{self, TGAS};
@@ -83,6 +84,13 @@ pub struct Rescue {
     pub outcome: Outcome,
     pub fee_sent: bool,
     pub outcome_recorded: bool,
+    /// Isolated guards: the credit moved into the position, the nonce of the move in flight, and the tries so far.
+    #[serde(default)]
+    pub margin_moved: bool,
+    #[serde(default)]
+    pub margin_nonce: Option<u64>,
+    #[serde(default)]
+    pub margin_tries: u32,
 }
 
 /// u ∈ [0, 1) from the host's randomness (53 bits).
@@ -92,7 +100,7 @@ fn uniform(host: &dyn Host) -> f64 {
 }
 
 /// Seals `plain` to the owner's receipt key, bound to the guard: only the owner can open it.
-fn seal_to_owner(host: &dyn Host, guard_id: &str, g: &StoredGuard, plain: &Value) -> Result<String, String> {
+pub fn seal_to_owner(host: &dyn Host, guard_id: &str, g: &StoredGuard, plain: &Value) -> Result<String, String> {
     let owner = settings::receipt_key(&g.settings).ok_or("receipt key is malformed")?;
     let eph: [u8; 32] = host.random(32).try_into().map_err(|_| "randomness")?;
     let nonce: [u8; 12] = host.random(12).try_into().map_err(|_| "randomness")?;
@@ -229,6 +237,38 @@ fn advance(
             Ok(None)
         }
     }
+}
+
+/// An isolated guard's credit lands in the account's balance; this moves it into the position with the agent key.
+/// `Some(pending)` while a move is unfinished. A refusal (the credit may not be usable yet) tries again next check
+/// under a fresh nonce; a lost answer sends the same nonce, which Hyperliquid won't apply twice.
+fn move_margin(
+    host: &dyn Host,
+    custody: &Custody,
+    guard_id: &str,
+    g: &StoredGuard,
+    t: &mut Track,
+) -> Result<Option<CheckStatus>, String> {
+    if g.settings.isolated.is_none() {
+        return Ok(None);
+    }
+    let Some(r) = t.rescues.iter_mut().find(|r| {
+        r.stage == Stage::Credited && !r.margin_moved && r.margin_tries < MAX_MARGIN_TRIES && r.credited_usd.is_some()
+    }) else {
+        return Ok(None);
+    };
+    r.margin_tries += 1;
+    let retry = r.margin_nonce.is_some();
+    let nonce = *r.margin_nonce.get_or_insert(host.now_ms());
+    let asset = hl::asset_index(host, NET.hyperliquid, &r.coin)?;
+    let ntli = (r.credited_usd.unwrap_or(0.0) * 1e6).floor() as u64;
+    match agent::add_margin(host, custody, NET.hyperliquid, guard_id, asset, ntli, nonce)? {
+        Moved::Done => r.margin_moved = true,
+        Moved::Refused { nonce: true } if retry => r.margin_moved = true,
+        Moved::Refused { .. } => r.margin_nonce = None,
+        Moved::Unknown => {}
+    }
+    Ok((!r.margin_moved).then_some(CheckStatus::Pending))
 }
 
 /// Records credited rescues on the registry (the hour and a rounded amount in public, the exact figures sealed to
@@ -395,6 +435,11 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         return Ok(status);
     }
     vault::put(host, &key, &t)?;
+    let moving = move_margin(host, &custody, guard_id, &g, &mut t);
+    vault::put(host, &key, &t)?;
+    if let Some(status) = moving? {
+        return Ok(status);
+    }
     settle_and_record(host, &custody, guard_id, &g, &mut t, &positions, fee_wallet)?;
     vault::put(host, &key, &t)?;
 
@@ -475,6 +520,14 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         vault::put(host, &key, &t)?;
         return Ok(CheckStatus::Guarding);
     };
+    // A credit can't reach an isolated position without the owner's approval, so without it the reserve stays put.
+    if iso.is_some() {
+        let agent = custody.evm_address(guard_id)?;
+        if !hl::agent_approved(host, NET.hyperliquid, &s.hl_address, &agent, now)? {
+            vault::put(host, &key, &t)?;
+            return Ok(CheckStatus::Skipped);
+        }
+    }
 
     let usdc_units = ((amount * 1e6).floor() as u128).to_string();
     let (stage, swap_in, swap_min_out) = if s.reserve_asset == policy::USDC {
@@ -507,6 +560,9 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         outcome: Outcome::Pending,
         fee_sent: false,
         outcome_recorded: false,
+        margin_moved: false,
+        margin_nonce: None,
+        margin_tries: 0,
     };
     let op = send(&custody, guard_id, &g, &r)?;
     let status = took(&mut r, op);

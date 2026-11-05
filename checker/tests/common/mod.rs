@@ -35,7 +35,19 @@ pub struct Net {
     pub transfers: Vec<Value>,
     /// Accepted requests: id → the amount a success delivers.
     pub pending: std::collections::HashMap<String, String>,
+    /// Agents the owner has approved on Hyperliquid (`extraAgents`).
+    pub agents: Value,
+    /// What the guard wallet was asked to sign, and what reached Hyperliquid's `/exchange`.
+    pub signed: Vec<Value>,
+    pub exchange: Vec<Value>,
+    /// What `/exchange` answers, one per call in order (`ok` once they run out); "lost" drops the answer.
+    pub exchange_answers: std::collections::VecDeque<&'static str>,
+    /// The confidential balances (`None` answers 503).
+    pub balances: Option<Value>,
 }
+
+/// The guard wallet's EVM address in the fake network.
+pub const AGENT: &str = "0xa9e47000000000000000000000000000000000a9";
 
 /// One position as Hyperliquid's `clearinghouseState` lists it (numbers as strings).
 pub fn position(coin: &str, szi: f64, mark: f64, liq: Option<f64>, max_lev: u32, kind: &str) -> Value {
@@ -119,7 +131,24 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
             };
             return ok(json!({ "jsonrpc": "2.0", "id": "ripcord", "result": result }));
         }
+        if url == format!("{}/exchange", NET.hyperliquid) {
+            let mut net = n.borrow_mut();
+            net.exchange.push(serde_json::from_str(&body).unwrap());
+            return match net.exchange_answers.pop_front().unwrap_or("ok") {
+                "ok" => ok(json!({ "status": "ok", "response": { "type": "default" } })),
+                "lost" => (502, b"".to_vec()),
+                err => ok(json!({ "status": "err", "response": err })),
+            };
+        }
         if url == format!("{}/info", NET.hyperliquid) {
+            let req: Value = serde_json::from_str(&body).unwrap();
+            if req["type"] == "meta" {
+                return ok(json!({ "universe": [{ "name": "BTC" }, { "name": "ETH" }, { "name": "HYPE" }] }));
+            }
+            if req["type"] == "extraAgents" {
+                let a = n.borrow().agents.clone();
+                return ok(if a.is_null() { json!([]) } else { a });
+            }
             let st = n.borrow().hl_state.clone();
             return ok(if st.is_null() { state(vec![]) } else { st });
         }
@@ -143,6 +172,15 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                 "wallet/v1/confidential/deposit/cross-chain" => {
                     ok(json!({ "intent_id": "i-1", "deposit_address": "0xDEP0517", "amount": req["amount"] }))
                 }
+                "wallet/v1/address?chain=arbitrum" => ok(json!({ "address": AGENT })),
+                "wallet/v1/evm/sign-typed-data" => {
+                    n.borrow_mut().signed.push(req);
+                    ok(json!({ "signature": format!("0x{}{}1b", "11".repeat(32), "22".repeat(32)) }))
+                }
+                "wallet/v1/confidential/balance" => match n.borrow().balances.clone() {
+                    Some(b) => ok(json!({ "balances": b, "account_id": "x" })),
+                    None => (503, b"{}".to_vec()),
+                },
                 "wallet/v1/confidential/withdraw" => {
                     let mut net = n.borrow_mut();
                     match net.withdraw_code {

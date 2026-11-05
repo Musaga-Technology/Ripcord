@@ -51,16 +51,45 @@ pub fn parse(state: &Value) -> Result<Vec<HlPosition>, String> {
         .collect()
 }
 
-pub fn positions(host: &dyn Host, api: &str, user: &str) -> Result<Vec<HlPosition>, String> {
-    let body = json!({ "type": "clearinghouseState", "user": user }).to_string();
+fn info(host: &dyn Host, api: &str, body: &Value) -> Result<Value, String> {
     let (code, raw) = host.http(
         "POST",
         &format!("{api}/info"),
         &[("Content-Type", "application/json".into())],
-        Some(body.as_bytes()),
+        Some(body.to_string().as_bytes()),
     )?;
     if code != 200 {
         return Err(format!("hyperliquid: HTTP {code}"));
     }
-    parse(&serde_json::from_slice(&raw).map_err(|_| "hyperliquid: not JSON")?)
+    serde_json::from_slice(&raw).map_err(|_| "hyperliquid: not JSON".into())
+}
+
+pub fn positions(host: &dyn Host, api: &str, user: &str) -> Result<Vec<HlPosition>, String> {
+    parse(&info(
+        host,
+        api,
+        &json!({ "type": "clearinghouseState", "user": user }),
+    )?)
+}
+
+/// A coin's asset number: its place in the perps universe (`meta`, weight 20, so only when a rescue needs it).
+pub fn asset_index(host: &dyn Host, api: &str, coin: &str) -> Result<u32, String> {
+    let meta = info(host, api, &json!({ "type": "meta" }))?;
+    let universe = meta["universe"].as_array().ok_or("meta has no universe")?;
+    universe
+        .iter()
+        .position(|a| a["name"] == coin)
+        .map(|i| i as u32)
+        .ok_or_else(|| "coin is not in the perps universe".into())
+}
+
+/// Has the owner approved this agent, and is the approval still good? (`extraAgents`, read Nov 5 2026:
+/// a list of `{name, address, validUntil}`.)
+pub fn agent_approved(host: &dyn Host, api: &str, user: &str, agent: &str, now_ms: u64) -> Result<bool, String> {
+    let list = info(host, api, &json!({ "type": "extraAgents", "user": user }))?;
+    let list = list.as_array().ok_or("extraAgents is not a list")?;
+    Ok(list.iter().any(|a| {
+        a["address"].as_str().is_some_and(|x| x.eq_ignore_ascii_case(agent))
+            && a["validUntil"].as_u64().is_none_or(|until| until > now_ms)
+    }))
 }

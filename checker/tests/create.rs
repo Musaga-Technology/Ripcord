@@ -3,7 +3,7 @@
 use ripcord_checker::actions::{run, SealedPayload, StoredGuard};
 use ripcord_checker::commitment::{account_commitment, commitment, owner_commitment};
 use ripcord_checker::host::{Host, MockHost};
-use ripcord_checker::seal::seal_with;
+use ripcord_checker::seal::{open, public_key, seal_with};
 use ripcord_checker::types::{GuardSettings, Isolated, Preset};
 use ripcord_checker::{policy, vault};
 use serde_json::{json, Value};
@@ -348,6 +348,53 @@ fn a_wnear_reserve_is_capped_in_wnear_at_the_listed_price() {
 }
 
 const ARB_USDC: &str = "nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near";
+const RECEIPT_SECRET: [u8; 32] = [9; 32];
+
+/// Settings with a receipt key whose secret the test holds, so it can read what is sealed to the owner.
+fn owned() -> GuardSettings {
+    GuardSettings {
+        receipt_pk: format!("x25519:{}", hex::encode(public_key(&RECEIPT_SECRET))),
+        ..settings()
+    }
+}
+
+fn opened(sealed: &str) -> Value {
+    serde_json::from_slice(&open(&RECEIPT_SECRET, &hex::decode(sealed).unwrap(), GID).unwrap()).unwrap()
+}
+
+#[test]
+fn the_reserve_balance_is_sealed_to_the_owner() {
+    let (host, net) = common::host(1);
+    let ask = json!({ "action": "reserve", "guard_id": GID }).to_string();
+    assert_eq!(run(&host, &ask)["refused"], "no such guard");
+    run(&host, &create_input(&host, &owned(), GID, GID));
+
+    assert_eq!(run(&host, &ask)["refused"], "the private route is unavailable");
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
+    let out = run(&host, &ask);
+    assert!(
+        !out.to_string().contains("4000000000"),
+        "a stranger's call learns nothing"
+    );
+    assert_eq!(
+        opened(out["sealed"].as_str().unwrap())["balances"][0]["balance"],
+        "4000000000"
+    );
+}
+
+#[test]
+fn an_isolated_guard_hands_its_agent_only_to_the_owner() {
+    let (host, _) = common::host(1);
+    let mut s = owned();
+    s.isolated = Some(Isolated { coin: "BTC".into() });
+    let out = run(&host, &create_input(&host, &s, GID, GID));
+    assert_eq!(out["status"], "pending");
+    assert!(
+        !out.to_string().contains(common::AGENT),
+        "an agent's address names its account"
+    );
+    assert_eq!(opened(out["sealed"].as_str().unwrap())["agent"], common::AGENT);
+}
 
 #[test]
 fn funds_a_registered_guard_with_its_sealed_budget() {
@@ -356,7 +403,7 @@ fn funds_a_registered_guard_with_its_sealed_budget() {
     assert_eq!(run(&host, &fund)["refused"], "no such guard");
 
     net.borrow_mut().fail_tx = true;
-    run(&host, &create_input(&host, &settings(), GID, GID));
+    run(&host, &create_input(&host, &owned(), GID, GID));
     assert_eq!(
         run(&host, &fund)["refused"],
         "guard is not registered yet",
@@ -364,9 +411,15 @@ fn funds_a_registered_guard_with_its_sealed_budget() {
     );
 
     net.borrow_mut().fail_tx = false;
-    run(&host, &create_input(&host, &settings(), GID, GID));
+    run(&host, &create_input(&host, &owned(), GID, GID));
     let out = run(&host, &fund);
-    assert_eq!(out, json!({ "status": "pending", "deposit_address": "0xDEP0517" }));
+    assert_eq!(out["status"], "pending");
+    assert!(
+        !out.to_string().contains("0xDEP0517"),
+        "the address names the reserve's size on its chain, so only the owner reads it"
+    );
+    let plain = opened(out["sealed"].as_str().unwrap());
+    assert_eq!(plain["deposit_address"], "0xDEP0517");
     let n = net.borrow();
     let (_, dep) = n.requests.last().unwrap();
     assert_eq!(

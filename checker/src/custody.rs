@@ -137,6 +137,56 @@ impl<'a> Custody<'a> {
             .map(String::from)
             .ok_or_else(|| "deposit: no address".into())
     }
+
+    /// The wallet's confidential balances, as (token, smallest units). `None` when the route is down.
+    pub fn balances(&self, seed: &str) -> Result<Option<Vec<(String, String)>>, String> {
+        let t = self.token(seed)?;
+        let (code, v) = self.request("GET", "/wallet/v1/confidential/balance", Some(&t), None, None)?;
+        if code == 503 {
+            return Ok(None);
+        }
+        let v = self.ok("balance", (code, v))?;
+        let list = v["balances"].as_array().ok_or("balance: no list")?;
+        Ok(Some(
+            list.iter()
+                .filter_map(|b| Some((b["token"].as_str()?.to_string(), b["balance"].as_str()?.to_string())))
+                .collect(),
+        ))
+    }
+
+    /// The wallet's EVM address (the same on every EVM chain): the agent an isolated guard's owner approves.
+    pub fn evm_address(&self, seed: &str) -> Result<String, String> {
+        let t = self.token(seed)?;
+        let v = self.ok(
+            "address",
+            self.request("GET", "/wallet/v1/address?chain=arbitrum", Some(&t), None, None)?,
+        )?;
+        v["address"]
+            .as_str()
+            .map(String::from)
+            .ok_or_else(|| "address: no address".into())
+    }
+
+    /// Signs EIP-712 typed data with the wallet's EVM key (only an isolated guard's policy allows it). Returns
+    /// (r, s, v) as Hyperliquid wants them. Only `agent::add_margin` calls this.
+    pub fn sign_typed_data(&self, seed: &str, typed: &Value) -> Result<(String, String, u8), String> {
+        let t = self.token(seed)?;
+        let body = json!({ "chain": "arbitrum", "typed_data": typed });
+        let v = self.ok(
+            "sign-typed-data",
+            self.request("POST", "/wallet/v1/evm/sign-typed-data", Some(&t), Some(&body), None)?,
+        )?;
+        let sig = v["signature"].as_str().ok_or("sign-typed-data: no signature")?;
+        let sig = hex::decode(sig.trim_start_matches("0x")).map_err(|_| "sign-typed-data: not hex")?;
+        if sig.len() != 65 {
+            return Err("sign-typed-data: wrong length".into());
+        }
+        Ok((
+            format!("0x{}", hex::encode(&sig[..32])),
+            format!("0x{}", hex::encode(&sig[32..64])),
+            sig[64],
+        ))
+    }
 }
 
 /// What OutLayer answered an action (withdraw, swap, transfer): every one is asynchronous and keyed.

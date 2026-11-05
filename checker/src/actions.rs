@@ -1,9 +1,10 @@
 //! The checker's actions (docs/SPEC.md §3). Input is JSON on stdin, output is JSON on stdout (≤ 900 bytes) and
 //! carries a status, never a setting. Refusal reasons name the rule that failed, never the value.
+use crate::check::{self, seal_to_owner};
 use crate::config::{NET, REGISTER_DEPOSIT, REGISTER_GAS};
 use crate::custody::Custody;
 use crate::host::Host;
-use crate::{check, oneclick, policy, registry, settings, vault};
+use crate::{oneclick, policy, registry, settings, vault};
 use ripcord_rules::commitment::{account_commitment, commitment, is_guard_id, owner_commitment};
 use ripcord_rules::seal;
 use ripcord_rules::types::{CheckStatus, GuardSettings};
@@ -19,6 +20,7 @@ pub enum Input {
     Pubkey,
     Create(CreateInput),
     Fund(FundInput),
+    Reserve { guard_id: String },
     Check { guard_id: String },
 }
 
@@ -69,6 +71,7 @@ pub fn run(host: &dyn Host, input: &str) -> Value {
         Ok(Input::Pubkey) => pubkey(host).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Create(c)) => create(host, &c).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Fund(f)) => fund(host, &f).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Reserve { guard_id }) => reserve(host, &guard_id).unwrap_or_else(|e| refuse(&e)),
         // A check answers with its status alone, even when it fails (rule 4).
         Ok(Input::Check { guard_id }) => {
             json!({ "status": check::check(host, &guard_id).unwrap_or(CheckStatus::Skipped) })
@@ -125,6 +128,13 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
         g.registered = Some(register(host, c, &g.settings)?);
         vault::put(host, &key, &g)?;
     }
+    // An isolated guard's owner approves this wallet's EVM address on Hyperliquid. Sealed: an approved agent's
+    // address names the account it serves, so a guard id must not lead to it.
+    if g.settings.isolated.is_some() {
+        let agent = Custody::new(host, NET.outlayer_api)?.evm_address(&c.guard_id)?;
+        let sealed = seal_to_owner(host, &c.guard_id, &g, &json!({ "agent": agent }))?;
+        return Ok(json!({ "status": "pending", "sealed": sealed }));
+    }
     Ok(json!({ "status": "pending" }))
 }
 
@@ -161,7 +171,8 @@ fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<Strin
 
 /// A one-time address on the owner's chain that funds the guard's confidential reserve with its budget. Only for
 /// a registered guard, so no money reaches a wallet before its policy does. The amount comes from the sealed
-/// settings, never from input; the output carries the address only.
+/// settings, never from input. The address and amount are sealed to the owner: guard ids are public, and whoever
+/// holds the address can read the reserve's size on its chain.
 pub fn fund(host: &dyn Host, f: &FundInput) -> Result<Value, String> {
     let g: StoredGuard = vault::get(host, &format!("s/{}", f.guard_id))?.ok_or("no such guard")?;
     if g.registered.is_none() {
@@ -171,7 +182,25 @@ pub fn fund(host: &dyn Host, f: &FundInput) -> Result<Value, String> {
     let amount = ((g.settings.budget_usd * t.per_usd()).ceil() as u128).to_string();
     let custody = Custody::new(host, NET.outlayer_api)?;
     let address = custody.deposit_address(&f.guard_id, &f.source_asset, &amount)?;
-    Ok(json!({ "status": "pending", "deposit_address": address }))
+    let sealed = seal_to_owner(
+        host,
+        &f.guard_id,
+        &g,
+        &json!({ "deposit_address": address, "amount": amount, "decimals": t.decimals }),
+    )?;
+    Ok(json!({ "status": "pending", "sealed": sealed }))
+}
+
+/// The reserve's balances, sealed to the owner: a stranger's call learns nothing, not even whether it is funded.
+pub fn reserve(host: &dyn Host, guard_id: &str) -> Result<Value, String> {
+    let g: StoredGuard = vault::get(host, &format!("s/{guard_id}"))?.ok_or("no such guard")?;
+    let custody = Custody::new(host, NET.outlayer_api)?;
+    let Some(list) = custody.balances(guard_id)? else {
+        return Err("the private route is unavailable".into());
+    };
+    let balances: Vec<Value> = list.iter().map(|(t, b)| json!({ "token": t, "balance": b })).collect();
+    let sealed = seal_to_owner(host, guard_id, &g, &json!({ "balances": balances }))?;
+    Ok(json!({ "status": "guarding", "sealed": sealed }))
 }
 
 /// The wallet policy for a stored guard (used by `create` once its custody wallet is open).

@@ -1,6 +1,6 @@
 {
   "display": { "name": "Ripcord checker" },
-  "operations": ["pubkey", "create", "fund", "check"],
+  "operations": ["pubkey", "create", "fund", "reserve", "check"],
   "capabilities": {
     "network": [
       "api.hyperliquid.xyz",

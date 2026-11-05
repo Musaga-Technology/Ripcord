@@ -1,6 +1,7 @@
 //! Ripcord's checker: the program sealed in OutLayer's TEE. Pure logic lives here and is tested natively against a
 //! mock host; `src/main.rs` (feature `outlayer`) wires it to OutLayer's interfaces for the wasm32-wasip2 build.
 pub mod actions;
+pub mod agent;
 pub mod check;
 pub mod config;
 pub mod custody;

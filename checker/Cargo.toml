@@ -1,6 +1,6 @@
 [package]
 name = "ripcord-checker"
-version = "0.1.1"
+version = "0.1.2"
 description = "Ripcord's guard checker: sealed settings, Hyperliquid reads and rescues, run in OutLayer's TEE"
 edition.workspace = true
 license.workspace = true
@@ -24,6 +24,7 @@ ripcord-rules = { path = "../crates/rules", features = ["seal"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sha3 = "0.10"
 hex.workspace = true
 base64 = "0.22"
 wit-bindgen = { version = "0.36", optional = true }
