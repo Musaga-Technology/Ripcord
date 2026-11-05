@@ -3,7 +3,7 @@
 use ripcord_rules::canonical::canonical;
 use ripcord_rules::commitment::*;
 use ripcord_rules::guard::*;
-use ripcord_rules::types::{GuardSettings, Outcome, Position};
+use ripcord_rules::types::{GuardSettings, Outcome, Position, Preset};
 use serde_json::Value;
 
 fn load(name: &str) -> Value {
@@ -166,5 +166,21 @@ fn guard_decisions() {
         );
         let want: Outcome = serde_json::from_value(r["outcome"].clone()).unwrap();
         assert_eq!(o, want);
+    }
+}
+
+#[test]
+fn preset_ranges_match() {
+    for c in load("guard")["preset_ranges"].as_array().unwrap() {
+        let preset: Preset = serde_json::from_value(c["preset"].clone()).unwrap();
+        let got = preset_ranges(preset, f(&c["d0"]));
+        let want = (!c["ranges"].is_null()).then(|| {
+            let r = &c["ranges"];
+            (
+                [f(&r["line_range_pct"][0]), f(&r["line_range_pct"][1])],
+                [f(&r["target_range_pct"][0]), f(&r["target_range_pct"][1])],
+            )
+        });
+        assert_eq!(got, want, "{c}");
     }
 }

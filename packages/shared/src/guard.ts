@@ -1,6 +1,34 @@
 // The guard's decisions as pure functions (docs/SPEC.md §3 "One check"). The checker runs the Rust twin
 // (checker/src/guard.rs) inside the enclave; the web app and the replay harness use this one. Distances are in %.
-import type { Outcome, Position } from './types';
+import type { Outcome, Position, Preset } from './types';
+
+/** Line and target as fractions of the position's distance from liquidation at setup (docs/ARCHITECTURE.md §4.2). */
+export const PRESET_FRACTIONS: Record<Preset, [number, number]> = {
+  safer: [0.75, 1.1],
+  balanced: [0.6, 1.0],
+  lean: [0.45, 0.9],
+};
+/** The sealed ranges' half-width around a preset's line and target, as a fraction of each. */
+export const RANGE_WIDTH = 0.15;
+
+export interface PresetRanges {
+  line_range_pct: [number, number];
+  target_range_pct: [number, number];
+}
+
+const round2 = (x: number) => Math.floor(x * 100 + 0.5) / 100;
+
+/** A preset's sealed ranges for a position `d0` % from liquidation; null if they wouldn't pass the checker. */
+export function presetRanges(preset: Preset, d0: number): PresetRanges | null {
+  const [lf, tf] = PRESET_FRACTIONS[preset];
+  const [line, target] = [lf * d0, tf * d0];
+  const lo = round2(line * (1 - RANGE_WIDTH));
+  const hi = Math.min(round2(line * (1 + RANGE_WIDTH)), 50);
+  const tlo = round2(target * (1 - RANGE_WIDTH));
+  const thi = Math.min(round2(target * (1 + RANGE_WIDTH)), 80);
+  if (lo < 0.5 || lo > hi || tlo <= hi || tlo > thi) return null;
+  return { line_range_pct: [lo, hi], target_range_pct: [tlo, thi] };
+}
 
 export function distancePct(liquidationPx: number | null, mark: number): number | null {
   if (liquidationPx === null) return null;

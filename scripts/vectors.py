@@ -265,6 +265,25 @@ def settle(szi, liq_before, mark, liquidated, age_s):
     return 'early' if age_s >= 86400 else 'pending'
 
 
+PRESET_FRACTIONS = {'safer': (0.75, 1.10), 'balanced': (0.60, 1.00), 'lean': (0.45, 0.90)}
+RANGE_WIDTH = 0.15
+
+
+def round_2(x):
+    return round_half_up(x * 100) / 100
+
+
+def preset_ranges(preset, d0):
+    """A preset's sealed ranges for a position d0 % from liquidation; None if they wouldn't pass the checker."""
+    lf, tf = PRESET_FRACTIONS[preset]
+    line, target = lf * d0, tf * d0
+    lo, hi = round_2(line * (1 - RANGE_WIDTH)), min(round_2(line * (1 + RANGE_WIDTH)), 50.0)
+    tlo, thi = round_2(target * (1 - RANGE_WIDTH)), min(round_2(target * (1 + RANGE_WIDTH)), 80.0)
+    if lo < 0.5 or lo > hi or tlo <= hi or tlo > thi:
+        return None
+    return {'line_range_pct': [lo, hi], 'target_range_pct': [tlo, thi]}
+
+
 # ---------- vectors ----------
 SALT_A = '1f' * 32
 SALT_B = hashlib.sha256(b'ripcord account salt').hexdigest()
@@ -386,7 +405,10 @@ def vectors_guard():
                for z, lb, m, lq, a in [(12.4, 2131.0, 2120.0, False, 3600), (12.4, 2131.0, 2200.0, False, 3600),
                                        (12.4, 2131.0, 2200.0, False, 86400), (-0.8, 90000.0, 90500.0, False, 10),
                                        (12.4, 2131.0, 1900.0, True, 100)]]
-    return {'distance': distance, 'guard_distance': guard_d, 'fall_rate': falls, 'should_fire': fires, 'speed_target': targets, 'rescue_size': sizes,
+    presets = [{'preset': p, 'd0': d, 'ranges': preset_ranges(p, d)}
+               for p, d in [('balanced', 17.3), ('safer', 8.2), ('lean', 23.456), ('balanced', 1.0), ('lean', 1.0),
+                            ('safer', 0.5), ('balanced', 90.0), ('safer', 75.0)]]
+    return {'preset_ranges': presets, 'distance': distance, 'guard_distance': guard_d, 'fall_rate': falls, 'should_fire': fires, 'speed_target': targets, 'rescue_size': sizes,
             'save_fee': fees, 'round_credit': rounding, 'at_hour': hours, 'latency_s': lats, 'draw': draws, 'settle': settles}
 
 

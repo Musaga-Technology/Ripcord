@@ -1,4 +1,100 @@
 {
+ "preset_ranges": [
+  {
+   "preset": "balanced",
+   "d0": 17.3,
+   "ranges": {
+    "line_range_pct": [
+     8.82,
+     11.94
+    ],
+    "target_range_pct": [
+     14.71,
+     19.9
+    ]
+   }
+  },
+  {
+   "preset": "safer",
+   "d0": 8.2,
+   "ranges": {
+    "line_range_pct": [
+     5.23,
+     7.07
+    ],
+    "target_range_pct": [
+     7.67,
+     10.37
+    ]
+   }
+  },
+  {
+   "preset": "lean",
+   "d0": 23.456,
+   "ranges": {
+    "line_range_pct": [
+     8.97,
+     12.14
+    ],
+    "target_range_pct": [
+     17.94,
+     24.28
+    ]
+   }
+  },
+  {
+   "preset": "balanced",
+   "d0": 1.0,
+   "ranges": {
+    "line_range_pct": [
+     0.51,
+     0.69
+    ],
+    "target_range_pct": [
+     0.85,
+     1.15
+    ]
+   }
+  },
+  {
+   "preset": "lean",
+   "d0": 1.0,
+   "ranges": null
+  },
+  {
+   "preset": "safer",
+   "d0": 0.5,
+   "ranges": null
+  },
+  {
+   "preset": "balanced",
+   "d0": 90.0,
+   "ranges": {
+    "line_range_pct": [
+     45.9,
+     50.0
+    ],
+    "target_range_pct": [
+     76.5,
+     80.0
+    ]
+   }
+  },
+  {
+   "preset": "safer",
+   "d0": 75.0,
+   "ranges": {
+    "line_range_pct": [
+     47.81,
+     50.0
+    ],
+    "target_range_pct": [
+     70.13,
+     80.0
+    ]
+   }
+  }
+ ],
  "distance": [
   {
    "liquidation_px": 1995.1,

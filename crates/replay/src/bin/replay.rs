@@ -14,12 +14,16 @@ const ASSETS: [(&str, f64, [f64; 2]); 4] = [
     ("SOLUSDT", 20.0, [5.0, 10.0]),
     ("HYPEUSDT", 10.0, [3.0, 5.0]),
 ];
-pub const MODES: [Mode; 7] = [
+pub const MODES: [Mode; 8] = [
     Mode::Unguarded,
     Mode::Upfront,
     Mode::Guarded {
         preset: Preset::Safer,
         speed_aware: false,
+    },
+    Mode::Guarded {
+        preset: Preset::Safer,
+        speed_aware: true,
     },
     Mode::Guarded {
         preset: Preset::Balanced,

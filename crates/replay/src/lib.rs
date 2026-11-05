@@ -7,8 +7,10 @@
 //! mark; decisions on bar closes; a rescue's credit lands `delay_bars` bars after it fires, and the bars in between
 //! are tested against the old liquidation price. A rescue is saved if, within 24 h, the price crosses the
 //! liquidation price from before it; early if it doesn't; failed if the position is liquidated anyway.
-use ripcord_rules::guard::{draw, fall_rate, rescue_size, settle, should_fire, speed_target, SizeInput};
-use ripcord_rules::types::Outcome;
+use ripcord_rules::guard::{
+    draw, fall_rate, preset_fractions, rescue_size, settle, should_fire, speed_target, SizeInput,
+};
+use ripcord_rules::types::{self, Outcome};
 
 pub const NOTIONAL: f64 = 10_000.0;
 /// The sealed ranges' half-width around a preset's line and target, as a fraction of each.
@@ -50,11 +52,11 @@ pub enum Preset {
 impl Preset {
     /// Line and target as fractions of the starting distance to liquidation D0 (docs/ARCHITECTURE.md §4.2).
     pub fn fractions(self) -> (f64, f64) {
-        match self {
-            Preset::Safer => (0.75, 1.10),
-            Preset::Balanced => (0.60, 1.00),
-            Preset::Lean => (0.45, 0.90),
-        }
+        preset_fractions(match self {
+            Preset::Safer => types::Preset::Safer,
+            Preset::Balanced => types::Preset::Balanced,
+            Preset::Lean => types::Preset::Lean,
+        })
     }
 }
 

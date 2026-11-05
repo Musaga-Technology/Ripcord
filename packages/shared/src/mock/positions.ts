@@ -1,5 +1,5 @@
 // Demo-mode data: one trader's Hyperliquid account as `clearinghouseState` would describe it, and the guards on
-// it. Matches the Product canvas (ETH long guarded, BTC short guarded, SOL unguarded, HYPE isolated guarded).
+// it. ETH long and BTC short share one cross guard; HYPE isolated is guarded; SOL isolated is left to guard.
 // Commitments are computed from real (example) sealed settings, so cards and fingerprints are what a user sees.
 import { commitment, fingerprint } from '../commitment';
 import { guardDistance, markOf } from '../guard';
@@ -10,7 +10,7 @@ export const DEMO_TRADER = '0x9c4e7a1b2c3d4e5f60718293a4b5c6d7e8f941f2';
 export const DEMO_POSITIONS: Position[] = [
   { coin: 'ETH', szi: 12.4, position_value: 29906.32, liquidation_px: 1995.1, leverage_type: 'cross' },
   { coin: 'BTC', szi: -0.8, position_value: 66400, liquidation_px: 98940, leverage_type: 'cross' },
-  { coin: 'SOL', szi: 140, position_value: 14978.6, liquidation_px: 87.1, leverage_type: 'cross' },
+  { coin: 'SOL', szi: 140, position_value: 14978.6, liquidation_px: 87.1, leverage_type: 'isolated' },
   { coin: 'HYPE', szi: 300, position_value: 24594, liquidation_px: 55.3, leverage_type: 'isolated' },
 ];
 

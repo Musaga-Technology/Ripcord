@@ -1,6 +1,6 @@
 //! The guard's decisions as pure functions (docs/SPEC.md §3 "One check"). Mirrors `packages/shared/src/guard.ts`.
 //! Distances are in %.
-use crate::types::{LeverageType, Outcome, Position};
+use crate::types::{LeverageType, Outcome, Position, Preset};
 
 pub fn distance_pct(liquidation_px: Option<f64>, mark: f64) -> Option<f64> {
     liquidation_px.map(|lp| (lp - mark).abs() / mark * 100.0)
@@ -126,4 +126,31 @@ pub fn settle(szi: f64, liq_before: f64, mark: f64, liquidated: bool, age_s: f64
     } else {
         Outcome::Pending
     }
+}
+
+/// Line and target as fractions of the position's distance from liquidation at setup (docs/ARCHITECTURE.md §4.2).
+pub fn preset_fractions(preset: Preset) -> (f64, f64) {
+    match preset {
+        Preset::Safer => (0.75, 1.10),
+        Preset::Balanced => (0.60, 1.00),
+        Preset::Lean => (0.45, 0.90),
+    }
+}
+
+/// The sealed ranges' half-width around a preset's line and target, as a fraction of each.
+pub const RANGE_WIDTH: f64 = 0.15;
+
+/// A preset's sealed ranges for a position `d0` % from liquidation, or `None` if they wouldn't pass the checker.
+pub fn preset_ranges(preset: Preset, d0: f64) -> Option<([f64; 2], [f64; 2])> {
+    let round2 = |x: f64| (x * 100.0 + 0.5).floor() / 100.0;
+    let (lf, tf) = preset_fractions(preset);
+    let (line, target) = (lf * d0, tf * d0);
+    let lo = round2(line * (1.0 - RANGE_WIDTH));
+    let hi = round2(line * (1.0 + RANGE_WIDTH)).min(50.0);
+    let tlo = round2(target * (1.0 - RANGE_WIDTH));
+    let thi = round2(target * (1.0 + RANGE_WIDTH)).min(80.0);
+    if lo < 0.5 || lo > hi || tlo <= hi || tlo > thi {
+        return None;
+    }
+    Some(([lo, hi], [tlo, thi]))
 }

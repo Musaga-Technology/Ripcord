@@ -5,3 +5,6 @@ export * from './guard';
 export * from './rosette';
 export * from './owner';
 export * from './seal';
+export * from './base58';
+export * from './sealfile';
+export * from './setup';

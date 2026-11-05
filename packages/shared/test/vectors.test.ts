@@ -10,6 +10,7 @@ import {
   commitment,
   distancePct,
   draw,
+  presetRanges,
   fallRate,
   fingerprint,
   fingerprintShort,
@@ -29,6 +30,7 @@ import {
   type Json,
   type Position,
 } from '../src/index';
+import type { Preset } from '../src/types';
 
 const close = (a: number | null, b: number | null) =>
   a === null || b === null
@@ -83,6 +85,9 @@ describe('guard decisions', () => {
   it.each(guardV.at_hour)('at hour $at_s', (h) => expect(atHour(h.at_s)).toBe(h.at_hour));
   it.each(guardV.latency_s)('latency $seconds', (l) => expect(latencyS(l.seconds)).toBe(l.latency_s));
   it.each(guardV.draw)('draw %#', (d) => close(draw(d.lo, d.hi, d.u), d.value));
+  it.each(guardV.preset_ranges)('preset ranges %#', (c) =>
+    expect(presetRanges(c.preset as Preset, c.d0)).toEqual(c.ranges),
+  );
   it.each(guardV.settle)('settle %#', (s) =>
     expect(settle(s.szi, s.liq_before, s.mark, s.liquidated, s.age_s)).toBe(s.outcome),
   );
