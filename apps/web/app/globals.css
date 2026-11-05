@@ -89,9 +89,239 @@ body {
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
+/* Motion tokens (DESIGN §8). */
+:root {
+  --dur-1: 120ms;
+  --dur-2: 240ms;
+  --dur-3: 420ms;
+  --dur-4: 600ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The card as an object (components/site/Card3D.tsx). */
+.card-3d-body {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  will-change: transform;
+}
+.card-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: #0b0b0d;
+  border: 1px solid #1f1f24;
+}
+.card-shadow {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -9%;
+  height: 22%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.42;
+  filter: blur(28px);
+  transform: translateX(var(--sx, 0px));
+}
+:root[data-theme='light'] .card-shadow {
+  opacity: 0.18;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .card-shadow {
+    opacity: 0.18;
   }
+}
+@media (max-width: 640px) {
+  .card-edge {
+    border-radius: 22px;
+  }
+}
+
+/* The seal: the rosette prints itself (DESIGN §8.1). */
+.card-print .rosette-outer,
+.card-print .rosette-inner {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: rosette-print var(--dur-4) var(--ease) forwards;
+}
+.card-print .rosette-outer {
+  animation-duration: 1400ms;
+}
+.card-print .rosette-inner {
+  animation-delay: 700ms;
+  animation-duration: 900ms;
+}
+@keyframes rosette-print {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.chip-pulse {
+  animation: chip-pulse 900ms ease-in-out infinite;
+}
+@keyframes chip-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* A section settles into place as it scrolls in. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--dur-4) var(--ease),
+    transform var(--dur-4) var(--ease);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
+/* Reduced motion: every moment becomes a 120 ms cross-fade to the same end state (DESIGN §6). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: var(--dur-1) !important;
+  }
+  .reveal {
+    transform: none;
+  }
+}
+
+/* "Your liquidation price is public.": a shallow 3D stack (components/site/Levels.tsx). */
+.levels {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.levels-row {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: center;
+  height: 26px;
+}
+.levels-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.levels-price {
+  height: 1.5px;
+  background: var(--text);
+}
+.levels-track {
+  position: relative;
+  height: 22px;
+  perspective: 900px;
+  perspective-origin: 0% -60%;
+}
+.levels-mine {
+  position: absolute;
+  z-index: 2;
+  top: -1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  white-space: nowrap;
+}
+.slab {
+  --d: 14px;
+  --c: var(--line-3);
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 22px;
+  width: var(--w);
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transform: rotateX(-18deg) rotateY(14deg) scaleX(0.02);
+  transition: transform var(--dur-4) var(--ease);
+}
+.slab.up {
+  transform: rotateX(-18deg) rotateY(14deg) scaleX(1);
+}
+.slab.mine {
+  --c: var(--red);
+}
+.slab .f {
+  position: absolute;
+  background: var(--c);
+}
+.slab .front {
+  inset: 0;
+  transform: translateZ(calc(var(--d) / 2));
+  border-radius: 2px;
+}
+.slab .top {
+  left: 0;
+  width: 100%;
+  top: calc(50% - var(--d) / 2);
+  height: var(--d);
+  transform: rotateX(90deg) translateZ(11px);
+  filter: brightness(1.25);
+}
+.slab .side {
+  top: 0;
+  height: 100%;
+  width: var(--d);
+  left: calc(100% - var(--d) / 2);
+  transform: rotateY(90deg);
+  filter: brightness(0.6);
+}
+.slab.mine .top {
+  filter: brightness(1.15);
+}
+.land-ring {
+  animation: land-ring var(--dur-4) var(--ease) forwards;
+}
+@keyframes land-ring {
+  from {
+    r: 5;
+    opacity: 0.9;
+  }
+  to {
+    r: 26;
+    opacity: 0;
+  }
+}
+.reveal-line {
+  opacity: 0;
+  animation: reveal-line var(--dur-3) var(--ease) forwards;
+}
+@keyframes reveal-line {
+  to {
+    opacity: 1;
+  }
+}
+
+/* "Watch the line move." plays once it is seen (components/site/WatchLine.tsx). */
+.watch .watch-wipe {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.watch.play .watch-wipe {
+  animation: watch-wipe var(--dur) linear forwards;
+}
+@keyframes watch-wipe {
+  to {
+    transform: scaleX(1);
+  }
+}
+.watch .watch-mark {
+  opacity: 0;
+}
+.watch.play .watch-mark {
+  animation: reveal-line var(--dur-2) var(--ease) forwards;
 }

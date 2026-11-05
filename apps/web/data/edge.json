@@ -1,0 +1,50 @@
+{
+  "scanned_at": "2026-11-03T18:06Z",
+  "accounts": 1500,
+  "within_10_usd": 220790050,
+  "within_10_count": 15,
+  "within_5_count": 2,
+  "within_5_isolated": 2,
+  "top": [
+    {
+      "coin": "ETH",
+      "side": "long",
+      "notional": 68835702.25,
+      "leverage": 10,
+      "margin": "cross",
+      "distance_pct": 5.45
+    },
+    {
+      "coin": "ETH",
+      "side": "long",
+      "notional": 58463976.04,
+      "leverage": 9,
+      "margin": "cross",
+      "distance_pct": 5.13
+    },
+    {
+      "coin": "BTC",
+      "side": "short",
+      "notional": 30638600.0,
+      "leverage": 30,
+      "margin": "cross",
+      "distance_pct": 7.78
+    },
+    {
+      "coin": "BTC",
+      "side": "long",
+      "notional": 23275007.73,
+      "leverage": 7,
+      "margin": "cross",
+      "distance_pct": 8.71
+    },
+    {
+      "coin": "BTC",
+      "side": "long",
+      "notional": 19576229.38,
+      "leverage": 40,
+      "margin": "isolated",
+      "distance_pct": 5.06
+    }
+  ]
+}

@@ -37,10 +37,11 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={change}
-      className="rounded-full border border-line-3 px-3 py-1.5 text-[13px] text-muted hover:text-text"
+      className="min-h-10 whitespace-nowrap rounded-full border border-line-3 px-3 text-[13px] text-muted hover:text-text"
       aria-label={`Theme: ${LABEL[choice]}. Change theme`}
     >
-      Theme: {LABEL[choice]}
+      <span className="hidden sm:inline">Theme: </span>
+      {LABEL[choice]}
     </button>
   );
 }

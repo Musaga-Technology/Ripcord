@@ -66,3 +66,6 @@ docs/private/
 *.p12
 owner.json
 policy.json
+
+# Written and re-added by next dev; the root AGENTS.md is the guide
+apps/web/AGENTS.md

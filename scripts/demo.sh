@@ -59,13 +59,15 @@ ok "502 retried with the same key · 503 pauses with no public fallback · busy 
 ok "two pokers firing the same rescue pay once · 300 random fault mixes pay at most once"
 
 step "Web app"
+run $PNPM --filter @ripcord/web test && ok "the hunt on the home page: a sale every tick never beats the guard; the same sales liquidate it with no reserve"
 run $PNPM --filter @ripcord/web build && ok "production build"
 
 cat <<'EOF'
 
 Done. Try it:
   corepack pnpm dev          → open http://localhost:3000
-  · see your guards: ETH, BTC and HYPE guarded, SOL not
+  · the home page: a live rescue under the card, then "Try to hunt it": sell into the book and see if you can liquidate it
+  · open http://localhost:3000/guards → your guards: ETH, BTC and HYPE guarded, SOL not
   · click "Hunter's view"    → the same position as anyone sees it: liquidation price public, guard "Can't tell"
   · hold "Hold to peek"      → your sealed rescue range, top-up and reserve appear while held
   · Theme: System / Light / Dark switches the page; the guard card stays dark

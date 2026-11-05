@@ -70,19 +70,20 @@ Rescue history: when · margin added · before → after · landed in · outcome
 
 ## 4. Screens
 1. **Home** (website, desktop and phone), top to bottom:
-   - Hero: "Hidden margin.", one sentence, **Guard a position** · **Watch a rescue**, and the card laid over what a hunter sees.
-   - Four stats, each with its source and date: 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay; 53 of 53 without a guard), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
-   - "Your liquidation price is public.": an illustrated stack of liquidation levels, yours in red.
+   - Hero: "Hidden margin.", one sentence, **Guard a position** · **Watch a rescue**, and the card laid over what a hunter sees. The card is a 3D object (it turns toward the pointer, floats when idle, shows its edge, and its rosette prints on load); what a hunter sees is live: simulated prices at 10× speed through the guard's real rules, one rescue per loop.
+   - Four stats, each with its source and date: 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay, Balanced with the speed-aware trigger and a 1× reserve; 53 of 53 without a guard; `crates/replay`), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
+   - "Your liquidation price is public.": an illustrated stack of liquidation levels in shallow 3D, rising when seen, yours in red.
    - **"The edge, right now."**: the five largest positions near liquidation in a scan of public Hyperliquid data (the 1,500 largest accounts, addresses left out), each with a distance bar, red under 5 %. On Oct 21 every position within 5 % was isolated. Re-run the scan (RESEARCH_NOTES, "Isolated margin among hunted positions") before the video and the submission, and keep its date on screen.
    - Three steps: Seal, Fund, Guarded; an isolated position takes one approval on Hyperliquid first.
-   - "Watch the line move.": the rescue chart. Two rescues step the red line down, and only the first counts as a save.
+   - "Watch the line move.": the rescue chart. Two rescues step the red line down, and only the first counts as a save. It plays once when scrolled to.
+   - **"Try to hunt it."**: the Hunt simulator (screen 5), on the page.
    - **"Paid only when it saves you."**: $0 for a close call, 3 % for a save, $1 a month per guard.
    - "Built so you don't have to trust us.": Pays only you · Nobody can link it · A line nobody can learn · Code you can check · Freeze it yourself · We pay if we fail.
    - Built on NEAR, five questions, and the closing band "Your line is public. Your defence isn't."
 2. **Guards** (dashboard) — a summary row (account value, guarded notional with "3 of 4", reserve `••••••`, rescues in 30 days and how many saved, median rescue time); every position with its guard (Guarded, Guarded · isolated, or a **Guard** button); beside them the selected guard's card, its health line, what a hunter saw today and recent activity. One line of evidence at the foot: "Watching prices every 3 s · enclave last checked 41 s ago · guard build 4e1d9a7 · verified".
 3. **Guard** — what a hunter sees (mark, public liquidation, distance, the chart with rescues marked) beside the card and its sealed settings (Hold to peek). Actions: Top up reserve · Change range · Freeze reserve · Close guard. Under the title, the health line "Guarded · checked 41 s ago"; when checks stop, the paused banner (§5) takes its place and the card's chip turns red: Paused. Rescue history: when, margin added, distance before → after (shown only to the owner), landed in, outcome (Saved and its fee · Settling and the time left · Close call, no fee), proof, and **Publish proof** for any rescue (§5).
 4. **New guard** (set up) — position (cross needs no approval; isolated takes one on Hyperliquid) → describe in plain words → read back → **Seal** → fund. The read-back puts the **reserve first** (asset, amount, how long; its size against the position's margin, the replay result at 2× and a one-tap "Use 0.078 BTC"), then **when to step in**: Safer, Balanced or Lean, each with its replay figures (share liquidated, early rescues a month). The choice marked for you follows the reserve: Lean at ≥ 1.5× margin, else Balanced. The honesty and fee lines (§5) sit above **Seal guard**. A live preview of the card sits beside the steps and seals itself at the end.
-5. **Hunt** — the simulator: chart, two buttons, four inline figures, a short public feed, reveal at the end.
+5. **Hunt** — the simulator: chart, two buttons, four inline figures, a short public feed, reveal at the end (the sealed lines drawn where they were, and which sale would have liquidated the position with no reserve). One sale per 3 s while the book refills; tested to hold on every seed (`apps/web/test/hunt.test.ts`).
 6. **Verify** — guard id + seal file → the card opens → three ticks: the settings match the seal; every rescue fired inside its drawn range, with each one's outcome; the guard runs the published code. Then **Our promise**: "No liquidation on this guard", or after a liquidation the answer to the compensation question: "Eligible: your line was crossed at 14:03:21 while guarded; no rescue fired." or the plain reason it isn't.
 7. **Ledger** — public totals (rescues, saves, margin added, median time to land, slowest 5 %); the make-good fund line (balance, 10 % of every save fee, where it earns at the live rate, e.g. "earning 10 % a year on Rhea", paid out, a link to its Trezu treasury, where anyone sees its members, votes and payouts); then every rescue: the hour, a rounded amount, latency, outcome (**Saved**, **Settling** or **Close call**, settled 24 h after landing), the guard's fingerprint and its receipt. Hyperliquid and NEAR links appear only where the owner published proof; Ripcord's own guards always do. No account, distance, range or reserve.
 
@@ -123,7 +124,7 @@ Production: record the raw mainnet runs on Day 7 with a real clock in frame; the
 
 ## 8. The breathtaking bar
 
-One bold object per screen, everything else quiet and exact. Expressive motion only in these four moments.
+One bold object per screen, everything else quiet and exact. Expressive motion only in these four moments, plus Home's live hero and Hunt, which are the rescue moment running continuously.
 
 ### 8.1 Signature moments
 | Moment | What happens |

@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "echo 'web: covered by packages/shared tests until Day 6'"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ripcord/shared": "workspace:*",
@@ -20,6 +20,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "postcss": "8.5.30",
-    "tailwindcss": "4.3.3"
+    "tailwindcss": "4.3.3",
+    "vitest": "5.0.5"
   }
 }

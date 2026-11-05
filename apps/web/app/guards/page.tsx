@@ -1,7 +1,7 @@
 import { demoRows, DEMO_TRADER } from '@ripcord/shared/mock';
-import { Dashboard } from '../components/Dashboard';
-import { ThemeToggle } from '../components/ThemeToggle';
-import { usd } from '../components/format';
+import { Dashboard } from '../../components/Dashboard';
+import { ThemeToggle } from '../../components/ThemeToggle';
+import { usd } from '../../components/format';
 
 function Logo() {
   return (
