@@ -59,7 +59,7 @@ ok "502 retried with the same key · 503 pauses with no public fallback · busy 
 ok "two pokers firing the same rescue pay once · 300 random fault mixes pay at most once"
 
 step "Web app"
-run $PNPM --filter @ripcord/web test && ok "the hunt on the home page: a sale every tick never beats the guard; the same sales liquidate it with no reserve"
+run $PNPM --filter @ripcord/web test && ok "the web app: the hunt holds on every seed, a crash runs the real rules, a browser can only ask for what it may"
 run $PNPM --filter @ripcord/web build && ok "production build"
 
 cat <<'EOF'
@@ -67,8 +67,10 @@ cat <<'EOF'
 Done. Try it:
   corepack pnpm dev          → open http://localhost:3000
   · the home page: a live rescue under the card, then "Try to hunt it": sell into the book and see if you can liquidate it
-  · open http://localhost:3000/guards → your guards: ETH, BTC and HYPE guarded, SOL not
+  · open http://localhost:3000/guards, press "Try an example account" → positions and their guards
   · click "Hunter's view"    → the same position as anyone sees it: liquidation price public, guard "Can't tell"
+  · press "Guard" on SOL, then "Seal guard" → sealed in your browser: the card prints itself; save the seal file, approve, fund
+  · on a guard, "Try a crash" → the real rules on simulated prices: the rescue lands and the red line slides away
   · hold "Hold to peek"      → your sealed rescue range, top-up and reserve appear while held
   · Theme: System / Light / Dark switches the page; the guard card stays dark
 EOF

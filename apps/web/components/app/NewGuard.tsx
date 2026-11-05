@@ -1,0 +1,572 @@
+'use client';
+
+// New guard (docs/DESIGN.md §4.4): the reserve first, then when to step in, then the seal. Everything sealed is made in
+// this browser; only three hashes and an envelope only the enclave can open leave it. The card beside the steps is a
+// preview until the seal, when it prints itself (§8.1).
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
+import {
+  createInput,
+  MIN_RESERVE_USD,
+  prepareGuard,
+  presetRanges,
+  writeSealFile,
+  type PreparedGuard,
+  type Preset,
+} from '@ripcord/shared';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ASSETS, demoPrices, suggestAmount, type Prices } from '../../lib/assets';
+import { random, watch } from '../../lib/backend';
+import { guardOf, guardsFor, labelOf, watchedDistance } from '../../lib/guards';
+import type { Holding } from '../../lib/hl';
+import { markedPreset, replayFigure } from '../../lib/replay';
+import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
+import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } from '../../lib/store';
+import { pct, price, usd } from '../format';
+import { GuardCard } from '../GuardCard';
+import { Card3D } from '../site/Card3D';
+import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
+import { Connect } from './Connect';
+import { Approve, explain, Fund } from './steps';
+
+const PRESETS: { id: Preset; name: string; line: string }[] = [
+  { id: 'safer', name: 'Safer', line: 'Steps in early.' },
+  { id: 'balanced', name: 'Balanced', line: 'Steps in midway.' },
+  { id: 'lean', name: 'Lean', line: 'Waits longest, spends least.' },
+];
+const GUARD_DAYS = 90;
+const DOTS = '••••••';
+const DRAFT_PRINT = '•••• •••• ···· ••••';
+
+type Phase = 'edit' | 'sealing' | 'save' | 'approve' | 'fund' | 'guarded';
+
+const pctRange = ([a, b]: [number, number]) => `${a}–${b}%`;
+
+function usePrices(isDemo: boolean): Prices | null {
+  const [prices, setPrices] = useState<Prices | null>(isDemo ? demoPrices() : null);
+  useEffect(() => {
+    if (isDemo) return;
+    fetch('/api/tokens')
+      .then((r) => (r.ok ? (r.json() as Promise<Prices>) : null))
+      .then(setPrices)
+      .catch(() => setPrices(null));
+  }, [isDemo]);
+  return prices;
+}
+
+function Chooser({ holdings }: { holdings: Holding[] }) {
+  return (
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5">
+      <h1 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Which position?</h1>
+      <ul className="overflow-hidden rounded-[20px] border border-line bg-panel">
+        {holdings.map((h) => (
+          <li key={h.coin} className="border-t border-line first:border-t-0">
+            <Link
+              href={`/guards/new?coin=${encodeURIComponent(h.coin)}`}
+              className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 tabular-nums hover:bg-line/30"
+            >
+              <span className="font-semibold">{labelOf(h)}</span>
+              <span className="text-[15px] text-text-2">{h.distance === null ? '—' : `${pct(h.distance)} away`}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
+  const router = useRouter();
+  const { session } = useSession();
+  const isDemo = session?.kind === 'demo';
+  const backend = backendFor(session);
+  const prices = usePrices(isDemo);
+
+  const crossMargin = all.filter((h) => h.margin === 'cross').reduce((s, h) => s + h.marginUsed, 0);
+  const margin = holding.margin === 'isolated' ? holding.marginUsed : crossMargin;
+  const distance = watchedDistance(holding, all) ?? 0;
+
+  const [assetIx, setAssetIx] = useState(0);
+  const asset = ASSETS[assetIx]!;
+  const assetPrice = prices?.[asset.source] ?? null;
+  const [amount, setAmount] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<Preset | null>(null);
+  const [pass, setPass] = useState('');
+  const [pass2, setPass2] = useState('');
+
+  const suggestion = assetPrice ? suggestAmount(asset, margin * 2, assetPrice) : '';
+  const amountStr = amount ?? suggestion;
+  const reserveUsd = assetPrice ? (Number(amountStr) || 0) * assetPrice : 0;
+  const reserveX = margin > 0 ? reserveUsd / margin : 0;
+  const marked = markedPreset(reserveX);
+  const preset = chosen ?? marked;
+  const ranges = presetRanges(preset, distance);
+  const figure = replayFigure(holding.coin, holding.leverage, reserveX, preset);
+  const atTwo = replayFigure(holding.coin, holding.leverage, 2, preset);
+
+  const [phase, setPhase] = useState<Phase>('edit');
+  const [error, setError] = useState<string | null>(null);
+  const [prepared, setPrepared] = useState<PreparedGuard | null>(null);
+  const [local, setLocal] = useState<LocalGuard | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [collapsed, setCollapsed] = useState(0);
+  const [typed, setTyped] = useState(0);
+
+  const previewHash = useMemo(
+    () => bytesToHex(sha256(utf8ToBytes(`${holding.coin}|${asset.symbol}|${amountStr}|${preset}`))),
+    [holding.coin, asset.symbol, amountStr, preset],
+  );
+
+  // A retry after a failed seal keeps the same guard id, so it can't leave a second guard behind, unless the
+  // settings changed since.
+  const preparedFor = useRef<string | null>(null);
+  const reduce = useRef(false);
+  useEffect(() => {
+    reduce.current = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  const canSeal =
+    phase === 'edit' && !!ranges && !!assetPrice && reserveUsd >= MIN_RESERVE_USD && pass.length >= 8 && pass === pass2;
+
+  /** The seal (DESIGN §8.1): the rosette prints, each sealed value collapses, the fingerprint types in. */
+  const playSeal = async (fingerprint: string) => {
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, reduce.current ? 0 : ms));
+    await wait(900);
+    for (let i = 1; i <= 3; i++) {
+      setCollapsed(i);
+      await wait(120);
+    }
+    await new Promise<void>((resolve) => {
+      if (reduce.current) {
+        setTyped(fingerprint.length);
+        resolve();
+        return;
+      }
+      let n = 0;
+      const frame = () => {
+        n += 1;
+        setTyped(n);
+        if (n < fingerprint.length) requestAnimationFrame(frame);
+        else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+  };
+
+  const seal = async () => {
+    if (!session || !ranges) return;
+    setError(null);
+    setPhase('sealing');
+    try {
+      const reuse = prepared && preparedFor.current === previewHash;
+      const p = reuse
+        ? prepared
+        : prepareGuard(
+            {
+              hl_address: session.address,
+              preset,
+              distance,
+              budget_usd: reserveUsd,
+              reserve_asset: asset.reserve,
+              isolated: holding.margin === 'isolated' ? holding.coin : null,
+              days: GUARD_DAYS,
+            },
+            random,
+            Date.now(),
+          );
+      preparedFor.current = previewHash;
+      setPrepared(p);
+      keepOpened(p.contents);
+      const animation = playSeal(p.fingerprint);
+      const [file] = await Promise.all([
+        writeSealFile(p.contents, p.commitment, pass, random),
+        backend.pubkey().then((pk) => backend.create(createInput(p, pk, random), p.contents.receipt_secret)),
+        animation,
+      ]);
+      const g: LocalGuard = {
+        id: p.contents.guard_id,
+        commitment: p.commitment,
+        fingerprint: p.fingerprint,
+        address: session.address.toLowerCase(),
+        coin: holding.coin,
+        label: labelOf(holding),
+        margin: holding.margin,
+        demo: isDemo,
+        funded: false,
+        approved: false,
+        file,
+        created_at: Date.now(),
+      };
+      saveGuard(g);
+      setLocal(g);
+      void watch(p.contents);
+      setPhase('save');
+    } catch (e) {
+      setError(explain(e, 'the seal'));
+      setCollapsed(0);
+      setTyped(0);
+      setPhase('edit');
+    }
+  };
+
+  const sealedShown = phase !== 'edit';
+  const shown = (i: number, text: string) => (collapsed >= i ? DOTS : text);
+  const fp = prepared?.fingerprint;
+  const fingerprintText = fp && sealedShown ? fp.slice(0, typed) + DRAFT_PRINT.slice(typed) : DRAFT_PRINT;
+  const finished = phase === 'guarded';
+  const cardState = finished ? 'guarded' : 'draft';
+  const status = finished
+    ? 'Guarded'
+    : phase === 'sealing'
+      ? 'Sealing…'
+      : phase === 'fund'
+        ? 'Waiting for reserve'
+        : phase === 'approve'
+          ? 'Needs approval'
+          : sealedShown
+            ? 'Sealed'
+            : 'Not sealed';
+
+  const afterSave = () => setPhase(holding.margin === 'isolated' ? 'approve' : 'fund');
+
+  return (
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:gap-16">
+      <div className="order-2 flex min-w-0 flex-col gap-9 lg:order-1">
+        {phase === 'edit' || phase === 'sealing' ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-[36px] font-semibold leading-none tracking-[-0.04em] sm:text-[48px]">
+                Guard {holding.coin} {holding.side.toLowerCase()}.
+              </h1>
+              <p className="text-[15px] text-text-2">
+                {holding.margin === 'cross'
+                  ? 'Cross margin, so no approval is needed. An isolated position takes one approval on Hyperliquid, so a rescue can reach it.'
+                  : 'Isolated margin, so this guard needs one approval on Hyperliquid. Its code only adds margin.'}
+              </p>
+            </div>
+
+            <section aria-label="Reserve" className="flex flex-col gap-3">
+              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Your reserve</h2>
+              <div role="radiogroup" aria-label="Reserve asset" className="flex flex-wrap gap-2">
+                {ASSETS.map((a, i) => (
+                  <button
+                    key={a.symbol}
+                    type="button"
+                    role="radio"
+                    aria-checked={i === assetIx}
+                    disabled={phase !== 'edit'}
+                    onClick={() => {
+                      setAssetIx(i);
+                      setAmount(null);
+                    }}
+                    className={`min-h-11 rounded-full border px-4 text-[15px] font-medium transition-colors duration-[120ms] ${i === assetIx ? 'border-text bg-text text-ground' : 'border-line-3 hover:border-muted'}`}
+                  >
+                    {a.symbol}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative w-full max-w-[240px]">
+                  <input
+                    aria-label={`Reserve amount in ${asset.symbol}`}
+                    inputMode="decimal"
+                    className={`${fieldCls} pr-16 text-[20px] font-semibold`}
+                    value={amountStr}
+                    disabled={phase !== 'edit'}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[15px] text-muted">
+                    {asset.symbol}
+                  </span>
+                </div>
+                <span className="text-[15px] tabular-nums text-text-2">
+                  {assetPrice ? (
+                    <>
+                      {usd(reserveUsd)} · <span className="font-medium text-text">{reserveX.toFixed(1)}×</span> your{' '}
+                      {usd(margin)} margin
+                    </>
+                  ) : (
+                    'Reading prices…'
+                  )}
+                </span>
+              </div>
+              {assetPrice && suggestion !== amountStr && phase === 'edit' && (
+                <button
+                  type="button"
+                  className="w-fit text-[15px] font-medium underline decoration-line-3 underline-offset-4 hover:decoration-text"
+                  onClick={() => setAmount(null)}
+                >
+                  Use {suggestion} {asset.symbol}
+                </button>
+              )}
+              <p className="text-[15px] text-text-2">
+                {figure ? (
+                  <>
+                    At {figure.band}× margin, <span className="font-medium text-text">{figure.liquidated}%</span> of
+                    replayed positions were liquidated, against {figure.unguarded}% with no guard.
+                    {reserveX < 2 && atTwo ? ` At 2×, ${atTwo.liquidated}%.` : ''}
+                  </>
+                ) : (
+                  'Under half your margin, the replays have no figure. A rescue may not be enough.'
+                )}
+              </p>
+            </section>
+
+            <section aria-label="When to step in" className="flex flex-col gap-3">
+              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">When to step in</h2>
+              <div role="radiogroup" aria-label="When to step in" className="grid gap-2 sm:grid-cols-3">
+                {PRESETS.map((p) => {
+                  const r = presetRanges(p.id, distance);
+                  const f = replayFigure(holding.coin, holding.leverage, reserveX, p.id);
+                  const on = p.id === preset;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      disabled={!r || phase !== 'edit'}
+                      onClick={() => setChosen(p.id)}
+                      className={`flex min-h-11 flex-col gap-1 rounded-[20px] border p-4 text-left transition-colors duration-[120ms] disabled:opacity-40 ${on ? 'border-text' : 'border-line hover:border-line-3'} bg-panel`}
+                    >
+                      <span className="flex items-center justify-between gap-2 font-semibold">
+                        {p.name}
+                        {p.id === marked && (
+                          <span className="h-[7px] w-[7px] rounded-full bg-amber" title="Suits your reserve" />
+                        )}
+                      </span>
+                      <span className="text-[13px] text-muted">{p.line}</span>
+                      <span className="mt-1.5 text-[15px] tabular-nums">
+                        {r ? `${pctRange(r.line_range_pct)} away` : 'Too close'}
+                      </span>
+                      {f && (
+                        <span className="text-[13px] tabular-nums text-text-2">
+                          {f.liquidated}% liquidated · {f.earlyMonth} early a month
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[13px] text-muted">
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-amber" />
+                Suits your reserve. {figure?.source ?? ''} An early rescue still adds to your margin, and costs only the
+                network fee.
+              </p>
+              {!ranges && (
+                <p className="text-[15px] text-red">This position is too close to liquidation for this choice.</p>
+              )}
+            </section>
+
+            <section aria-label="Seal" className="flex flex-col gap-3 border-t border-line pt-7">
+              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Your seal file</h2>
+              <p className="text-[15px] text-text-2">
+                It holds your settings and the key to your reserve. Choose a passphrase to lock it. Nobody can reset it.
+              </p>
+              <div className="grid max-w-[520px] gap-2 sm:grid-cols-2">
+                <input
+                  type="password"
+                  aria-label="Passphrase"
+                  placeholder="Passphrase, 8 or more characters"
+                  autoComplete="new-password"
+                  className={fieldCls}
+                  value={pass}
+                  disabled={phase !== 'edit'}
+                  onChange={(e) => setPass(e.target.value)}
+                />
+                <input
+                  type="password"
+                  aria-label="Repeat the passphrase"
+                  placeholder="Repeat it"
+                  autoComplete="new-password"
+                  className={fieldCls}
+                  value={pass2}
+                  disabled={phase !== 'edit'}
+                  onChange={(e) => setPass2(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1 pt-2 text-[13px] text-muted">
+                <p>A rescue takes under a minute. A move faster than that can still liquidate you.</p>
+                <p>
+                  No Ripcord fee unless a rescue saves you, then 3% of it · $1 a month · about $0.32 network cost per
+                  rescue
+                </p>
+              </div>
+              <button type="button" className={`${primaryBtn} mt-1 w-full sm:w-fit`} disabled={!canSeal} onClick={seal}>
+                {phase === 'sealing' ? 'Sealing…' : 'Seal guard'}
+              </button>
+              <p role="alert" className="min-h-6 text-[15px] text-red">
+                {error}
+              </p>
+            </section>
+          </>
+        ) : phase === 'save' && local ? (
+          <div className="step-in flex flex-col items-start gap-4">
+            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Sealed.</h2>
+            <p className="max-w-[34rem] text-[15px] text-text-2">
+              Only a fingerprint is public. Keep your seal file somewhere safe: it proves what you sealed, and it&apos;s
+              how you close the guard from another device.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={saved ? ghostBtn : primaryBtn}
+                onClick={() => {
+                  downloadSealFile(local);
+                  setSaved(true);
+                }}
+              >
+                {saved ? 'Save it again' : 'Save seal file'}
+              </button>
+              <button type="button" className={saved ? primaryBtn : ghostBtn} disabled={!saved} onClick={afterSave}>
+                {holding.margin === 'isolated' ? 'Next' : 'Fund reserve'}
+              </button>
+            </div>
+          </div>
+        ) : phase === 'approve' && prepared && session ? (
+          <Approve
+            contents={prepared.contents}
+            backend={backend}
+            isDemo={isDemo}
+            owner={session.address}
+            onDone={() => {
+              if (local) saveGuard({ ...local, approved: true });
+              setLocal((l) => (l ? { ...l, approved: true } : l));
+              setPhase('fund');
+            }}
+          />
+        ) : phase === 'fund' && prepared && local ? (
+          <Fund
+            contents={prepared.contents}
+            backend={backend}
+            isDemo={isDemo}
+            fallback={amountStr}
+            onFunded={() => {
+              saveGuard({ ...local, funded: true });
+              setPhase('guarded');
+            }}
+          />
+        ) : (
+          <div className="step-in flex flex-col items-start gap-4">
+            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Guarded.</h2>
+            <p className="max-w-[34rem] text-[15px] text-text-2">
+              Near liquidation, part of your reserve lands in your Hyperliquid margin as USDC. Nobody sees it coming.
+            </p>
+            <button type="button" className={primaryBtn} onClick={() => router.push(`/guards/${local?.id ?? ''}`)}>
+              Open guard
+            </button>
+          </div>
+        )}
+      </div>
+
+      <aside aria-label="Your guard" className="order-1 flex flex-col gap-5 lg:sticky lg:top-7 lg:order-2">
+        <div className="mx-auto w-full max-w-[460px]">
+          <Card3D>
+            <GuardCard
+              key={sealedShown ? prepared?.commitment : 'preview'}
+              label={labelOf(holding)}
+              distance={pct(distance)}
+              sub="from liquidation"
+              fingerprint={fingerprintText}
+              commitment={sealedShown && prepared ? prepared.commitment : previewHash}
+              state={cardState}
+              status={status}
+              reserve={sealedShown ? DOTS : `${amountStr || '0'} ${asset.symbol}`}
+              print={sealedShown}
+              depth
+            />
+          </Card3D>
+        </div>
+        <div className="flex flex-col gap-2.5 rounded-[20px] border border-line bg-panel px-5 py-4 text-[15px]">
+          <span className="text-[13px] text-muted">{sealedShown ? 'Sealed' : 'What gets sealed'}</span>
+          <SealedRow
+            label="Rescue range"
+            value={shown(1, ranges ? `${pctRange(ranges.line_range_pct)} away` : '—')}
+            dots={collapsed >= 1}
+          />
+          <SealedRow
+            label="Tops up to"
+            value={shown(2, ranges ? pctRange(ranges.target_range_pct) : '—')}
+            dots={collapsed >= 2}
+          />
+          <SealedRow label="Reserve" value={shown(3, `${amountStr || '0'} ${asset.symbol}`)} dots={collapsed >= 3} />
+          <p className="text-[13px] text-muted">
+            Mark {price(holding.mark)} · Liq{' '}
+            <span className="text-red">{holding.liquidation === null ? '—' : price(holding.liquidation)}</span>, public
+            to everyone.
+          </p>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function SealedRow({ label, value, dots }: { label: string; value: string; dots: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-line pt-2.5">
+      <span className="text-muted">{label}</span>
+      <span
+        key={String(dots)}
+        className={`seal-swap text-right font-medium tabular-nums ${dots ? 'font-mono tracking-[0.2em]' : ''}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Page() {
+  const { ready, session } = useSession();
+  const { account, error } = useAccount(session);
+  const params = useSearchParams();
+  const coin = params.get('coin');
+  const [local, setLocal] = useState<LocalGuard[]>([]);
+  useEffect(() => setLocal(loadGuards()), []);
+
+  if (!ready) return <div className="flex-1" />;
+  if (!session) return <Connect />;
+  if (error && !account)
+    return (
+      <p className="my-auto py-16 text-center text-text-2">
+        Hyperliquid can&apos;t be read right now. Try again in a moment.
+      </p>
+    );
+  if (!account)
+    return <div aria-busy="true" className="h-[420px] animate-pulse rounded-[20px] border border-line bg-panel" />;
+  const holding = account.holdings.find((h) => h.coin === coin);
+  if (!holding) {
+    if (account.holdings.length === 0)
+      return <p className="my-auto py-16 text-center text-text-2">No open positions on this account.</p>;
+    return <Chooser holdings={account.holdings} />;
+  }
+  const existing = guardOf(holding, guardsFor(session.address, session.kind === 'demo', local));
+  if (existing) {
+    return (
+      <div className="my-auto flex flex-col items-center gap-4 py-16 text-center">
+        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">
+          {holding.margin === 'cross'
+            ? 'A guard already covers your cross positions.'
+            : 'This position already has a guard.'}
+        </h1>
+        <Link href={`/guards/${existing.id}`} className={primaryBtn}>
+          Open guard
+        </Link>
+      </div>
+    );
+  }
+  return <Flow key={holding.coin} holding={holding} all={account.holdings} />;
+}
+
+export function NewGuard() {
+  return (
+    <SessionProvider>
+      <AppShell>
+        <Suspense fallback={<div className="flex-1" />}>
+          <Page />
+        </Suspense>
+      </AppShell>
+    </SessionProvider>
+  );
+}

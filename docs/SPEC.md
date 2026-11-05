@@ -98,6 +98,8 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 ```
 No `approval` block. The fee wallet is a confidential identity: `/confidential/transfer` takes `{to, amount, token}` with `to` = the recipient's 64-hex intents id (verified Nov 3 in OutLayer's confidential docs), so `RIPCORD_FEE_WALLET` is that id, compiled in; unset (zeros), no fee is charged.
 
+**Web route.** `apps/web/app/api/checker` carries a browser's requests to the checker with Ripcord's payment key, which stays on the server. It takes only `pubkey`, `create`, `fund` and `reserve` (never `check`), 30 a minute per IP, and logs nothing. It only ever sees hashes and ciphertext. Positions, the registry and the pokers are reached from the browser directly, so Ripcord's web server never learns which account a session belongs to.
+
 ## 4. Pokers: `services/poker/` (Node)
 
 **Hyperliquid's limits shape this** (read Oct 22): REST 1,200 weight per minute per IP (`clearinghouseState` and `allMids` weight 2, most other info 20); WebSocket at most 10 connections, 1,000 subscriptions and **10 unique users** per IP across user-specific feeds. So:

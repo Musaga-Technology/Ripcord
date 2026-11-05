@@ -1,0 +1,186 @@
+// The guard's enclave, as this browser reaches it. Live: Ripcord's server carries sealed requests to the checker on
+// OutLayer (app/api/checker). Demo: a stand-in in this tab that does what the checker does with the same shared
+// functions (opens the envelope, checks all three hashes, seals its answers to the owner), so the flow is the real one
+// with no account, funds or network. What each returns is sealed to the owner either way.
+import { x25519 } from '@noble/curves/ed25519.js';
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
+import {
+  accountCommitment,
+  commitment,
+  open,
+  ownerCommitment,
+  seal,
+  type CreateInput,
+  type SealContents,
+} from '@ripcord/shared';
+
+export const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
+
+export class Refused extends Error {}
+
+export interface Deposit {
+  address: string;
+  /** Smallest units, and the decimals to read them with. */
+  amount: string;
+  decimals: number;
+}
+
+export interface Backend {
+  pubkey(): Promise<string>;
+  /** Registers the guard. An isolated guard's answer names the agent its owner approves. */
+  create(input: CreateInput, receiptSecret: string): Promise<{ agent: string | null }>;
+  fund(c: SealContents, source: string): Promise<Deposit>;
+  /** The reserve's balances by token. */
+  reserve(c: SealContents): Promise<Record<string, string>>;
+}
+
+const opened = <T>(sealed: string, receiptSecret: string, guardId: string): T =>
+  JSON.parse(new TextDecoder().decode(open(hexToBytes(receiptSecret), hexToBytes(sealed), guardId))) as T;
+
+interface Answer {
+  status?: string;
+  refused?: string;
+  sealed?: string;
+  enc_pk?: string;
+  error?: string;
+}
+
+async function call(input: object): Promise<Answer> {
+  const r = await fetch('/api/checker', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const a = (await r.json()) as Answer;
+  if (a.refused) throw new Refused(a.refused);
+  if (!r.ok) throw new Refused(a.error ?? 'the guard did not answer');
+  return a;
+}
+
+const toBalances = (b: { balances: { token: string; balance: string }[] }) =>
+  Object.fromEntries(b.balances.map((x) => [x.token, x.balance]));
+
+export const live: Backend = {
+  async pubkey() {
+    return (await call({ action: 'pubkey' })).enc_pk ?? '';
+  },
+  async create(input, receiptSecret) {
+    const a = await call(input);
+    const agent = a.sealed ? opened<{ agent: string }>(a.sealed, receiptSecret, input.guard_id).agent : null;
+    return { agent };
+  },
+  async fund(c, source) {
+    const a = await call({ action: 'fund', guard_id: c.guard_id, source_asset: source });
+    const d = opened<{ deposit_address: string; amount: string; decimals: number }>(
+      a.sealed ?? '',
+      c.receipt_secret,
+      c.guard_id,
+    );
+    return { address: d.deposit_address, amount: d.amount, decimals: d.decimals };
+  },
+  async reserve(c) {
+    const a = await call({ action: 'reserve', guard_id: c.guard_id });
+    return toBalances(opened(a.sealed ?? '', c.receipt_secret, c.guard_id));
+  },
+};
+
+/** Demo only. Money arrives this long after an address is made. */
+export const DEMO_ARRIVES_MS = 8_000;
+
+function demoBackend(): Backend {
+  const secret = random(32);
+  const funded = new Map<string, number>();
+  const sealFor = (c: { receipt_pk: string }, guardId: string, v: unknown) =>
+    bytesToHex(seal(hexToBytes(c.receipt_pk.slice('x25519:'.length)), utf8ToBytes(JSON.stringify(v)), guardId, random));
+  return {
+    async pubkey() {
+      return bytesToHex(x25519.getPublicKey(secret));
+    },
+    async create(input, receiptSecret) {
+      await new Promise((r) => setTimeout(r, 900));
+      const plain = open(secret, hexToBytes(input.enc_settings), input.guard_id);
+      const p = JSON.parse(new TextDecoder().decode(plain)) as Pick<SealContents, 'settings' | 'salt' | 'owner_salt'>;
+      const ok =
+        commitment(p.settings, p.salt) === input.commitment &&
+        ownerCommitment(p.settings.owner, p.owner_salt) === input.owner_commitment &&
+        accountCommitment(p.settings.hl_address, p.settings.account_salt) === input.account_commitment;
+      if (!ok) throw new Refused('settings do not match the public commitments');
+      if (!p.settings.isolated) return { agent: null };
+      const agent = `0x${bytesToHex(random(20))}`;
+      const sealed = sealFor(p.settings, input.guard_id, { agent });
+      return { agent: opened<{ agent: string }>(sealed, receiptSecret, input.guard_id).agent };
+    },
+    async fund(c) {
+      funded.set(c.guard_id, Date.now());
+      return { address: `example-${bytesToHex(random(16))}`, amount: '0', decimals: 0 };
+    },
+    async reserve(c) {
+      const since = funded.get(c.guard_id);
+      return since !== undefined && Date.now() - since >= DEMO_ARRIVES_MS ? { [c.settings.reserve_asset]: '1' } : {};
+    },
+  };
+}
+
+let demoInstance: Backend | null = null;
+export const demo = (): Backend => (demoInstance ??= demoBackend());
+
+// The public registry and the pokers, read and told directly from the browser, not through Ripcord's server.
+const RPC = process.env.NEXT_PUBLIC_NEAR_RPC ?? 'https://rpc.testnet.near.org';
+const REGISTRY = process.env.NEXT_PUBLIC_REGISTRY ?? '';
+const POKERS = (process.env.NEXT_PUBLIC_POKERS ?? '').split(',').filter(Boolean);
+
+async function view<T>(method: string, args: object): Promise<T | null> {
+  if (!REGISTRY) return null;
+  const r = await fetch(RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'ripcord',
+      method: 'query',
+      params: {
+        request_type: 'call_function',
+        finality: 'final',
+        account_id: REGISTRY,
+        method_name: method,
+        args_base64: btoa(JSON.stringify(args)),
+      },
+    }),
+  });
+  const a = (await r.json()) as { result?: { result?: number[] } };
+  return a.result?.result ? (JSON.parse(new TextDecoder().decode(new Uint8Array(a.result.result))) as T) : null;
+}
+
+export interface OnChainReceipt {
+  public: { at_hour: number; credit_usd: number; latency_s: number; outcome: string };
+  sealed: string;
+}
+
+export const readGuard = (id: string) => view<{ status: string }>('get_guard', { guard_id: id });
+export const readReceipts = (id: string) =>
+  view<OnChainReceipt[]>('get_receipts', { guard_id: id, from: 0, limit: 50 });
+
+/** Asks each poker to watch the guard: only the owner's device can prove the address (docs/SPEC.md §4). */
+export async function watch(c: SealContents): Promise<void> {
+  await Promise.allSettled(
+    POKERS.map((p) =>
+      fetch(`${p}/v1/watch/${c.guard_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hl_address: c.settings.hl_address, account_salt: c.settings.account_salt }),
+      }),
+    ),
+  );
+}
+
+/** The most recent check any poker knows of, or null when none answers. */
+export async function lastCheck(id: string): Promise<number | null> {
+  const answers = await Promise.allSettled(
+    POKERS.map(async (p) => {
+      const r = await fetch(`${p}/v1/health/${id}`);
+      return r.ok ? ((await r.json()) as { last_check_at: number | null }).last_check_at : null;
+    }),
+  );
+  const times = answers.flatMap((a) => (a.status === 'fulfilled' && a.value ? [a.value] : []));
+  return times.length ? Math.max(...times) : null;
+}

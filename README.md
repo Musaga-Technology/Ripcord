@@ -33,7 +33,10 @@ Design notes, research and feasibility tests were prepared from Oct 20 (results 
 | Do | See |
 |---|---|
 | `bash scripts/demo.sh` (needs Node 22; Python 3 and Rust optional) | Installs, checks that Python, TypeScript and Rust agree on every hash and guard decision, runs the fault-injection tests, builds the web app; every step ✓ |
-| `corepack pnpm dev`, open http://localhost:3000 | Your guards on an example account: ETH, BTC and HYPE guarded, SOL not; each guard is a card whose pattern is drawn from its commitment |
+| `corepack pnpm dev`, open http://localhost:3000 | The home page: a live rescue under the card, then "Try to hunt it" |
+| Open http://localhost:3000/guards, then **Try an example account** | Your positions and guards on an example account; each guard is a card whose pattern is drawn from its commitment |
+| Press **Guard** on SOL, then **Seal guard** | The real set-up: your settings are sealed in the browser, the rosette prints, the values collapse, and you save a seal file. Then one approval and a funded reserve, simulated here |
+| On any example guard, press **Try a crash** | The guard's real rules on simulated prices: the rescue fires, the red line slides away, and the fall passes your old liquidation price |
 | Click **Hunter's view** | The same position as anyone sees it on Hyperliquid: liquidation price public, guarded "Can't tell", range and reserve `••••••` |
 | Press and hold **Hold to peek** | Your sealed rescue range, top-up and reserve, only while held |
 | `corepack pnpm testnet:registry account`, then `deploy`, then `e2e` (needs internet; testnet NEAR comes free from the faucet) | 13 ✓ lines on NEAR testnet and OutLayer's testnet: the registry becomes a guard wallet's controller, an unlisted recipient is refused, the owner freezes with one NEP-413 signature, a frozen wallet refuses everything, a replayed signature is refused, unfreeze, close |

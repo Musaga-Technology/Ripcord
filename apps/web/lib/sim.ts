@@ -28,6 +28,8 @@ export interface PositionSpec {
   leverage: number;
   /** Maintenance fraction: 1 / (2 × max leverage). ETH: 2 %. */
   mm: number;
+  /** The margin held, when it isn't notional / leverage (cross margin). */
+  margin?: number;
 }
 
 /** Isolated liquidation price: equity equals maintenance. */
@@ -83,7 +85,7 @@ export class GuardedPosition {
     readonly guard: GuardSpec,
     private readonly u: () => number,
   ) {
-    this.margin0 = pos.notional / pos.leverage;
+    this.margin0 = pos.margin ?? pos.notional / pos.leverage;
     this.margin = this.margin0;
     this.liq = liqPrice(pos, this.margin);
     this.left = guard.reserveX * this.margin0;

@@ -1,18 +1,32 @@
 'use client';
 
-import type { DemoRow } from '@ripcord/shared/mock';
+import Link from 'next/link';
 import { useState } from 'react';
+import { guardOf, labelOf, STATE_TEXT, type ShownGuard } from '../lib/guards';
+import type { Holding } from '../lib/hl';
 import { price, pct } from './format';
-import { GuardCard } from './GuardCard';
+import { GuardCard, type CardState } from './GuardCard';
 
 type View = 'yours' | 'hunter';
 
+export const CARD_STATE: Record<ShownGuard['state'], CardState> = {
+  approval: 'draft',
+  waiting: 'draft',
+  guarded: 'guarded',
+};
+
+interface Row extends Holding {
+  guard: ShownGuard | null;
+}
+
+const newGuardHref = (coin: string) => `/guards/new?coin=${encodeURIComponent(coin)}`;
+
 /** Positions with their guards, and the selected guard in two views: yours (the card) and a hunter's. */
-export function Dashboard({ rows }: { rows: DemoRow[] }) {
+export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: ShownGuard[] }) {
+  const rows: Row[] = holdings.map((h) => ({ ...h, guard: guardOf(h, guards) }));
   const firstGuarded = rows.findIndex((r) => r.guard !== null);
   const [selected, setSelected] = useState(firstGuarded < 0 ? 0 : firstGuarded);
   const [view, setView] = useState<View>('yours');
-  const [peek, setPeek] = useState(false);
   const row = rows[selected]!;
   const g = row.guard;
   const guardedCount = rows.filter((r) => r.guard).length;
@@ -53,8 +67,10 @@ export function Dashboard({ rows }: { rows: DemoRow[] }) {
                 <span
                   className={`flex items-center justify-end gap-1.5 text-[13px] font-medium ${r.guard ? '' : 'text-muted'}`}
                 >
-                  <span className={`h-1.5 w-1.5 rounded-full ${r.guard ? 'bg-amber' : 'bg-muted'}`} />
-                  {r.guard ? 'Guarded' : 'Not guarded'}
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${r.guard?.state === 'guarded' ? 'bg-amber' : 'bg-muted'}`}
+                  />
+                  {r.guard ? STATE_TEXT[r.guard.state] : 'Not guarded'}
                 </span>
               </button>
             </li>
@@ -81,7 +97,7 @@ export function Dashboard({ rows }: { rows: DemoRow[] }) {
                   aria-selected={i === selected}
                 >
                   <td className="px-5 py-4">
-                    <button type="button" className="flex flex-col text-left" onClick={() => setSelected(i)}>
+                    <button type="button" className="flex flex-col text-left">
                       <span className="font-semibold">{r.coin}-USD</span>
                       <span className="text-[13px] text-muted">
                         {r.side} · {r.leverage}× {r.margin}
@@ -111,14 +127,25 @@ export function Dashboard({ rows }: { rows: DemoRow[] }) {
                   </td>
                   <td className="px-5 py-4 text-right">
                     {r.guard ? (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium">
-                        <span className="h-[7px] w-[7px] rounded-full bg-amber" />
-                        {r.margin === 'isolated' ? 'Guarded · isolated' : 'Guarded'}
-                      </span>
+                      <Link
+                        href={`/guards/${r.guard.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-2 rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium hover:border-muted"
+                      >
+                        <span
+                          className={`h-[7px] w-[7px] rounded-full ${r.guard.state === 'guarded' ? 'bg-amber' : 'bg-muted'}`}
+                        />
+                        {STATE_TEXT[r.guard.state]}
+                        {r.guard.state === 'guarded' && r.margin === 'isolated' ? ' · isolated' : ''}
+                      </Link>
                     ) : (
-                      <span className="inline-block rounded-full px-3.5 py-1.5 text-[13px] font-semibold shadow-[inset_0_0_0_1px_var(--line-3)]">
+                      <Link
+                        href={newGuardHref(r.coin)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-block rounded-full bg-text px-3.5 py-1.5 text-[13px] font-semibold text-ground hover:opacity-90"
+                      >
                         Guard
-                      </span>
+                      </Link>
                     )}
                   </td>
                 </tr>
@@ -149,52 +176,43 @@ export function Dashboard({ rows }: { rows: DemoRow[] }) {
 
         {view === 'yours' && g ? (
           <>
-            <GuardCard
-              label={g.label}
-              distance={row.distance === null ? '—' : pct(row.distance)}
-              sub="from liquidation · rescue in under a minute"
-              fingerprint={g.fingerprint}
-              commitment={g.commitment}
-              state="guarded"
-              status="Guarded"
-              reserve={peek ? g.sealed.reserve : '••••••'}
-            />
-            <span className="-mt-1 flex items-center gap-2 text-[13px] text-text-2">
-              <span className="h-[7px] w-[7px] rounded-full bg-amber" />
-              Guarded · checked 41 s ago
-            </span>
-            <div className="flex flex-col gap-2.5 rounded-[20px] border border-line bg-panel px-5 py-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-muted">Sealed settings</span>
-                <button
-                  type="button"
-                  className="rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium select-none"
-                  onPointerDown={() => setPeek(true)}
-                  onPointerUp={() => setPeek(false)}
-                  onPointerLeave={() => setPeek(false)}
-                  onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && setPeek(true)}
-                  onKeyUp={() => setPeek(false)}
-                >
-                  Hold to peek
-                </button>
-              </div>
-              <Fact label="Rescue range" value={peek ? `${g.sealed.range} from liquidation` : '••••••'} mono={!peek} />
-              <Fact label="Tops up to" value={peek ? g.sealed.target : '••••••'} mono={!peek} />
-              <Fact label="Reserve" value={peek ? g.sealed.reserve : '••••••'} mono={!peek} />
-              <p className="text-[13px] text-muted">
-                Only you can open these. They were sealed when you set the guard.
-              </p>
-            </div>
+            <Link href={`/guards/${g.id}`} aria-label={`Open the guard on ${g.label}`} className="block rounded-[28px]">
+              <GuardCard
+                label={g.label}
+                distance={row.distance === null ? '—' : pct(row.distance)}
+                sub="from liquidation"
+                fingerprint={g.fingerprint}
+                commitment={g.commitment}
+                state={CARD_STATE[g.state]}
+                status={STATE_TEXT[g.state]}
+                reserve="••••••"
+              />
+            </Link>
+            <Link
+              href={`/guards/${g.id}`}
+              className="flex min-h-11 items-center justify-between rounded-[20px] border border-line bg-panel px-5 text-[15px] font-medium hover:border-line-3"
+            >
+              Open guard
+              <span aria-hidden="true" className="text-muted">
+                →
+              </span>
+            </Link>
           </>
         ) : view === 'yours' ? (
-          <div className="rounded-[20px] border border-line bg-panel px-5 py-6">
-            <p className="text-[17px] font-semibold">This position isn't guarded.</p>
-            <p className="mt-1 text-muted">Set a guard and a rescue lands in your margin before the liquidator does.</p>
+          <div className="flex flex-col items-start gap-3 rounded-[20px] border border-line bg-panel px-5 py-6">
+            <p className="text-[17px] font-semibold">This position isn&apos;t guarded.</p>
+            <p className="text-muted">Set a guard and a rescue lands in your margin before the liquidator does.</p>
+            <Link
+              href={newGuardHref(row.coin)}
+              className="inline-flex min-h-11 items-center rounded-full bg-text px-6 text-[15px] font-semibold text-ground hover:opacity-90"
+            >
+              Guard {row.coin} {row.side.toLowerCase()}
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-2.5 rounded-[20px] border border-line bg-panel px-5 py-4">
             <span className="text-[13px] text-muted">What anyone can see on Hyperliquid</span>
-            <Fact label="Position" value={`${row.coin} ${row.side.toLowerCase()} · ${row.leverage}×`} />
+            <Fact label="Position" value={labelOf(row)} />
             <Fact label="Size" value={`${row.size.toLocaleString('en-US')} ${row.coin}`} />
             <Fact label="Mark" value={price(row.mark)} />
             <Fact label="Liquidation" value={row.liquidation === null ? '—' : price(row.liquidation)} red />

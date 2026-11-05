@@ -1,0 +1,414 @@
+{
+  "figures": {
+    "BTC": {
+      "10": {
+        "0.5": {
+          "balanced": {
+            "early_month": 2.9,
+            "liquidated": 5.59
+          },
+          "lean": {
+            "early_month": 1.8,
+            "liquidated": 5.59
+          },
+          "safer": {
+            "early_month": 4.1,
+            "liquidated": 5.59
+          },
+          "unguarded": 14.38,
+          "upfront": 5.59
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 3.2,
+            "liquidated": 1.92
+          },
+          "lean": {
+            "early_month": 2.1,
+            "liquidated": 1.92
+          },
+          "safer": {
+            "early_month": 4.7,
+            "liquidated": 1.83
+          },
+          "unguarded": 14.38,
+          "upfront": 1.83
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 3.3,
+            "liquidated": 0.09
+          },
+          "lean": {
+            "early_month": 2.2,
+            "liquidated": 0.09
+          },
+          "safer": {
+            "early_month": 5.0,
+            "liquidated": 0.0
+          },
+          "unguarded": 14.38,
+          "upfront": 0.0
+        }
+      },
+      "20": {
+        "0.5": {
+          "balanced": {
+            "early_month": 3.2,
+            "liquidated": 30.22
+          },
+          "lean": {
+            "early_month": 2.2,
+            "liquidated": 30.4
+          },
+          "safer": {
+            "early_month": 4.6,
+            "liquidated": 30.13
+          },
+          "unguarded": 50.46,
+          "upfront": 30.13
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 4.3,
+            "liquidated": 14.65
+          },
+          "lean": {
+            "early_month": 2.9,
+            "liquidated": 14.93
+          },
+          "safer": {
+            "early_month": 6.0,
+            "liquidated": 14.56
+          },
+          "unguarded": 50.46,
+          "upfront": 14.38
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 5.1,
+            "liquidated": 6.04
+          },
+          "lean": {
+            "early_month": 3.4,
+            "liquidated": 6.59
+          },
+          "safer": {
+            "early_month": 7.3,
+            "liquidated": 5.68
+          },
+          "unguarded": 50.46,
+          "upfront": 5.59
+        }
+      }
+    },
+    "ETH": {
+      "10": {
+        "0.5": {
+          "balanced": {
+            "early_month": 3.3,
+            "liquidated": 13.55
+          },
+          "lean": {
+            "early_month": 2.3,
+            "liquidated": 13.55
+          },
+          "safer": {
+            "early_month": 4.5,
+            "liquidated": 13.55
+          },
+          "unguarded": 33.97,
+          "upfront": 13.55
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 4.0,
+            "liquidated": 5.86
+          },
+          "lean": {
+            "early_month": 2.8,
+            "liquidated": 5.86
+          },
+          "safer": {
+            "early_month": 5.6,
+            "liquidated": 5.86
+          },
+          "unguarded": 33.97,
+          "upfront": 5.86
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 4.3,
+            "liquidated": 0.92
+          },
+          "lean": {
+            "early_month": 3.0,
+            "liquidated": 1.1
+          },
+          "safer": {
+            "early_month": 6.1,
+            "liquidated": 0.82
+          },
+          "unguarded": 33.97,
+          "upfront": 0.82
+        }
+      },
+      "20": {
+        "0.5": {
+          "balanced": {
+            "early_month": 2.6,
+            "liquidated": 48.9
+          },
+          "lean": {
+            "early_month": 1.8,
+            "liquidated": 49.08
+          },
+          "safer": {
+            "early_month": 3.6,
+            "liquidated": 48.44
+          },
+          "unguarded": 68.5,
+          "upfront": 48.26
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 3.6,
+            "liquidated": 35.53
+          },
+          "lean": {
+            "early_month": 2.5,
+            "liquidated": 35.9
+          },
+          "safer": {
+            "early_month": 4.9,
+            "liquidated": 34.43
+          },
+          "unguarded": 68.5,
+          "upfront": 33.97
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 4.5,
+            "liquidated": 16.94
+          },
+          "lean": {
+            "early_month": 3.2,
+            "liquidated": 17.86
+          },
+          "safer": {
+            "early_month": 6.2,
+            "liquidated": 14.84
+          },
+          "unguarded": 68.5,
+          "upfront": 13.55
+        }
+      }
+    },
+    "HYPE": {
+      "3": {
+        "0.5": {
+          "balanced": {
+            "early_month": 1.7,
+            "liquidated": 2.84
+          },
+          "lean": {
+            "early_month": 0.9,
+            "liquidated": 2.84
+          },
+          "safer": {
+            "early_month": 3.1,
+            "liquidated": 2.84
+          },
+          "unguarded": 6.5,
+          "upfront": 2.84
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 1.9,
+            "liquidated": 0.82
+          },
+          "lean": {
+            "early_month": 1.1,
+            "liquidated": 0.46
+          },
+          "safer": {
+            "early_month": 3.4,
+            "liquidated": 0.46
+          },
+          "unguarded": 6.5,
+          "upfront": 0.46
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 2.0,
+            "liquidated": 0.37
+          },
+          "lean": {
+            "early_month": 1.1,
+            "liquidated": 0.0
+          },
+          "safer": {
+            "early_month": 3.5,
+            "liquidated": 0.0
+          },
+          "unguarded": 6.5,
+          "upfront": 0.0
+        }
+      },
+      "5": {
+        "0.5": {
+          "balanced": {
+            "early_month": 3.4,
+            "liquidated": 8.88
+          },
+          "lean": {
+            "early_month": 2.3,
+            "liquidated": 8.88
+          },
+          "safer": {
+            "early_month": 4.8,
+            "liquidated": 8.88
+          },
+          "unguarded": 23.99,
+          "upfront": 8.88
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 3.8,
+            "liquidated": 4.4
+          },
+          "lean": {
+            "early_month": 2.6,
+            "liquidated": 4.4
+          },
+          "safer": {
+            "early_month": 5.6,
+            "liquidated": 4.4
+          },
+          "unguarded": 23.99,
+          "upfront": 4.4
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 4.0,
+            "liquidated": 2.2
+          },
+          "lean": {
+            "early_month": 2.7,
+            "liquidated": 2.2
+          },
+          "safer": {
+            "early_month": 5.9,
+            "liquidated": 1.83
+          },
+          "unguarded": 23.99,
+          "upfront": 0.92
+        }
+      }
+    },
+    "SOL": {
+      "10": {
+        "0.5": {
+          "balanced": {
+            "early_month": 3.7,
+            "liquidated": 16.76
+          },
+          "lean": {
+            "early_month": 2.6,
+            "liquidated": 16.85
+          },
+          "safer": {
+            "early_month": 5.0,
+            "liquidated": 16.67
+          },
+          "unguarded": 41.58,
+          "upfront": 16.67
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 4.6,
+            "liquidated": 6.96
+          },
+          "lean": {
+            "early_month": 3.2,
+            "liquidated": 7.51
+          },
+          "safer": {
+            "early_month": 6.3,
+            "liquidated": 6.78
+          },
+          "unguarded": 41.58,
+          "upfront": 6.78
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 4.9,
+            "liquidated": 2.56
+          },
+          "lean": {
+            "early_month": 3.4,
+            "liquidated": 3.21
+          },
+          "safer": {
+            "early_month": 6.9,
+            "liquidated": 2.47
+          },
+          "unguarded": 41.58,
+          "upfront": 2.47
+        }
+      },
+      "5": {
+        "0.5": {
+          "balanced": {
+            "early_month": 2.2,
+            "liquidated": 2.47
+          },
+          "lean": {
+            "early_month": 1.3,
+            "liquidated": 2.47
+          },
+          "safer": {
+            "early_month": 3.6,
+            "liquidated": 2.47
+          },
+          "unguarded": 6.78,
+          "upfront": 2.47
+        },
+        "1.0": {
+          "balanced": {
+            "early_month": 2.3,
+            "liquidated": 0.73
+          },
+          "lean": {
+            "early_month": 1.4,
+            "liquidated": 0.73
+          },
+          "safer": {
+            "early_month": 3.8,
+            "liquidated": 0.73
+          },
+          "unguarded": 6.78,
+          "upfront": 0.73
+        },
+        "2.0": {
+          "balanced": {
+            "early_month": 2.4,
+            "liquidated": 0.0
+          },
+          "lean": {
+            "early_month": 1.5,
+            "liquidated": 0.09
+          },
+          "safer": {
+            "early_month": 3.9,
+            "liquidated": 0.0
+          },
+          "unguarded": 6.78,
+          "upfront": 0.0
+        }
+      }
+    }
+  },
+  "held_days": 7,
+  "period": "Oct 2025 to Jun 2026"
+}
