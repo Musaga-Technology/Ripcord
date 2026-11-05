@@ -34,7 +34,7 @@ async function start() {
       r.status,
       await r.json(),
     ]);
-  return { req, watcher, store, file: join(dir, 'watch.json') };
+  return { base, req, watcher, store, file: join(dir, 'watch.json') };
 }
 
 describe('the poker API', () => {
@@ -50,6 +50,15 @@ describe('the poker API', () => {
       { watching: true },
     ]);
     expect(watcher.list()).toEqual([{ guardId: GID, hlAddress: HL }]);
+  });
+
+  it('answers a browser directly, from any origin', async () => {
+    const { base } = await start();
+    const pre = await fetch(`${base}/v1/watch/g-vf6per4bfx`, { method: 'OPTIONS' });
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get('access-control-allow-methods')).toContain('PUT');
+    const health = await fetch(`${base}/healthz`);
+    expect(health.headers.get('access-control-allow-origin')).toBe('*');
   });
 
   it('keeps the watch list encrypted at rest', async () => {

@@ -17,8 +17,16 @@ async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
   return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 }
 
+// The owner's browser registers and reads directly, so Ripcord's web server never sees the address. Any origin is
+// fine: registering needs the salt, and health carries no address.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 function send(res: ServerResponse, code: number, v: unknown): void {
-  res.writeHead(code, { 'Content-Type': 'application/json' }).end(JSON.stringify(v));
+  res.writeHead(code, { 'Content-Type': 'application/json', ...CORS }).end(JSON.stringify(v));
 }
 
 export function server(watcher: Watcher, store: Store, commitmentOf: CommitmentOf, now = Date.now): Server {
@@ -36,6 +44,7 @@ export function server(watcher: Watcher, store: Store, commitmentOf: CommitmentO
 
   return createServer(async (req, res) => {
     try {
+      if (req.method === 'OPTIONS') return void res.writeHead(204, CORS).end();
       const url = new URL(req.url ?? '/', 'http://poker');
       const [, v1, kind, id] = url.pathname.split('/');
       if (url.pathname === '/healthz') return send(res, 200, { ok: true, guards: watcher.list().length });
