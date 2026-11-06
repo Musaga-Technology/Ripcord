@@ -25,9 +25,9 @@ export class CrashRun {
 
   constructor(
     readonly pos: PositionSpec,
-    spec: GuardSpec,
-    seed: number,
-    private readonly windowS = 300,
+    readonly spec: GuardSpec,
+    readonly seed: number,
+    readonly windowS = 300,
   ) {
     this.u = rng(seed);
     this.guard = new GuardedPosition(pos, spec, this.u);
@@ -71,6 +71,22 @@ export class CrashRun {
       this.landedPrice = this.price;
     }
     if (this.savedAt === null && g.rescues.some((r) => r.outcome === 'saved')) this.savedAt = this.t;
+  }
+
+  /**
+   * Every price and liquidation price this run will show if the crash starts now: the same seed gives the same run,
+   * so a twin played to the end tells the chart its range before anything moves.
+   */
+  forecast(): number[] {
+    const twin = new CrashRun(this.pos, this.spec, this.seed, this.windowS);
+    while (twin.t < this.t) twin.step();
+    twin.crashing = true;
+    const seen = this.pts.map((p) => p[1]).concat(this.guard.liq);
+    for (let i = 0; i < 3000 && !twin.over; i++) {
+      twin.step();
+      seen.push(twin.price, twin.guard.liq);
+    }
+    return seen;
   }
 
   get over(): boolean {

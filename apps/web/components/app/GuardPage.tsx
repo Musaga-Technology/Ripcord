@@ -16,14 +16,19 @@ import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/s
 import { downloadSealFile, keepOpened, loadGuards, openedSeal, patchGuard, type LocalGuard } from '../../lib/store';
 import { pct, price, usd } from '../format';
 import { GuardCard, type CardState } from '../GuardCard';
+import { rangeOf, RescueChart } from '../RescueChart';
+import { Ticker } from '../Ticker';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
-import { HunterChart } from './HunterChart';
 import { Approve, assetOf, Fund } from './steps';
 
 const DOTS = '••••••';
-const SPEED = 10;
+/** Calm stretches of a crash run at 10× speed; the rescue in flight at 3×, so its clock can be read. */
+const CALM_SPEED = 10;
+const FLIGHT_SPEED = 3;
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 /** An hour's heartbeat, twice over: past this the guard isn't being checked (docs/SPEC.md §4). */
 const PAUSED_AFTER_MS = 2 * 3_600_000;
 
@@ -69,10 +74,16 @@ function useCrash(h: Holding, settings: GuardSettings | null, reserveX: number) 
     };
   }, [h, settings, reserveX]);
 
-  if (!run.current || run.current.pos.entry !== spec.pos.entry) run.current = new CrashRun(spec.pos, spec.guard, seed);
+  const range = useRef<[number, number]>([0, 0]);
+  const fresh = () => {
+    const r = new CrashRun(spec.pos, spec.guard, seed);
+    range.current = rangeOf(r.pts.map((p) => p[1]).concat(r.guard.liq), 0.3);
+    return r;
+  };
+  if (!run.current || run.current.pos.entry !== spec.pos.entry) run.current = fresh();
 
   useEffect(() => {
-    run.current = new CrashRun(spec.pos, spec.guard, seed);
+    run.current = fresh();
     tick((n) => n + 1);
   }, [spec, seed]);
 
@@ -88,7 +99,7 @@ function useCrash(h: Holding, settings: GuardSettings | null, reserveX: number) 
       if (reduce && r.crashing) {
         while (!r.over) r.step();
       } else {
-        acc += dt * (r.crashing && !r.over ? SPEED : 1);
+        acc += dt * (r.crashing && !r.over ? (r.guard.inFlight ? FLIGHT_SPEED : CALM_SPEED) : 1);
         while (acc >= 1) {
           r.step();
           acc -= 1;
@@ -103,7 +114,10 @@ function useCrash(h: Holding, settings: GuardSettings | null, reserveX: number) 
 
   return {
     run: run.current,
+    range: range.current,
     start: () => {
+      // The range is fixed for the whole crash, so the red line itself moves when the rescue lands.
+      range.current = rangeOf(run.current!.forecast(), 0.1);
       run.current!.crashing = true;
     },
     again: () => setSeed((s) => s + 1),
@@ -156,7 +170,10 @@ function Hunter({
         <span className="text-muted">
           Mark <span className="text-text">{price(mark)}</span>
         </span>
-        <span className="text-red">Liq ─ {liq === null ? '—' : price(liq)}</span>
+        <span className="flex items-center gap-2 text-red">
+          <span aria-hidden="true" className="h-0.5 w-3 rounded-full bg-red" />
+          Liq {liq === null ? '—' : price(liq)}
+        </span>
         <span className="text-muted">{liq === null ? '' : `${distanceOf(liq, mark).toFixed(1)}% away`}</span>
         <span className="text-muted">
           {h.size.toLocaleString('en-US')} {h.coin}
@@ -322,28 +339,107 @@ function Header({
   paused: string | null;
   dot?: 'bg-green' | 'bg-red';
 }) {
+  // The health line is a sibling of the page's sections, not inside the title block, so it stays pinned to the top
+  // while the chart plays a rescue below it (on a phone the card is a screen away by then).
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
-        <Link href="/guards" className="underline decoration-line-3 underline-offset-4 hover:text-text">
-          Guards
-        </Link>
+    <>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
+          <Link
+            href="/guards"
+            className="inline-flex min-h-11 items-center underline decoration-line-3 underline-offset-4 hover:text-text"
+          >
+            Guards
+          </Link>
+        </div>
+        <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">{g.label}</h1>
       </div>
-      <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">{g.label}</h1>
       {paused ? (
-        <p role="alert" className="rounded-[12px] border border-red px-4 py-3 text-[15px] text-red">
+        <p role="alert" className="-mt-4 rounded-[12px] border border-red px-4 py-3 text-[15px] text-red">
           {paused}
         </p>
       ) : (
-        <p aria-live="polite" className="flex items-center gap-2 text-[15px] text-text-2">
+        <p
+          aria-live="polite"
+          className="sticky top-[env(safe-area-inset-top,0px)] z-20 -mx-1 -my-4 flex items-center gap-2 bg-ground px-1 py-2 text-[15px] text-text-2"
+        >
           <span
-            className={`h-[7px] w-[7px] rounded-full ${dot ?? (g.state === 'guarded' ? 'bg-amber' : 'bg-muted')}`}
+            className={`h-[7px] w-[7px] shrink-0 rounded-full ${dot ?? (g.state === 'guarded' ? 'bg-amber' : 'bg-muted')}`}
           />
           {health}
         </p>
       )}
-    </div>
+    </>
   );
+}
+
+interface Phase {
+  state: CardState;
+  status: string;
+  health: string;
+  sub: string;
+  dot?: 'bg-green' | 'bg-red';
+}
+
+/** One state for the card's chip, its line, and the health line above the chart (DESIGN §5's words). */
+function phaseOf(run: CrashRun, coin: string): Phase {
+  const G = run.guard;
+  const f = G.inFlight;
+  const last = G.rescues[G.rescues.length - 1];
+  const landedIn = last && last.landedAt !== null ? last.landedAt - last.firedAt : 0;
+  const moved = run.pos.side > 0 ? 'fell' : 'rose';
+  if (G.phase === 'liquidated') {
+    return {
+      state: 'paused',
+      status: 'Liquidated',
+      health:
+        'Liquidated. The price fell past the margin this rescue added. Verify says whether our promise covers it.',
+      sub: 'liquidated',
+      dot: 'bg-red',
+    };
+  }
+  if (f) {
+    const amount = `${Math.round(f.amount).toLocaleString('en-US')} USDC`;
+    return {
+      state: 'rescuing',
+      status: 'Rescuing…',
+      health: `Rescuing… ${mmss(run.t - f.firedAt)} · ${amount} on its way to your margin`,
+      sub: `rescue on its way · ${mmss(run.t - f.firedAt)}`,
+    };
+  }
+  if (run.savedAt !== null && run.oldLiq !== null && run.landedAt !== null) {
+    return {
+      state: 'rescued',
+      status: 'Saved',
+      health: `Saved. ${coin} ${moved} past your old liquidation price (${price(run.oldLiq)}). Your reserve had moved it to ${price(G.liq)}, ${run.savedAt - run.landedAt} s earlier.`,
+      sub: 'from liquidation',
+      dot: 'bg-green',
+    };
+  }
+  if (run.landedAt !== null && run.oldLiq !== null && run.t < run.landedAt + 20) {
+    return {
+      state: 'rescued',
+      status: 'Rescued',
+      health: `Rescued · landed in ${landedIn} s · Liq ${price(run.oldLiq)} → ${price(G.liq)}`,
+      sub: `landed in ${landedIn} s`,
+      dot: 'bg-green',
+    };
+  }
+  if (run.landedAt !== null && run.oldLiq !== null) {
+    // Until the price crosses the old line (a save) or 24 h pass (a close call), the rescue is settling.
+    return {
+      state: 'guarded',
+      status: 'Settling',
+      health: `Settling · it counts as a save if ${coin} ${moved === 'fell' ? 'falls' : 'rises'} past ${price(run.oldLiq)} in the next 24 h`,
+      sub: 'from liquidation',
+    };
+  }
+  return {
+    state: 'guarded',
+    status: 'Guarded',
+    health: `Guarded · checked ${run.t % 3 || 3} s ago`,
+    sub: 'from liquidation',
+  };
 }
 
 function ExampleGuard({
@@ -357,38 +453,13 @@ function ExampleGuard({
   settings: GuardSettings | null;
   reserveX: number;
 }) {
-  const { run, start, again } = useCrash(h, settings, reserveX);
+  const { run, range, start, again } = useCrash(h, settings, reserveX);
   const [opened, setOpened] = useState<SealContents | null>(g.local ? openedSeal(g.id) : null);
+  const [openedAt] = useState(() => Date.now());
   const G = run.guard;
   const crashing = run.crashing;
-  const landedRecently = run.landedAt !== null && run.t < run.landedAt + 20;
-  const saved = run.savedAt !== null;
-  const lost = G.phase === 'liquidated';
   const shownSettings = g.example ? settings : (opened?.settings ?? null);
-
-  const state: CardState = lost
-    ? 'paused'
-    : G.phase === 'rescuing'
-      ? 'rescuing'
-      : saved || landedRecently
-        ? 'rescued'
-        : 'guarded';
-  const status = lost
-    ? 'Liquidated'
-    : G.phase === 'rescuing'
-      ? 'Rescuing…'
-      : saved
-        ? 'Saved'
-        : landedRecently
-          ? 'Rescued'
-          : 'Guarded';
-  const health = lost
-    ? 'Liquidated. The price fell past the margin this rescue added.'
-    : G.phase === 'rescuing'
-      ? 'Rescuing… the reserve is on its way as USDC.'
-      : saved
-        ? 'Saved. The price fell past your old liquidation price, after the rescue had moved it.'
-        : `Guarded · checked ${run.t % 3 || 3} s ago`;
+  const p = phaseOf(run, h.coin);
   const rows: HistoryRow[] = G.rescues
     .filter((r) => r.landedAt !== null)
     .map((r) => ({
@@ -398,24 +469,29 @@ function ExampleGuard({
       outcome: OUTCOME[r.outcome] ?? 'Settling',
     }));
   const d = distanceOf(G.liq, run.price);
-  const window = run.pts.filter(([t]) => t >= run.t - 300);
+  const simClock = (t: number) => hhmm(openedAt + (t - run.windowS) * 1000);
 
   return (
     <div className="flex flex-col gap-6">
-      <Header g={g} health={health} paused={null} dot={lost ? 'bg-red' : saved ? 'bg-green' : undefined} />
+      <Header g={g} health={p.health} paused={null} dot={p.dot} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
           <Hunter
             h={h}
             mark={run.price}
             liq={G.liq}
-            note={`simulated${crashing && !run.over ? ` · ${SPEED}× speed` : ''}`}
+            note={`simulated${crashing && !run.over ? ` · ${G.inFlight ? FLIGHT_SPEED : CALM_SPEED}× speed` : ''}`}
           >
-            <HunterChart
-              pts={window}
+            <RescueChart
+              pts={run.pts}
+              t0={run.t - run.windowS}
+              t1={run.t}
+              lo={range[0]}
+              hi={range[1]}
               liq={G.liq}
               oldLiq={run.oldLiq}
               landed={run.landedAt !== null ? [run.landedAt, run.landedPrice] : null}
+              timeLabel={simClock}
               label="The position's price and its public liquidation price."
             />
           </Hunter>
@@ -437,12 +513,12 @@ function ExampleGuard({
           <Card3D>
             <GuardCard
               label={g.label}
-              distance={`${d.toFixed(1)}%`}
-              sub={G.phase === 'rescuing' ? 'rescue on its way' : 'from liquidation'}
+              distance={<Ticker value={d} suffix="%" />}
+              sub={p.sub}
               fingerprint={g.fingerprint}
               commitment={g.commitment}
-              state={state}
-              status={status}
+              state={p.state}
+              status={p.status}
               reserve={DOTS}
               depth
             />
@@ -463,6 +539,11 @@ function ExampleGuard({
       <History rows={rows} />
     </div>
   );
+}
+
+function rangeFrom(pts: [number, number][], liq: number | null): { lo: number; hi: number } {
+  const [lo, hi] = rangeOf(pts.map((p) => p[1]).concat(liq ?? []), 0.08);
+  return { lo, hi };
 }
 
 const reserveWords = (s: GuardSettings) => `${usd(s.budget_usd)} in ${assetOf(s.reserve_asset).symbol}`;
@@ -573,9 +654,13 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
         <div className="order-2 min-w-0 lg:order-1">
           {h ? (
             <Hunter h={h} mark={mark} liq={liq} note="live from Hyperliquid">
-              <HunterChart
+              <RescueChart
                 pts={pts}
+                t0={pts[0]?.[0] ?? 0}
+                t1={pts[pts.length - 1]?.[0] ?? 1}
+                {...rangeFrom(pts, liq)}
                 liq={liq}
+                timeLabel={(t) => hhmm(t * 1000)}
                 label={`${g.coin} price over the last hour and its public liquidation price.`}
               />
             </Hunter>
