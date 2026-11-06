@@ -49,7 +49,7 @@ function Home() {
       >
         <Stat label="Account value" value={usd(account.value, 2)} />
         <Stat label="Guarded notional" value={usd(notional)} note={`${guarded.length} of ${account.holdings.length}`} />
-        <Stat label="Reserve" value="••••••" mono />
+        <ReserveStat reserves={guards.flatMap((g) => (g.example ? [g.example.reserve] : []))} />
       </section>
       <Dashboard holdings={account.holdings} guards={guards} />
       {session.kind === 'demo' ? (
@@ -78,6 +78,36 @@ function Skeleton() {
     <div aria-busy="true" aria-label="Reading your positions" className="flex flex-col gap-6">
       <div className="h-[84px] animate-pulse rounded-[20px] border border-line bg-panel" />
       <div className="h-[320px] animate-pulse rounded-[20px] border border-line bg-panel" />
+    </div>
+  );
+}
+
+/** The owner's own reserves, masked until held: the dashboard is the owner's view, so it may show them. */
+function ReserveStat({ reserves }: { reserves: string[] }) {
+  const [peek, setPeek] = useState(false);
+  return (
+    <div className="flex flex-col gap-1 border-line px-5 py-4 [&:not(:first-child)]:md:border-l">
+      <span className="flex items-center justify-between gap-3 text-[13px] text-muted">
+        Reserve
+        {reserves.length > 0 && (
+          <button
+            type="button"
+            className="min-h-9 select-none rounded-full border border-line-3 px-3 text-[13px] font-medium text-text"
+            onPointerDown={() => setPeek(true)}
+            onPointerUp={() => setPeek(false)}
+            onPointerLeave={() => setPeek(false)}
+            onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && setPeek(true)}
+            onKeyUp={() => setPeek(false)}
+          >
+            Hold to peek
+          </button>
+        )}
+      </span>
+      <span
+        className={`text-[20px] font-semibold tracking-[-0.02em] tabular-nums ${peek ? '' : 'font-mono tracking-[0.2em]'}`}
+      >
+        {peek ? reserves.join(' · ') : '••••••'}
+      </span>
     </div>
   );
 }

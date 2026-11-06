@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useSession } from '../../lib/session';
 import { ThemeToggle } from '../ThemeToggle';
+import { AccountMenu } from './AccountMenu';
 
 function Logo() {
   return (
@@ -19,7 +20,6 @@ export const appWrap =
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { session, leave } = useSession();
-  const short = session ? `${session.address.slice(0, 6)}…${session.address.slice(-4)}` : null;
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line">
@@ -39,17 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {session?.kind === 'demo' && (
               <span className="hidden text-[13px] text-muted sm:inline">Example account</span>
             )}
-            {short && (
-              <button
-                type="button"
-                onClick={leave}
-                title="Disconnect"
-                aria-label={`Disconnect ${short}`}
-                className="min-h-10 rounded-full border border-line-3 px-3 font-mono text-[13px] text-text-2 transition-colors duration-[120ms] hover:border-muted"
-              >
-                {short}
-              </button>
-            )}
+            {session && <AccountMenu session={session} onLeave={leave} />}
             <ThemeToggle />
           </div>
         </div>

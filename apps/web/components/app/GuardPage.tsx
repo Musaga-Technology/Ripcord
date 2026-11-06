@@ -3,7 +3,7 @@
 // Guard (docs/DESIGN.md §4.3): what a hunter sees beside the card and its sealed settings, the health line, and the
 // rescue history. An example guard can be run through a simulated crash; a real one reads Hyperliquid and the registry.
 import { DEMO_GUARDS } from '@ripcord/shared/mock';
-import { open, readSealFile, type GuardSettings, type SealContents } from '@ripcord/shared';
+import { open, presetRanges, readSealFile, type GuardSettings, type SealContents } from '@ripcord/shared';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -21,6 +21,7 @@ import { Ticker } from '../Ticker';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
+import { GuardActions, NO_CONTROL, type Control } from './GuardActions';
 import { Approve, assetOf, Fund } from './steps';
 
 const DOTS = '••••••';
@@ -453,13 +454,50 @@ function ExampleGuard({
   settings: GuardSettings | null;
   reserveX: number;
 }) {
-  const { run, range, start, again } = useCrash(h, settings, reserveX);
+  const [control, setControl] = useState<Control>(NO_CONTROL);
   const [opened, setOpened] = useState<SealContents | null>(g.local ? openedSeal(g.id) : null);
+  const d0 = useMemo(() => distanceOf(h.liquidation ?? h.mark * 0.8, h.mark), [h]);
+  // A resealed range is what the next crash runs on.
+  const ruled = useMemo(() => {
+    const r = control.preset ? presetRanges(control.preset, d0) : null;
+    return r && settings ? { ...settings, ...r } : settings;
+  }, [control.preset, d0, settings]);
+  const baseReserve = g.example?.reserve ?? (opened ? reserveWords(opened.settings) : '');
+  const asset = g.example
+    ? (baseReserve.split(' ').pop() ?? '')
+    : opened
+      ? assetOf(opened.settings.reserve_asset).symbol
+      : '';
+  const addedTotal = control.added.reduce((a, b) => a + b, 0);
+  const base = /^([\d.]+) (\w+)$/.exec(baseReserve.replace(/,/g, ''));
+  // A top-up adds to the reserve's own figure when there is one ("0.057 BTC" + 0.02 → "0.077 BTC").
+  const reserveText = !addedTotal
+    ? baseReserve
+    : base
+      ? `${+(Number(base[1]) + addedTotal).toFixed(6)} ${base[2]}`
+      : `${baseReserve} + ${addedTotal} ${asset}`;
+  const { run, range, start, again } = useCrash(h, ruled, reserveX);
   const [openedAt] = useState(() => Date.now());
   const G = run.guard;
   const crashing = run.crashing;
-  const shownSettings = g.example ? settings : (opened?.settings ?? null);
-  const p = phaseOf(run, h.coin);
+  const shownSettings = g.example ? ruled : (opened?.settings ?? null);
+  const p = control.closed
+    ? ({
+        state: 'draft',
+        status: 'Closed',
+        health: `Closed. ${reserveText || 'The reserve'} is on its way back to your Hyperliquid account.`,
+        sub: 'closed',
+      } satisfies Phase)
+    : control.frozen && !crashing
+      ? ({
+          state: 'paused',
+          status: 'Frozen',
+          health:
+            'Reserve frozen. Nothing can leave it, rescues included, until you unfreeze it. Its balance shows again when you do.',
+          sub: 'reserve frozen',
+          dot: 'bg-red',
+        } satisfies Phase)
+      : phaseOf(run, h.coin);
   const rows: HistoryRow[] = G.rescues
     .filter((r) => r.landedAt !== null)
     .map((r) => ({
@@ -474,6 +512,14 @@ function ExampleGuard({
   return (
     <div className="flex flex-col gap-6">
       <Header g={g} health={p.health} paused={null} dot={p.dot} />
+      <GuardActions
+        example
+        control={control}
+        onChange={setControl}
+        reserve={reserveText || 'your reserve'}
+        asset={asset}
+        distance={d0}
+      />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
           <Hunter
@@ -495,7 +541,11 @@ function ExampleGuard({
               label="The position's price and its public liquidation price."
             />
           </Hunter>
-          {!crashing ? (
+          {control.closed ? null : control.frozen && !crashing ? (
+            <p className="text-[15px] text-text-2">
+              Frozen, so a crash would liquidate this position: nothing can leave the reserve, rescues included.
+            </p>
+          ) : !crashing ? (
             <button type="button" className={`${primaryBtn} w-full sm:w-fit`} onClick={start}>
               Try a crash
             </button>
@@ -523,12 +573,7 @@ function ExampleGuard({
               depth
             />
           </Card3D>
-          <Sealed
-            g={g}
-            settings={shownSettings}
-            reserveText={g.example?.reserve ?? (opened ? reserveWords(opened.settings) : DOTS)}
-            onOpen={setOpened}
-          />
+          <Sealed g={g} settings={shownSettings} reserveText={reserveText || DOTS} onOpen={setOpened} />
           {g.local && (
             <button type="button" className={ghostBtn} onClick={() => downloadSealFile(g.local!)}>
               Save seal file
@@ -618,6 +663,16 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   return (
     <div className="flex flex-col gap-6">
       <Header g={{ ...g, state }} health={health} paused={paused} />
+      {state === 'guarded' && h && (
+        <GuardActions
+          example={false}
+          control={NO_CONTROL}
+          onChange={() => {}}
+          reserve={opened ? reserveWords(opened.settings) : 'your reserve'}
+          asset={opened ? assetOf(opened.settings.reserve_asset).symbol : ''}
+          distance={h.distance ?? 10}
+        />
+      )}
       {state !== 'guarded' && (
         <section aria-label="Finish setting up" className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
           {!opened ? (
