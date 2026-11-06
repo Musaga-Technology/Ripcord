@@ -164,19 +164,6 @@ body {
   }
 }
 
-/* A section settles into place as it scrolls in. */
-.reveal {
-  opacity: 0;
-  transform: translateY(14px);
-  transition:
-    opacity var(--dur-4) var(--ease),
-    transform var(--dur-4) var(--ease);
-}
-.reveal.in {
-  opacity: 1;
-  transform: none;
-}
-
 h1,
 h2,
 h3 {
@@ -194,9 +181,6 @@ p {
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
     transition-duration: var(--dur-1) !important;
-  }
-  .reveal {
-    transform: none;
   }
 }
 

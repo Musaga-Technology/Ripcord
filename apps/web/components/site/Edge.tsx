@@ -29,8 +29,8 @@ export function Edge() {
   const when = date(edge.scanned_at);
   const isolated = edge.within_5_count > 0 && edge.within_5_isolated === edge.within_5_count;
   return (
-    <div className="grid gap-12 lg:grid-cols-[1fr_1.3fr] lg:items-end">
-      <Reveal className="flex flex-col gap-5">
+    <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-end">
+      <Reveal className="flex min-w-0 flex-col gap-5">
         <h2 className="text-[36px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[56px]">
           The edge, right now.
         </h2>
@@ -40,8 +40,33 @@ export function Edge() {
           {isolated ? ' Every position within 5% was isolated.' : ''}
         </p>
       </Reveal>
-      <Reveal>
-        <div className="overflow-x-auto">
+      <Reveal className="min-w-0">
+        {/* Phone: one row per position, the distance bar full width under it. */}
+        <ul className="flex flex-col sm:hidden">
+          {rows.map((r, i) => (
+            <li key={i} className="flex flex-col gap-2 border-b border-line py-3.5 tabular-nums">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="font-medium">
+                  {r.coin} {r.side} · {money(r.notional)}
+                </span>
+                <span className={r.distance_pct < 5 ? 'text-red' : ''}>{r.distance_pct.toFixed(1)}%</span>
+              </span>
+              <span className="text-[13px] text-text-2">
+                {r.leverage}× {r.margin}
+              </span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-line">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, r.distance_pct * 10)}%`,
+                    background: r.distance_pct < 5 ? 'var(--red)' : 'var(--muted)',
+                  }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[520px] text-left text-[15px] tabular-nums">
             <thead className="text-[13px] text-muted">
               <tr className="border-b border-line">

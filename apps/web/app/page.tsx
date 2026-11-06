@@ -29,9 +29,7 @@ const ghost =
 
 const STATS: { to?: number; prefix?: string; suffix?: string; text?: string; src: string }[] = [
   {
-    to: 46,
-    prefix: '27–',
-    suffix: ' s',
+    text: '27–46 s',
     src: 'Mainnet test rescues from a hidden reserve into Hyperliquid margin, Oct 21.',
   },
   { text: '0 of 53', src: 'BTC 10× longs liquidated in a replay of the Oct 10, 2025 crash. 53 of 53 without Ripcord.' },
@@ -86,7 +84,7 @@ const NEAR = [
   ['Confidential Intents', 'Keeps the reserve private and every rescue unlinkable.'],
   ['OutLayer', 'Runs the guard in a sealed enclave and gives each reserve its own custody wallet.'],
   ['NEAR contract', 'Holds each guard as hashes, and its wallet rules, which only your signature changes.'],
-  ['NEAR AI Cloud', 'Reads your plain-English setup privately.'],
+  ['NEAR AI Cloud', 'Coming next: reads your plain-English setup privately.'],
 ];
 
 const FAQ = [
@@ -212,7 +210,7 @@ export default function Home() {
         </section>
 
         <section id="rescue" className={`${wrap} scroll-mt-20 py-24`}>
-          <Reveal className="flex max-w-[44rem] flex-col gap-5">
+          <Reveal className="flex max-w-[36rem] flex-col gap-5">
             <h2 className={h2}>Watch the line move.</h2>
             <p className="text-[17px] text-text-2">
               A wick to 2,205 would have liquidated this ETH long at 2,231. Two hidden rescues moved the line out of
@@ -225,7 +223,7 @@ export default function Home() {
         </section>
 
         <section id="hunt" className={`${wrap} scroll-mt-20 py-24`}>
-          <Reveal className="flex max-w-[44rem] flex-col gap-5">
+          <Reveal className="flex max-w-[36rem] flex-col gap-5">
             <h2 className={h2}>Try to hunt it.</h2>
             <p className="text-[17px] text-text-2">
               You can see where this position dies. Sell into the book and push the price there. The guard runs the same
@@ -312,7 +310,7 @@ export default function Home() {
                     +
                   </span>
                 </summary>
-                <p className="mt-3 max-w-[44rem] text-[15px] text-text-2">{a}</p>
+                <p className="mt-3 max-w-[36rem] text-[15px] text-text-2">{a}</p>
               </details>
             ))}
           </div>

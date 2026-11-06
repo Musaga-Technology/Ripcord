@@ -10,9 +10,15 @@ const instrument = Instrument_Sans({
 });
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-jetbrains' });
 
+const description =
+  'Everyone can see where your Hyperliquid position dies. Ripcord keeps a reserve nobody can see, and moves it in first.';
+
 export const metadata: Metadata = {
-  title: 'Ripcord',
-  description: 'Hidden margin for Hyperliquid.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  title: { default: 'Ripcord · Hidden margin for Hyperliquid', template: '%s · Ripcord' },
+  description,
+  openGraph: { title: 'Ripcord · Hidden margin for Hyperliquid', description, type: 'website' },
+  twitter: { card: 'summary_large_image', title: 'Ripcord · Hidden margin for Hyperliquid', description },
 };
 
 // Applies a saved theme choice before first paint, so a light-mode user never sees a dark flash.

@@ -24,37 +24,49 @@ export function useInView<T extends Element>(margin = '-12% 0px'): [React.RefObj
   return [ref, seen];
 }
 
-/** A section settles into place as it scrolls in. */
+/**
+ * A block of the page. Content is visible as rendered, with no entrance: motion is kept for the rescue itself and the
+ * few moments DESIGN §8 names, and a page read as HTML or captured whole shows everything.
+ */
 export function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const [ref, seen] = useInView<HTMLDivElement>();
-  return (
-    <div ref={ref} className={`reveal ${seen ? 'in' : ''} ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
-/** A number that counts up once it is seen, in tabular digits so nothing shifts. */
+/**
+ * A number that counts up when it scrolls into view. The HTML carries the real value; only a number that starts out
+ * of view is set back to zero, unseen, to count up when it arrives.
+ */
 export function Count({ to, prefix = '', suffix = '' }: { to: number; prefix?: string; suffix?: string }) {
-  const [ref, seen] = useInView<HTMLSpanElement>();
-  const [v, setV] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [v, setV] = useState(to);
   useEffect(() => {
-    if (!seen) return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return setV(to);
-    const t0 = performance.now();
+    const el = ref.current;
+    if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const r = el.getBoundingClientRect();
+    if (r.top < innerHeight && r.bottom > 0) return;
+    setV(0);
     let raf = 0;
-    const f = (now: number) => {
-      const k = Math.min(1, (now - t0) / 900);
-      setV(to * (1 - Math.pow(1 - k, 3)));
-      if (k < 1) raf = requestAnimationFrame(f);
+    const io = new IntersectionObserver(([e]) => {
+      if (!e?.isIntersecting) return;
+      io.disconnect();
+      const t0 = performance.now();
+      const f = (now: number) => {
+        const k = Math.min(1, (now - t0) / 900);
+        setV(to * (1 - Math.pow(1 - k, 3)));
+        if (k < 1) raf = requestAnimationFrame(f);
+      };
+      raf = requestAnimationFrame(f);
+    });
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
     };
-    raf = requestAnimationFrame(f);
-    return () => cancelAnimationFrame(raf);
-  }, [seen, to]);
+  }, [to]);
   return (
     <span ref={ref} className="tabular-nums">
       {prefix}
-      {Math.round(seen ? v : 0)}
+      {Math.round(v)}
       {suffix}
     </span>
   );

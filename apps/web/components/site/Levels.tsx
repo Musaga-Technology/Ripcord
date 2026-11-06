@@ -17,7 +17,8 @@ const LEVELS: [string, number, boolean?][] = [
   ['2,200', 88],
   ['2,170', 45],
 ];
-const MAX_W = 440;
+/** The widest slab, as a share of the track: room is left for the "Your position" label. */
+const MAX_SHARE = 0.82;
 
 export function Levels() {
   const [ref, seen] = useInView<HTMLDivElement>();
@@ -35,7 +36,7 @@ export function Levels() {
               <span
                 className={`slab ${mine ? 'mine' : ''} ${seen ? 'up' : ''}`}
                 style={{
-                  ['--w' as string]: `${Math.round((w / 100) * MAX_W)}px`,
+                  ['--w' as string]: `${(w * MAX_SHARE).toFixed(1)}%`,
                   transitionDelay: `${120 + i * 70}ms`,
                 }}
               >
@@ -44,7 +45,7 @@ export function Levels() {
                 <i className="f side" />
               </span>
               {mine && (
-                <span className="levels-mine" style={{ left: `${Math.round((w / 100) * MAX_W) + 28}px` }}>
+                <span className="levels-mine" style={{ left: `calc(${(w * MAX_SHARE).toFixed(1)}% + 28px)` }}>
                   Your position
                 </span>
               )}

@@ -91,64 +91,67 @@ export function WatchLine() {
   const [ref, seen] = useInView<HTMLDivElement>('-25% 0px');
   return (
     <div ref={ref} className={`watch ${seen ? 'play' : ''}`} style={{ ['--dur' as string]: `${DUR}s` }}>
-      <svg
-        viewBox="0 0 1000 400"
-        className="h-auto w-full"
-        role="img"
-        aria-label="ETH wicks to 2,205, past the old liquidation price of 2,231. Two hidden rescues step the liquidation price down before the wick reaches it."
-      >
-        <defs>
-          <clipPath id="watch-clip">
-            <rect className="watch-wipe" x="0" y="0" width="1000" height="400" />
-          </clipPath>
-        </defs>
-        <line
-          x1="0"
-          x2="1000"
-          y1={C.oldY}
-          y2={C.oldY}
-          stroke="var(--red)"
-          strokeWidth="1"
-          strokeDasharray="6 6"
-          opacity=".45"
-          vectorEffect="non-scaling-stroke"
-        />
-        <text x="8" y={C.oldY - 8} fill="var(--red)" fontSize="13" opacity=".8">
-          Old liquidation 2,231
-        </text>
-        <g clipPath="url(#watch-clip)">
-          <path d={`${C.price} L1000 400 L0 400Z`} fill="var(--text)" fillOpacity=".022" />
-          <path
-            d={C.price}
-            fill="none"
-            stroke="var(--text)"
-            strokeWidth="2.5"
-            strokeLinejoin="round"
+      <div className="relative">
+        <svg
+          viewBox="0 0 1000 400"
+          className="h-auto w-full"
+          role="img"
+          aria-label="ETH wicks to 2,205, past the old liquidation price of 2,231. Two hidden rescues step the liquidation price down before the wick reaches it."
+        >
+          <defs>
+            <clipPath id="watch-clip">
+              <rect className="watch-wipe" x="0" y="0" width="1000" height="400" />
+            </clipPath>
+          </defs>
+          <line
+            x1="0"
+            x2="1000"
+            y1={C.oldY}
+            y2={C.oldY}
+            stroke="var(--red)"
+            strokeWidth="1"
+            strokeDasharray="6 6"
+            opacity=".45"
             vectorEffect="non-scaling-stroke"
           />
-          <path d={C.liqPath} fill="none" stroke="var(--red)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        </g>
-        {C.marks.map((m) => (
-          <g
-            key={m.x}
-            className="watch-mark"
-            style={{ animationDelay: `calc(var(--dur) * ${(m.x / 1000).toFixed(3)})` }}
-          >
-            <circle cx={m.x} cy={m.y} r="6" fill="var(--green)" />
-            <text
-              x={m.x}
-              y={m.y - 18}
-              fill="var(--green)"
-              fontSize="14"
-              fontWeight="600"
-              textAnchor="middle"
-              className="tabular-nums"
-            >
-              {m.label}
-            </text>
+          <g clipPath="url(#watch-clip)">
+            <path d={`${C.price} L1000 400 L0 400Z`} fill="var(--text)" fillOpacity=".022" />
+            <path
+              d={C.price}
+              fill="none"
+              stroke="var(--text)"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            <path d={C.liqPath} fill="none" stroke="var(--red)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>
+        </svg>
+        <span
+          aria-hidden="true"
+          className="absolute left-2 -translate-y-full pb-1 text-[13px] text-red"
+          style={{ top: `${(C.oldY / 400) * 100}%` }}
+        >
+          Old liquidation 2,231
+        </span>
+        {C.marks.map((m) => (
+          <span
+            key={m.x}
+            aria-hidden="true"
+            className="watch-mark absolute"
+            style={{
+              left: `${m.x / 10}%`,
+              top: `${(m.y / 400) * 100}%`,
+              animationDelay: `calc(var(--dur) * ${(m.x / 1000).toFixed(3)})`,
+            }}
+          >
+            <span className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-green" />
+            <span className="absolute -translate-x-1/2 -translate-y-[calc(100%+10px)] whitespace-nowrap rounded-[6px] bg-ground px-1.5 py-0.5 text-[13px] font-semibold text-green tabular-nums">
+              {m.label}
+            </span>
+          </span>
         ))}
-      </svg>
+      </div>
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[13px] text-muted">
         <span className="inline-flex items-center gap-2">
           <i className="h-[2px] w-5 bg-text" /> ETH price
