@@ -61,7 +61,8 @@ export function OpenSeal({ isDemo, onOpened }: { isDemo: boolean; onOpened(): vo
         type="file"
         accept="application/json,.json"
         className="sr-only"
-        aria-label="Seal file"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={pick}
       />
       {file ? (
@@ -81,7 +82,7 @@ export function OpenSeal({ isDemo, onOpened }: { isDemo: boolean; onOpened(): vo
       ) : (
         <button
           type="button"
-          className="underline decoration-line-3 underline-offset-4 hover:text-text"
+          className="inline-flex min-h-11 items-center underline decoration-line-3 underline-offset-4 hover:text-text"
           onClick={() => input.current?.click()}
         >
           Open a seal file

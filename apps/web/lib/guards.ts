@@ -9,6 +9,8 @@ export interface ShownGuard {
   fingerprint: string;
   coin: string;
   label: string;
+  /** A shorter name for the card, when the label lists what a cross guard covers. */
+  cardLabel?: string;
   margin: 'cross' | 'isolated';
   /** Example guards in demo mode show their sealed settings in words; real ones open with the seal file. */
   example: { reserve: string; range: string; target: string; reserveX: number } | null;
@@ -68,6 +70,24 @@ export function watchedDistance(h: Holding, all: Holding[]): number | null {
   if (h.margin === 'isolated') return h.distance;
   const cross = all.filter((x) => x.margin === 'cross' && x.distance !== null).map((x) => x.distance as number);
   return cross.length ? Math.min(...cross) : null;
+}
+
+/** What a guard is called on its card and its page: a cross guard names every position it covers. */
+export function guardName(g: ShownGuard, all: Holding[]): { title: string; card: string } {
+  if (g.margin === 'isolated') return { title: g.label, card: g.label };
+  const cross = all.filter((h) => h.margin === 'cross');
+  if (cross.length === 0) return { title: 'Cross margin', card: 'Cross margin' };
+  return {
+    title: `Cross margin · ${cross.map((h) => `${h.coin} ${h.side.toLowerCase()}`).join(', ')}`,
+    card: `Cross · ${cross.map((h) => h.coin).join(', ')}`,
+  };
+}
+
+/** The position whose distance a guard watches: the isolated one, or the nearest cross position. */
+export function watchedHolding(g: ShownGuard, all: Holding[]): Holding | null {
+  if (g.margin === 'isolated') return all.find((h) => h.margin === 'isolated' && h.coin === g.coin) ?? null;
+  const cross = all.filter((h) => h.margin === 'cross' && h.distance !== null);
+  return cross.sort((a, b) => (a.distance as number) - (b.distance as number))[0] ?? null;
 }
 
 export const labelOf = (h: Holding) =>

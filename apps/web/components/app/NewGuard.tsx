@@ -23,6 +23,7 @@ import { guardOf, guardsFor, labelOf, watchedDistance } from '../../lib/guards';
 import type { Holding } from '../../lib/hl';
 import { markedPreset, replayFigure } from '../../lib/replay';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
+import { radioKeys } from '../../lib/radio';
 import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } from '../../lib/store';
 import { pct, price, usd } from '../format';
 import { GuardCard } from '../GuardCard';
@@ -110,7 +111,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   const [error, setError] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedGuard | null>(null);
   const [local, setLocal] = useState<LocalGuard | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(0);
   const [typed, setTyped] = useState(0);
 
@@ -127,8 +128,19 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
     reduce.current = matchMedia('(prefers-reduced-motion: reduce)').matches;
   }, []);
 
-  const canSeal =
-    phase === 'edit' && !!ranges && !!assetPrice && reserveUsd >= MIN_RESERVE_USD && pass.length >= 8 && pass === pass2;
+  // Why Seal is blocked, said under the button rather than left to guess.
+  const blocker = !ranges
+    ? 'This position is too close to liquidation for this choice.'
+    : !assetPrice
+      ? 'Reading prices…'
+      : reserveUsd < MIN_RESERVE_USD
+        ? `A reserve needs at least $${MIN_RESERVE_USD}.`
+        : pass.length < 8
+          ? 'Your passphrase needs 8 or more characters.'
+          : pass !== pass2
+            ? "The two passphrases don't match yet."
+            : '';
+  const canSeal = phase === 'edit' && blocker === '';
 
   /** The seal (DESIGN §8.1): the rosette prints, each sealed value collapses, the fingerprint types in. */
   const playSeal = async (fingerprint: string) => {
@@ -256,6 +268,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                     type="button"
                     role="radio"
                     aria-checked={i === assetIx}
+                    tabIndex={i === assetIx ? 0 : -1}
+                    onKeyDown={radioKeys}
                     disabled={phase !== 'edit'}
                     onClick={() => {
                       setAssetIx(i);
@@ -327,6 +341,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                       type="button"
                       role="radio"
                       aria-checked={on}
+                      tabIndex={on ? 0 : -1}
+                      onKeyDown={radioKeys}
                       disabled={!r || phase !== 'edit'}
                       onClick={() => setChosen(p.id)}
                       className={`flex min-h-11 flex-col gap-1 rounded-[20px] border p-4 text-left transition-colors duration-[120ms] disabled:opacity-40 ${on ? 'border-text' : 'border-line hover:border-line-3'} bg-panel`}
@@ -365,38 +381,60 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
               <p className="text-[15px] text-text-2">
                 It holds your settings and the key to your reserve. Choose a passphrase to lock it. Nobody can reset it.
               </p>
-              <div className="grid max-w-[520px] gap-2 sm:grid-cols-2">
-                <input
-                  type="password"
-                  aria-label="Passphrase"
-                  placeholder="Passphrase, 8 or more characters"
-                  autoComplete="new-password"
-                  className={fieldCls}
-                  value={pass}
-                  disabled={phase !== 'edit'}
-                  onChange={(e) => setPass(e.target.value)}
-                />
-                <input
-                  type="password"
-                  aria-label="Repeat the passphrase"
-                  placeholder="Repeat it"
-                  autoComplete="new-password"
-                  className={fieldCls}
-                  value={pass2}
-                  disabled={phase !== 'edit'}
-                  onChange={(e) => setPass2(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1 pt-2 text-[13px] text-muted">
-                <p>A rescue takes under a minute. A move faster than that can still liquidate you.</p>
-                <p>
-                  No Ripcord fee unless a rescue saves you, then 3% of it · $1 a month · about $0.32 network cost per
-                  rescue
-                </p>
-              </div>
-              <button type="button" className={`${primaryBtn} mt-1 w-full sm:w-fit`} disabled={!canSeal} onClick={seal}>
-                {phase === 'sealing' ? 'Sealing…' : 'Seal guard'}
-              </button>
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (canSeal) void seal();
+                }}
+              >
+                <div className="grid max-w-[520px] gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5 text-[13px] text-muted">
+                    Passphrase
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      aria-describedby="seal-blocker"
+                      className={fieldCls}
+                      value={pass}
+                      disabled={phase !== 'edit'}
+                      onChange={(e) => setPass(e.target.value)}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-[13px] text-muted">
+                    Repeat it
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      aria-describedby="seal-blocker"
+                      className={fieldCls}
+                      value={pass2}
+                      disabled={phase !== 'edit'}
+                      onChange={(e) => setPass2(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-col gap-1 pt-2 text-[13px] text-muted">
+                  <p>A rescue takes under a minute. A move faster than that can still liquidate you.</p>
+                  <p>
+                    No Ripcord fee unless a rescue saves you, then 3% of it · $1 a month · about $0.32 network cost per
+                    rescue
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button
+                    type="submit"
+                    className={`${primaryBtn} mt-1 w-full sm:w-fit`}
+                    disabled={!canSeal}
+                    aria-describedby="seal-blocker"
+                  >
+                    {phase === 'sealing' ? 'Sealing…' : 'Seal guard'}
+                  </button>
+                  <p id="seal-blocker" className="text-[13px] text-muted">
+                    {phase === 'edit' ? blocker : ''}
+                  </p>
+                </div>
+              </form>
               <p role="alert" className="min-h-6 text-[15px] text-red">
                 {error}
               </p>
@@ -413,17 +451,17 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
               <button
                 type="button"
                 className={saved ? ghostBtn : primaryBtn}
-                onClick={() => {
-                  downloadSealFile(local);
-                  setSaved(true);
-                }}
+                onClick={() => setSaved(downloadSealFile(local))}
               >
                 {saved ? 'Save it again' : 'Save seal file'}
               </button>
               <button type="button" className={saved ? primaryBtn : ghostBtn} disabled={!saved} onClick={afterSave}>
-                {holding.margin === 'isolated' ? 'Next' : 'Fund reserve'}
+                {holding.margin === 'isolated' ? 'Continue to approval' : 'Fund reserve'}
               </button>
             </div>
+            <p aria-live="polite" className="min-h-5 text-[13px] text-muted">
+              {saved ? `Saved as ${saved}. A copy also stays in this browser.` : ''}
+            </p>
           </div>
         ) : phase === 'approve' && prepared && session ? (
           <Approve

@@ -49,11 +49,14 @@ const opened = new Map<string, SealContents>();
 export const openedSeal = (id: string) => opened.get(id) ?? null;
 export const keepOpened = (c: SealContents) => void opened.set(c.guard_id, c);
 
-export function downloadSealFile(g: Pick<LocalGuard, 'file' | 'fingerprint'>): void {
+/** Saves the seal file and returns the name it was saved under. */
+export function downloadSealFile(g: Pick<LocalGuard, 'file' | 'fingerprint'>): string {
+  const name = `ripcord-seal-${g.fingerprint.replace(/[^0-9A-F]/g, '').toLowerCase()}.json`;
   const url = URL.createObjectURL(new Blob([JSON.stringify(g.file, null, 1)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ripcord-seal-${g.fingerprint.replace(/[^0-9A-F]/g, '').toLowerCase()}.json`;
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
 }

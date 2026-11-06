@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { lastCheck, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
 import { CrashRun, marginFor } from '../../lib/crash';
-import { guardOf, guardsFor, STATE_TEXT, stateOf, type ShownGuard } from '../../lib/guards';
+import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
 import { readCandles, readMark, type Holding } from '../../lib/hl';
 import { distance as distanceOf } from '../../lib/sim';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
@@ -512,7 +512,7 @@ function ExampleGuard({
         <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
           <Card3D>
             <GuardCard
-              label={g.label}
+              label={g.cardLabel ?? g.label}
               distance={<Ticker value={d} suffix="%" />}
               sub={p.sub}
               fingerprint={g.fingerprint}
@@ -673,7 +673,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
         <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
           <Card3D>
             <GuardCard
-              label={g.label}
+              label={g.cardLabel ?? g.label}
               distance={d === null ? '—' : pct(d)}
               sub="from liquidation"
               fingerprint={g.fingerprint}
@@ -710,7 +710,7 @@ function Page({ id }: { id: string }) {
   if (!session) return <Connect />;
   const isDemo = session.kind === 'demo';
   const guards = guardsFor(session.address, isDemo, local);
-  const g = guards.find((x) => x.id === id);
+  let g = guards.find((x) => x.id === id);
   if (!g) {
     return (
       <div className="my-auto flex flex-col items-center gap-3 py-16 text-center">
@@ -724,8 +724,9 @@ function Page({ id }: { id: string }) {
   }
   if (!account)
     return <div aria-busy="true" className="h-[420px] animate-pulse rounded-[20px] border border-line bg-panel" />;
-  const h =
-    account.holdings.find((x) => guardOf(x, [g])?.id === g.id && (x.coin === g.coin || g.margin === 'cross')) ?? null;
+  const h = watchedHolding(g, account.holdings);
+  const name = guardName(g, account.holdings);
+  g = { ...g, label: name.title, cardLabel: name.card };
   if (isDemo && h) {
     const settings = exampleSettings(g.id) ?? openedSeal(g.id)?.settings ?? null;
     const budget = openedSeal(g.id)?.settings.budget_usd;

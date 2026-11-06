@@ -144,8 +144,9 @@ export function Fund({
   const asset = assetOf(contents.settings.reserve_asset);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'address' | 'amount' | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [arrived, setArrived] = useState(false);
   const done = useRef(onFunded);
   done.current = onFunded;
 
@@ -169,7 +170,11 @@ export function Fund({
       try {
         const balances = await backend.reserve(contents);
         const held = balances[contents.settings.reserve_asset];
-        if (!stop && held && BigInt(held) > 0n) done.current();
+        if (!stop && held && BigInt(held) > 0n) {
+          stop = true;
+          setArrived(true);
+          setTimeout(() => done.current(), 1400);
+        }
       } catch {
         // Keeps waiting: a missed look changes nothing.
       }
@@ -181,19 +186,20 @@ export function Fund({
     };
   }, [backend, contents, deposit, isDemo]);
 
-  const amount =
+  const exact =
     deposit && deposit.decimals > 0
-      ? (Number(deposit.amount) / 10 ** deposit.decimals).toLocaleString('en-US', { maximumFractionDigits: 8 })
-      : fallback;
+      ? String(Number(deposit.amount) / 10 ** deposit.decimals)
+      : fallback.replace(/,/g, '');
+  const amount = Number(exact).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-  const copy = async () => {
+  const copy = async (what: 'address' | 'amount') => {
     if (!deposit) return;
     try {
-      await navigator.clipboard.writeText(deposit.address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(what === 'address' ? deposit.address : exact);
+      setCopied(what);
+      setTimeout(() => setCopied(null), 1500);
     } catch {
-      // The address is selectable text.
+      // Both are selectable text.
     }
   };
 
@@ -220,21 +226,44 @@ export function Fund({
       ) : (
         <div className="flex flex-wrap items-center gap-5 rounded-[20px] border border-line bg-panel p-5">
           <Qr text={deposit.address} />
-          <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-3">
+          <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
             <span className="text-[13px] text-muted">
               {isDemo ? 'Example address, no funds needed' : `Your ${asset.chain} deposit address`}
             </span>
-            <code className="break-all font-mono text-[13px] leading-relaxed text-text-2">{deposit.address}</code>
-            <button type="button" className={`${ghostBtn} w-fit min-h-10 px-4 text-[13px]`} onClick={copy}>
-              {copied ? 'Copied' : 'Copy address'}
-            </button>
+            <code className="break-all font-mono text-[15px] leading-relaxed text-text">{deposit.address}</code>
+            <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] tabular-nums">
+              <span className="text-muted">Amount</span>
+              <span className="font-semibold">
+                {amount} {asset.symbol}
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-2">
+              <button type="button" className={`${ghostBtn} min-h-11 px-4 text-[13px]`} onClick={() => copy('address')}>
+                {copied === 'address' ? 'Copied' : 'Copy address'}
+              </button>
+              <button type="button" className={`${ghostBtn} min-h-11 px-4 text-[13px]`} onClick={() => copy('amount')}>
+                {copied === 'amount' ? 'Copied' : 'Copy amount'}
+              </button>
+            </span>
+            <span className="text-[13px] text-muted">
+              Send only {asset.symbol} on {asset.chain} to this address.
+            </span>
           </div>
         </div>
       )}
       {deposit && (
         <p aria-live="polite" className="flex items-center gap-2 text-[15px] text-text-2">
-          <span className="chip-pulse h-[7px] w-[7px] rounded-full bg-amber" />
-          Waiting for reserve. {isDemo ? `The example arrives in ${DEMO_ARRIVES_MS / 1000} seconds.` : asset.wait}
+          {arrived ? (
+            <>
+              <span className="h-[7px] w-[7px] rounded-full bg-green" />
+              Reserve received: {amount} {asset.symbol}.
+            </>
+          ) : (
+            <>
+              <span className="chip-pulse h-[7px] w-[7px] rounded-full bg-amber" />
+              Waiting for reserve. {isDemo ? `The example arrives in ${DEMO_ARRIVES_MS / 1000} seconds.` : asset.wait}
+            </>
+          )}
         </p>
       )}
     </div>

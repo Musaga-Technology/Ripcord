@@ -42,6 +42,7 @@ function Home() {
 
   return (
     <div className="flex flex-col gap-6">
+      <h1 className="sr-only">Your guards</h1>
       <section
         aria-label="Summary"
         className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-line bg-panel md:grid-cols-3"

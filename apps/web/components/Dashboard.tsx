@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { guardOf, labelOf, STATE_TEXT, type ShownGuard } from '../lib/guards';
+import { guardName, guardOf, labelOf, STATE_TEXT, watchedDistance, type ShownGuard } from '../lib/guards';
 import type { Holding } from '../lib/hl';
 import { price, pct } from './format';
 import { GuardCard, type CardState } from './GuardCard';
@@ -176,10 +176,17 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
 
         {view === 'yours' && g ? (
           <>
-            <Link href={`/guards/${g.id}`} aria-label={`Open the guard on ${g.label}`} className="block rounded-[28px]">
+            <Link
+              href={`/guards/${g.id}`}
+              aria-label={`Open the guard: ${guardName(g, holdings).title}`}
+              className="block rounded-[28px]"
+            >
               <GuardCard
-                label={g.label}
-                distance={row.distance === null ? '—' : pct(row.distance)}
+                label={guardName(g, holdings).card}
+                distance={(() => {
+                  const d = watchedDistance(row, holdings);
+                  return d === null ? '—' : pct(d);
+                })()}
                 sub="from liquidation"
                 fingerprint={g.fingerprint}
                 commitment={g.commitment}
