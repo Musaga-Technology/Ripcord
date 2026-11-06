@@ -14,7 +14,8 @@ export interface RescueChartProps {
   hi: number;
   liq: number | null;
   oldLiq?: number | null;
-  landed?: [number, number] | null;
+  /** Where rescues landed, as (time, price). */
+  landed?: [number, number][] | [number, number] | null;
   /** Bottom-axis labels for a time. */
   timeLabel?: (t: number) => string;
   label: string;
@@ -45,6 +46,11 @@ export function RescueChart({ pts, t0, t1, lo, hi, liq, oldLiq, landed, timeLabe
   const last = vis[vis.length - 1]!;
   const ticks = ticksFor(lo, hi);
   const near = (a: number, b: number) => Math.abs(yPct(a) - yPct(b)) < 7;
+  const landings: [number, number][] = !landed
+    ? []
+    : Array.isArray(landed[0])
+      ? (landed as [number, number][])
+      : [landed as [number, number]];
   // Tags never overlap: sorted top to bottom, each sits at least a tag's height below the one above.
   const GAP = 7;
   const tags = [
@@ -119,16 +125,19 @@ export function RescueChart({ pts, t0, t1, lo, hi, liq, oldLiq, landed, timeLabe
               <div className="h-0 border-t-2 border-red" />
             </div>
           )}
-          {landed && x(landed[0]) >= 0 && (
-            <span
-              aria-hidden="true"
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${(x(landed[0]) / W) * 100}%`, top: `${yPct(landed[1])}%` }}
-            >
-              <span className="block h-2.5 w-2.5 rounded-full bg-green" />
-              <span className="land-pulse absolute inset-0 rounded-full border-2 border-green" />
-            </span>
-          )}
+          {landings
+            .filter(([t]) => x(t) >= 0)
+            .map(([t, p]) => (
+              <span
+                key={t}
+                aria-hidden="true"
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${(x(t) / W) * 100}%`, top: `${yPct(p)}%` }}
+              >
+                <span className="block h-2.5 w-2.5 rounded-full bg-green" />
+                <span className="land-pulse absolute inset-0 rounded-full border-2 border-green" />
+              </span>
+            ))}
           <span
             aria-hidden="true"
             className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-text"

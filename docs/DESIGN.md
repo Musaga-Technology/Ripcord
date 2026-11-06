@@ -70,8 +70,9 @@ Rescue history: when · margin added · before → after · landed in · outcome
 
 ## 4. Screens
 1. **Home** (website, desktop and phone), top to bottom:
-   - Hero: "Hidden margin.", one sentence, **Guard a position** · **Watch a rescue**, and the card laid over what a hunter sees. The card is a 3D object (it turns toward the pointer, floats when idle, shows its edge, and its rosette prints on load); what a hunter sees is live: simulated prices at 10× speed through the guard's real rules, one rescue per loop.
-   - Four stats, each with its source and date: 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay, Balanced with the speed-aware trigger and a 1× reserve; 53 of 53 without a guard; `crates/replay`), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
+   - Hero: "Hidden margin.", one sentence, **Guard a position** · **Watch a rescue**, and the card laid over what a hunter sees. The card is a 3D object (it turns toward the pointer, floats when idle, shows its edge, and its rosette prints on load); what a hunter sees is live: the real Oct 10, 2025 ETH crash (Binance 1-minute bars, the replay harness's own fixture) through the guard's real rules, a 10× long opened at 21:00 UTC that an unguarded position loses at 21:16:37 and the guard keeps, at 20× speed and 4× while a rescue is in flight. The chart's price range is fixed for the run, so the red line itself slides away when a rescue lands and the old line stays dashed.
+   - "This is the app.": the app's own Dashboard and Guard components on the example account, framed as a desktop window and a phone, arriving once out of focus into focus (600 ms), with **Open the example account** (`/guards?example`).
+   - Four stats, each with its source and date, rendered with their real values (no count from zero in the HTML): 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay, Balanced with the speed-aware trigger and a 1× reserve; 53 of 53 without a guard; `crates/replay`), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
    - "Your liquidation price is public.": an illustrated stack of liquidation levels in shallow 3D, rising when seen, yours in red.
    - **"The edge, right now."**: the five largest positions near liquidation in a scan of public Hyperliquid data (the 1,500 largest accounts, addresses left out), each with a distance bar, red under 5 %. On Oct 21 every position within 5 % was isolated. Re-run the scan (RESEARCH_NOTES, "Isolated margin among hunted positions") before the video and the submission, and keep its date on screen.
    - Three steps: Seal, Fund, Guarded; an isolated position takes one approval on Hyperliquid first.
@@ -124,7 +125,7 @@ Production: record the raw mainnet runs on Day 7 with a real clock in frame; the
 
 ## 8. The breathtaking bar
 
-One bold object per screen, everything else quiet and exact. Expressive motion only in these four moments, plus Home's live hero and Hunt, which are the rescue moment running continuously.
+One bold object per screen, everything else quiet and exact. Expressive motion only in these four moments, plus Home's live hero and Hunt, which are the rescue moment running continuously. Sections don't fade in on scroll: content is visible as rendered.
 
 ### 8.1 Signature moments
 | Moment | What happens |

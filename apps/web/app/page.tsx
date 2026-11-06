@@ -7,6 +7,7 @@ import { Levels } from '../components/site/Levels';
 import { Count, Reveal } from '../components/site/Reveal';
 import { WatchLine } from '../components/site/WatchLine';
 import { Edge } from '../components/site/Edge';
+import { AppPreview } from '../components/site/AppPreview';
 
 // Home (docs/DESIGN.md §4.1): one bold object per section, few words, every public number with its source and date.
 
@@ -173,6 +174,19 @@ export default function Home() {
               <span className="max-w-[17rem] text-[13px] leading-[1.5] text-muted">{s.src}</span>
             </Reveal>
           ))}
+        </section>
+
+        <section id="app" className={`${wrap} scroll-mt-20 py-24`}>
+          <div className="flex max-w-[36rem] flex-col gap-5">
+            <h2 className={h2}>This is the app.</h2>
+            <p className="text-[17px] text-text-2">
+              Your positions with their guards, each guard a card only you can open, and the view a hunter gets: the
+              same position with nothing to aim at.
+            </p>
+          </div>
+          <div className="mt-12">
+            <AppPreview />
+          </div>
         </section>
 
         <section className={`${wrap} grid items-center gap-12 py-24 lg:grid-cols-[1fr_1.1fr]`}>

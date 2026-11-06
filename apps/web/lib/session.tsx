@@ -29,6 +29,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
+      // `?example` opens the example account directly (the landing page links to it).
+      if (new URLSearchParams(location.search).has('example')) {
+        sessionStorage.setItem(KEY, JSON.stringify(demoSession));
+      }
       const saved = sessionStorage.getItem(KEY);
       if (saved) setSession(JSON.parse(saved) as Session);
     } catch {
@@ -59,7 +63,7 @@ export const useSession = () => useContext(SessionContext);
 export const backendFor = (s: Session | null): Backend => (s?.kind === 'demo' ? demo() : live);
 export const demoSession: Session = { kind: 'demo', address: DEMO_TRADER };
 
-function demoAccount(): Account {
+export function demoAccount(): Account {
   const holdings = DEMO_POSITIONS.map((p): Holding => {
     const leverage = DEMO_LEVERAGE[p.coin] ?? 1;
     const size = Math.abs(p.szi);

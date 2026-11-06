@@ -2,137 +2,27 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { GuardCard, type CardState } from '../GuardCard';
-import { rangeOf, RescueChart } from '../RescueChart';
+import { RescueChart } from '../RescueChart';
 import { Ticker } from '../Ticker';
 import { Card3D } from './Card3D';
-import { distance, gauss, GuardedPosition, rng, type PositionSpec } from '../../lib/sim';
+import { clockOf, GUARD, HeroRun, WINDOW_S } from '../../lib/heroRun';
+import { distance } from '../../lib/sim';
 
-// What a hunter sees, live: price and the public liquidation line, as Hyperliquid shows them to everyone, under the
-// sealed card. The guard checks every 3 s with the enclave's own rules; a rescue lands 38 s after it fires (mainnet
-// test rescues: 27–46 s). Calm stretches run at 10× speed and the rescue in flight at 3×, so its clock can be read.
-// Prices are simulated; the decisions are not. Each run is computed once ahead, so its price range is fixed and the red
-// line itself moves when the rescue lands.
+// What a hunter sees, on the real Oct 10, 2025 crash: ETH's price and the public liquidation line of a 10× long, as
+// anyone sees them, under the sealed card. The guard decides with the enclave's own rules (lib/heroRun.ts); the run
+// plays at 20× speed and slows to 4× while a rescue is in flight, so its clock can be read.
 
-const CALM_SPEED = 10;
-const FLIGHT_SPEED = 3;
-const WINDOW_S = 240;
-const POS: PositionSpec = { side: 1, entry: 2460, notional: 32_900, leverage: 10, mm: 0.02 };
-const GUARD = {
-  lineRange: [4.4, 5.6] as [number, number],
-  targetRange: [8.0, 9.4] as [number, number],
-  speedAware: true,
-  reserveX: 1,
-  landS: 38,
-  cooldownS: 60,
-};
+const CALM_SPEED = 20;
+const FLIGHT_SPEED = 4;
 const COMMITMENT = '7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e';
-/** Seconds of calm after the chart opens, before the fall starts. */
-const CALM_S = 12;
-/** How long a run lasts after the save, before the next one. */
-const AFTER_SAVE_S = 90;
+const RANGE = HeroRun.range();
 
-interface World {
-  t: number;
-  price: number;
-  pts: [number, number][];
-  guard: GuardedPosition;
-  u: () => number;
-  oldLiq: number | null;
-  landedAt: number | null;
-  landedPrice: number;
-  savedAt: number | null;
-  feed: string;
-  flash: { kind: 'rescued' | 'saved'; until: number } | null;
-}
-
-function blank(seed: number): World {
-  const u = rng(seed);
-  const guard = new GuardedPosition(POS, GUARD, u);
-  const price = POS.entry * (1 + (u() - 0.5) * 0.004);
-  return {
-    t: 0,
-    price,
-    pts: [[0, price]],
-    guard,
-    u,
-    oldLiq: null,
-    landedAt: null,
-    landedPrice: 0,
-    savedAt: null,
-    feed: 'No margin changes in the last hour',
-    flash: null,
-  };
-}
-
-/** A run with the chart's window already full of calm, and the price range it will need from start to end. */
-function fresh(seed: number): { w: World; lo: number; hi: number } {
-  const w = blank(seed);
-  for (let i = 0; i < WINDOW_S; i++) step(w);
-  // The same seed gives the same run: play a twin to the end for the range, so nothing rescales on screen.
-  const twin = blank(seed);
-  const prices: number[] = [];
-  for (let i = 0; i < 1500 && (twin.savedAt === null || twin.t < twin.savedAt + AFTER_SAVE_S); i++) {
-    step(twin);
-    prices.push(twin.price, twin.guard.liq);
-  }
-  const [lo, hi] = rangeOf(prices, 0.12);
-  return { w, lo, hi };
-}
-
-const clock = (t: number) => {
-  const s = 14 * 3600 + 2 * 60 + Math.floor(t);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(Math.floor(s / 3600) % 24)}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`;
-};
-const minClock = (t: number) => clock(t).slice(0, 5);
 const fmt = (x: number) => x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-/** One simulated second: the choreographed market, and a check every 3 s. */
-function step(w: World) {
-  const g = w.guard;
-  const f = g.inFlight;
-  let target: number;
-  let k = 0.03;
-  if (w.savedAt !== null) {
-    target = POS.entry * 0.975;
-    k = 0.02;
-  } else if (w.landedAt !== null && w.oldLiq !== null) {
-    target = w.oldLiq * 0.988; // the wick goes past the old liquidation price: the rescue was a save
-    k = 0.045;
-  } else if (f) {
-    target = f.liqBefore * 1.012;
-  } else if (w.t < WINDOW_S + CALM_S) {
-    target = POS.entry * 0.993;
-    k = 0.02;
-  } else {
-    target = g.liq * 1.02;
-  }
-  w.price += k * (target - w.price) + 0.0007 * w.price * gauss(w.u);
-  if (f) w.price = Math.max(w.price, g.liq * 1.004);
-  w.t += 1;
-  w.pts.push([w.t, w.price]);
-  while (w.pts.length && w.pts[0]![0] < w.t - WINDOW_S - 5) w.pts.shift();
-  if (w.t % 3 !== 0) return;
-  const before = g.liq;
-  const ev = g.observe(w.t, w.price);
-  if (ev === 'landed') {
-    w.oldLiq = before;
-    w.landedAt = w.t;
-    w.landedPrice = w.price;
-    const r = g.rescues[g.rescues.length - 1]!;
-    w.feed = `${clock(w.t)} · Margin added: +${Math.round(r.amount).toLocaleString('en-US')} USDC · from: unknown`;
-    w.flash = { kind: 'rescued', until: w.t + 20 };
-  }
-  if (w.savedAt === null && g.rescues.some((r) => r.outcome === 'saved')) {
-    w.savedAt = w.t;
-    w.flash = { kind: 'saved', until: w.t + 40 };
-  }
-}
-
 export function HeroLive() {
-  const run = useRef<{ w: World; lo: number; hi: number } | null>(null);
-  run.current ??= fresh(7);
+  const run = useRef<HeroRun | null>(null);
+  run.current ??= new HeroRun();
   const [, setTick] = useState(0);
   const [fade, setFade] = useState(false);
   const [reduced, setReduced] = useState(false);
@@ -145,14 +35,13 @@ export function HeroLive() {
     let last = performance.now();
     let acc = 0;
     let visible = true;
-    let seed = 7;
     let resetting = false;
     const io = new IntersectionObserver(([e]) => (visible = !!e?.isIntersecting));
     if (box.current) io.observe(box.current);
     if (reduce) {
-      // One still frame of the end state: guarded, after a rescue that saved the position.
-      const w = run.current!.w;
-      for (let i = 0; i < 1500 && (w.savedAt === null || w.t < w.savedAt + 30); i++) step(w);
+      // One still frame: after the wick, the position still open.
+      const w = run.current!;
+      while (!w.over) w.step();
       setTick((n) => n + 1);
       return () => io.disconnect();
     }
@@ -160,21 +49,20 @@ export function HeroLive() {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (visible && !document.hidden) {
-        const w = run.current!.w;
+        const w = run.current!;
         acc += dt * (w.guard.inFlight ? FLIGHT_SPEED : CALM_SPEED);
-        while (acc >= 1) {
-          step(w);
+        while (acc >= 1 && !w.over) {
+          w.step();
           acc -= 1;
         }
-        if (!resetting && w.savedAt !== null && w.t > w.savedAt + AFTER_SAVE_S) {
+        if (!resetting && w.over) {
           resetting = true;
-          setFade(true);
+          setTimeout(() => setFade(true), 2500);
           setTimeout(() => {
-            seed += 1;
-            run.current = fresh(seed);
+            run.current = new HeroRun();
             setFade(false);
             resetting = false;
-          }, 600);
+          }, 3100);
         }
         setTick((n) => (n + 1) % 1_000_000);
       }
@@ -187,21 +75,21 @@ export function HeroLive() {
     };
   }, []);
 
-  const { w, lo, hi } = run.current!;
+  const w = run.current!;
   const g = w.guard;
   const d = distance(g.liq, w.price);
-  const flash = w.flash && w.t < w.flash.until ? w.flash.kind : null;
   const f = g.inFlight;
-  const settling = !f && !flash && w.landedAt !== null && w.savedAt === null;
-  const state: CardState = f ? 'rescuing' : flash ? 'rescued' : 'guarded';
-  const status = f ? 'Rescuing…' : flash === 'saved' ? 'Saved' : flash ? 'Rescued' : settling ? 'Settling' : 'Guarded';
+  const lastLanding = w.landings[w.landings.length - 1];
+  const justLanded = lastLanding !== undefined && w.t < lastLanding.t + 25;
+  const saved = w.savedAt !== null && w.unguardedAt !== null;
+  const settling = !f && !justLanded && !saved && lastLanding !== undefined;
+  const state: CardState = f ? 'rescuing' : justLanded || saved ? 'rescued' : 'guarded';
+  const status = f ? 'Rescuing…' : justLanded ? 'Rescued' : saved ? 'Saved' : settling ? 'Settling' : 'Guarded';
   const sub = f
     ? `rescue on its way · ${mmss(w.t - f.firedAt)}`
-    : flash === 'rescued' && w.landedAt !== null
+    : justLanded
       ? `landed in ${GUARD.landS} s`
       : 'from liquidation';
-  const last = g.rescues[g.rescues.length - 1];
-  const speed = f ? FLIGHT_SPEED : CALM_SPEED;
 
   return (
     <div ref={box} className={`relative transition-opacity duration-[600ms] ${fade ? 'opacity-0' : 'opacity-100'}`}>
@@ -209,7 +97,7 @@ export function HeroLive() {
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <span className="text-[15px] font-semibold">What a hunter sees</span>
           <span className="font-mono text-[12px] text-muted">
-            ETH-USD · {clock(w.t)} · simulated{reduced ? '' : ` · ${speed}× speed`}
+            ETH-USD · Oct 10, 2025 · {clockOf(w.t)} UTC{reduced ? '' : ` · ${f ? FLIGHT_SPEED : CALM_SPEED}×`}
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[15px] tabular-nums">
@@ -223,23 +111,29 @@ export function HeroLive() {
           <span className="text-muted">{d.toFixed(1)}% away</span>
         </div>
         <p className="mt-1.5 truncate text-[13px] text-muted tabular-nums" aria-live="polite">
-          {w.feed}
+          {w.unguardedAt !== null
+            ? `Without the hidden reserve, liquidated at ${clockOf(w.unguardedAt)}. With it, still open.`
+            : w.feed}
         </p>
         <div className="mt-4">
           <RescueChart
-            pts={w.pts}
+            pts={w.pts()}
             t0={w.t - WINDOW_S}
             t1={w.t}
-            lo={lo}
-            hi={hi}
+            lo={RANGE[0]}
+            hi={RANGE[1]}
             liq={g.liq}
-            oldLiq={w.oldLiq}
-            landed={w.landedAt !== null ? [w.landedAt, w.landedPrice] : null}
-            timeLabel={minClock}
-            label="A simulated ETH price falling toward its public liquidation price; a hidden rescue moves the liquidation price away just in time."
+            oldLiq={w.landings.length ? w.unguardedLiq : null}
+            landed={w.landings.map((l): [number, number] => [l.t, l.price])}
+            timeLabel={(t) => clockOf(t).slice(0, 5)}
+            label="ETH's real price on Oct 10, 2025 falling through the public liquidation price of a 10× long; hidden rescues move the liquidation price away before the price reaches it."
           />
         </div>
       </div>
+      <p className="mt-3 text-[12px] leading-[1.5] text-muted sm:ml-auto sm:max-w-[55%] sm:text-right">
+        Real prices: Binance ETH perpetual, 1-minute bars. The guard&apos;s real rules, a reserve the size of the
+        margin, and the 38 s a rescue took on mainnet.
+      </p>
       <div className="relative z-10 mx-auto -mt-6 w-[88%] max-w-[420px] sm:absolute sm:-bottom-28 sm:-left-14 sm:mt-0 sm:w-[min(400px,62%)] lg:-left-24">
         <Card3D>
           <GuardCard
@@ -256,7 +150,7 @@ export function HeroLive() {
           />
         </Card3D>
       </div>
-      {last && <span className="sr-only">Last rescue: {Math.round(last.amount)} USDC.</span>}
+      {lastLanding && <span className="sr-only">Last rescue: {Math.round(lastLanding.amount)} USDC.</span>}
     </div>
   );
 }

@@ -338,3 +338,19 @@ p {
     opacity: 0;
   }
 }
+
+/* The app's frames on the landing page arrive once, out of focus to in focus (components/site/AppPreview.tsx). */
+.arrive {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(18px) scale(0.985);
+}
+.arrive.in {
+  opacity: 1;
+  filter: none;
+  transform: none;
+  transition:
+    opacity var(--dur-4) var(--ease),
+    filter var(--dur-4) var(--ease),
+    transform var(--dur-4) var(--ease);
+}
