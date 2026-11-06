@@ -29,13 +29,14 @@ import { pct, price, usd } from '../format';
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
+import { PriceLadder } from './PriceLadder';
 import { Connect } from './Connect';
 import { Approve, explain, Fund } from './steps';
 
 const PRESETS: { id: Preset; name: string; line: string }[] = [
-  { id: 'safer', name: 'Safer', line: 'Steps in early.' },
+  { id: 'safer', name: 'Safer', line: 'Steps in early: more close calls, fewer surprises.' },
   { id: 'balanced', name: 'Balanced', line: 'Steps in midway.' },
-  { id: 'lean', name: 'Lean', line: 'Waits longest, spends least.' },
+  { id: 'lean', name: 'Lean', line: 'Waits longest, so the reserve lasts for a second rescue.' },
 ];
 const GUARD_DAYS = 90;
 const DOTS = '••••••';
@@ -43,7 +44,7 @@ const DRAFT_PRINT = '•••• •••• ···· ••••';
 
 type Phase = 'edit' | 'sealing' | 'save' | 'approve' | 'fund' | 'guarded';
 
-const pctRange = ([a, b]: [number, number]) => `${a}–${b}%`;
+const pctRange = ([a, b]: [number, number]) => `${Math.round(a)}–${Math.round(b)}%`;
 
 function usePrices(isDemo: boolean): Prices | null {
   const [prices, setPrices] = useState<Prices | null>(isDemo ? demoPrices() : null);
@@ -55,6 +56,13 @@ function usePrices(isDemo: boolean): Prices | null {
       .catch(() => setPrices(null));
   }, [isDemo]);
   return prices;
+}
+
+/** The price near which a range steps in: the midpoint of its line, as a price. */
+function stepsInAt(h: Holding, line: [number, number]): number {
+  const s = h.side === 'Long' ? -1 : 1;
+  const mid = (line[0] + line[1]) / 200;
+  return (h.liquidation ?? h.mark) / (1 + s * mid);
 }
 
 function Chooser({ holdings }: { holdings: Holding[] }) {
@@ -88,6 +96,13 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   const crossMargin = all.filter((h) => h.margin === 'cross').reduce((s, h) => s + h.marginUsed, 0);
   const margin = holding.margin === 'isolated' ? holding.marginUsed : crossMargin;
   const distance = watchedDistance(holding, all) ?? 0;
+  // A cross guard watches the nearest cross position, so its prices are that position's.
+  const watched =
+    holding.margin === 'cross'
+      ? (all
+          .filter((h) => h.margin === 'cross' && h.distance !== null)
+          .sort((a, b) => (a.distance as number) - (b.distance as number))[0] ?? holding)
+      : holding;
 
   const [assetIx, setAssetIx] = useState(0);
   const asset = ASSETS[assetIx]!;
@@ -330,6 +345,15 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
 
             <section aria-label="When to step in" className="flex flex-col gap-3">
               <h2 className="text-[20px] font-semibold tracking-[-0.02em]">When to step in</h2>
+              {ranges && watched.liquidation !== null && (
+                <PriceLadder
+                  side={watched.side}
+                  mark={watched.mark}
+                  liq={watched.liquidation ?? watched.mark}
+                  line={ranges.line_range_pct}
+                  target={ranges.target_range_pct}
+                />
+              )}
               <div role="radiogroup" aria-label="When to step in" className="grid gap-2 sm:grid-cols-3">
                 {PRESETS.map((p) => {
                   const r = presetRanges(p.id, distance);
@@ -349,17 +373,19 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                     >
                       <span className="flex items-center justify-between gap-2 font-semibold">
                         {p.name}
-                        {p.id === marked && (
+                        {p.id === marked && figure && (
                           <span className="h-[7px] w-[7px] rounded-full bg-amber" title="Suits your reserve" />
                         )}
                       </span>
                       <span className="text-[13px] text-muted">{p.line}</span>
                       <span className="mt-1.5 text-[15px] tabular-nums">
-                        {r ? `${pctRange(r.line_range_pct)} away` : 'Too close'}
+                        {r && watched.liquidation !== null
+                          ? `Near ${price(stepsInAt(watched, r.line_range_pct))} · ${pctRange(r.line_range_pct)} away`
+                          : 'Too close'}
                       </span>
                       {f && (
                         <span className="text-[13px] tabular-nums text-text-2">
-                          {f.liquidated}% liquidated · {f.earlyMonth} early a month
+                          {f.liquidated}% liquidated · {f.earlyMonth} close calls a month
                         </span>
                       )}
                     </button>
@@ -367,9 +393,15 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                 })}
               </div>
               <p className="text-[13px] text-muted">
-                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-amber" />
-                Suits your reserve. {figure?.source ?? ''} An early rescue still adds to your margin, and costs only the
-                network fee.
+                {figure ? (
+                  <>
+                    <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-amber" />
+                    {marked === 'lean'
+                      ? 'Lean suits a reserve of 1.5× your margin or more. '
+                      : 'Balanced suits a reserve under 1.5× your margin. '}
+                  </>
+                ) : null}
+                {figure?.source ?? ''} A close call still adds to your margin, and costs only the network fee.
               </p>
               {!ranges && (
                 <p className="text-[15px] text-red">This position is too close to liquidation for this choice.</p>
