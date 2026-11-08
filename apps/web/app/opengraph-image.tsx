@@ -8,11 +8,11 @@ export const contentType = 'image/png';
 
 const COMMITMENT = '7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e';
 
-/** Instrument Sans as TrueType, which the image renderer reads (Google serves it to an old user agent); none if offline. */
+/** Geist as TrueType, which the image renderer reads (Google serves it to an old user agent); none if offline. */
 async function font(weight: number): Promise<ArrayBuffer | null> {
   try {
     const css = await (
-      await fetch(`https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@${weight}`, {
+      await fetch(`https://fonts.googleapis.com/css2?family=Geist:wght@${weight}`, {
         headers: { 'User-Agent': 'Mozilla/4.0' },
       })
     ).text();
@@ -27,8 +27,8 @@ export default async function Image() {
   const r = rosette(COMMITMENT);
   const [semibold, regular] = await Promise.all([font(600), font(400)]);
   const fonts = [
-    ...(semibold ? [{ name: 'Instrument Sans', data: semibold, weight: 600 as const }] : []),
-    ...(regular ? [{ name: 'Instrument Sans', data: regular, weight: 400 as const }] : []),
+    ...(semibold ? [{ name: 'Geist', data: semibold, weight: 600 as const }] : []),
+    ...(regular ? [{ name: 'Geist', data: regular, weight: 400 as const }] : []),
   ];
   return new ImageResponse(
     <div
@@ -41,11 +41,11 @@ export default async function Image() {
         background: '#09090B',
         color: '#F4F4F5',
         padding: '0 72px',
-        fontFamily: 'Instrument Sans, sans-serif',
+        fontFamily: 'Geist, sans-serif',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28, width: 560 }}>
-        <div style={{ fontSize: 112, fontWeight: 600, letterSpacing: '-0.05em', lineHeight: 0.95 }}>Hidden margin.</div>
+        <div style={{ fontSize: 112, fontWeight: 600, letterSpacing: '-0.04em', lineHeight: 0.95 }}>Hidden margin.</div>
         <div style={{ fontSize: 30, lineHeight: 1.35, color: '#D4D4D8' }}>
           Everyone can see where your Hyperliquid position dies. Ripcord keeps a reserve nobody can see, and moves it in
           first.
@@ -86,7 +86,7 @@ export default async function Image() {
           </span>
         </div>
         <div style={{ position: 'absolute', left: 28, top: 110, display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 76, fontWeight: 600, letterSpacing: '-0.05em', lineHeight: 1 }}>17.3%</span>
+          <span style={{ fontSize: 76, fontWeight: 600, letterSpacing: '-0.04em', lineHeight: 1 }}>17.3%</span>
           <span style={{ fontSize: 20, color: '#A1A1AA' }}>from liquidation</span>
         </div>
         <div

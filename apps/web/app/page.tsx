@@ -24,7 +24,7 @@ const wrap =
   'mx-auto w-full max-w-[1240px] pl-[max(16px,env(safe-area-inset-left))] pr-[max(16px,env(safe-area-inset-right))] sm:px-8';
 const proof =
   'inline-flex min-h-11 w-fit items-center gap-1.5 text-[14px] font-medium text-text underline decoration-line-3 underline-offset-4 transition-colors duration-[120ms] hover:decoration-text';
-const h2 = 'text-[36px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[56px]';
+const h2 = 'text-[36px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[56px]';
 const primary =
   'inline-flex min-h-11 items-center rounded-full bg-text px-6 text-[15px] font-semibold text-ground transition-opacity duration-[120ms] hover:opacity-90 active:opacity-80';
 const ghost =
@@ -182,7 +182,7 @@ export default function Home() {
           className={`${wrap} grid items-center gap-14 pb-28 pt-14 sm:pt-20 lg:grid-cols-[1fr_1.12fr] lg:gap-10 lg:pb-36`}
         >
           <div className="flex flex-col gap-7">
-            <h1 className="text-[60px] font-semibold leading-[0.95] tracking-[-0.05em] sm:text-[88px] lg:text-[112px]">
+            <h1 className="text-[60px] font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[88px] lg:text-[112px]">
               Hidden margin.
             </h1>
             <p className="max-w-[30rem] text-[17px] leading-[1.55] text-text-2 sm:text-[20px]">
@@ -313,7 +313,7 @@ export default function Home() {
               ['$1', 'A month, per guard', 'Pays for the enclave checks that watch your position, day and night.'],
             ].map(([n, t, b]) => (
               <Reveal key={t} className="flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-7">
-                <span className="text-[56px] font-semibold leading-none tracking-[-0.05em]">{n}</span>
+                <span className="text-[56px] font-semibold leading-none tracking-[-0.04em]">{n}</span>
                 <span className="text-[17px] font-semibold">{t}</span>
                 <span className="text-[15px] text-text-2">{b}</span>
               </Reveal>
@@ -411,7 +411,7 @@ export default function Home() {
               />
             </svg>
             <div className="relative flex max-w-[40rem] flex-col items-start gap-8">
-              <h2 className="text-[40px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[64px]">
+              <h2 className="text-[40px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[64px]">
                 Your line is public. Your defence isn&apos;t.
               </h2>
               <Link

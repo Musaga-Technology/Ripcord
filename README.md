@@ -144,7 +144,7 @@ Libraries and tools, as the hackathon rules ask (Q-005). All code in this reposi
 - `@noble/hashes`, `@noble/curves`, `@noble/ciphers` (SHA-256, X25519, ChaCha20-Poly1305 in the browser and Node); `near-api-js` (testnet script and reference transactions)
 - Rust: `serde`, `serde_json`, `sha2`, `hex`, `base64`; `x25519-dalek`, `hkdf`, `chacha20poly1305` (sealing); `near-sdk` (registry contract); `wit-bindgen`, `wasi-http-client`, `wasi` (checker on OutLayer)
 - vitest, ESLint, Prettier, tsx; Python 3 standard library for the reference implementation (`scripts/vectors.py`)
-- Fonts: Instrument Sans, JetBrains Mono (Google Fonts)
+- Fonts: Geist, Geist Mono (Google Fonts)
 
 ## License
 

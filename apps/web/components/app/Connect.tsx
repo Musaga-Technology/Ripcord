@@ -34,7 +34,7 @@ export function Connect() {
   return (
     <div className="my-auto grid items-center gap-12 py-6 lg:grid-cols-[1fr_1fr] lg:gap-20">
       <div className="flex max-w-[30rem] flex-col gap-6">
-        <h1 className="text-[48px] font-semibold leading-[0.95] tracking-[-0.05em] sm:text-[76px]">
+        <h1 className="text-[48px] font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[76px]">
           Guard a position.
         </h1>
         <p className="text-[17px] text-text-2">

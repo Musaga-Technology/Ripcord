@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
-import { Instrument_Sans, JetBrains_Mono } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 import './globals.css';
 
-const instrument = Instrument_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-instrument',
-});
-const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-jetbrains' });
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 const description =
   'Everyone can see where your Hyperliquid position dies. Ripcord keeps a reserve nobody can see, and moves it in first.';
@@ -26,7 +22,7 @@ const themeScript = `try{var t=localStorage.getItem('ripcord-theme');if(t==='lig
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${instrument.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

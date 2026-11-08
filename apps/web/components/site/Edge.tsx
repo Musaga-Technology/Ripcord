@@ -31,7 +31,7 @@ export function Edge() {
   return (
     <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-end">
       <Reveal className="flex min-w-0 flex-col gap-5">
-        <h2 className="text-[36px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[56px]">
+        <h2 className="text-[36px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[56px]">
           The edge, right now.
         </h2>
         <p className="max-w-[30rem] text-[17px] text-text-2">

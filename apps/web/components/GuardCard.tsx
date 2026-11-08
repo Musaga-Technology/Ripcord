@@ -101,7 +101,7 @@ export function GuardCard(p: GuardCardProps) {
         <div className="flex flex-col gap-0.5">
           <span
             className="font-semibold leading-none tabular-nums"
-            style={{ fontSize: 'clamp(40px, 12.3cqw, 76px)', letterSpacing: '-0.05em' }}
+            style={{ fontSize: 'clamp(40px, 12.3cqw, 76px)', letterSpacing: '-0.04em' }}
           >
             {p.distance}
           </span>

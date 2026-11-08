@@ -34,8 +34,8 @@ Two themes from one set of tokens: dark is the signature look, light its dayligh
 Light values were picked for contrast on `#F7F7F5`: Text 2 9.7:1, Muted 7.2:1, Amber 5.1:1, Red 5.1:1, Green 4.7:1.
 
 ### Type
-- **UI and display:** Instrument Sans 400/500/600/700 (Google Fonts). Display headlines 600, tracking −4 to −5 %, line-height ≈ 0.95. Sentence case.
-- **Machine strings only** (addresses, fingerprints, masked values): JetBrains Mono 400, letter-spacing 0.16–0.2 em for card-number style.
+- **UI and display:** Geist 400/500/600/700 (Google Fonts, via `next/font`), chosen Nov 8 over Instrument Sans (an overused default) after side-by-side renders of the hero and the dashboard: crisp tabular figures and the look of a current trading tool. Display headlines 600, tracking −4 % (the floor), line-height ≈ 0.95. Sentence case.
+- **Machine strings only** (addresses, fingerprints, masked values): Geist Mono 400, letter-spacing 0.16–0.2 em for card-number style.
 - Scale: 13 · 15 · 17 · 20 · 28 · 36 · 48 · 56 · 76 · 112. The website's hero is 112 and its section headlines 56 (60 and 36 on phone); snap the canvas's in-between sizes (24, 30, 44) to the scale when building. Numbers that change use `tabular-nums`.
 
 ### Shape and space
