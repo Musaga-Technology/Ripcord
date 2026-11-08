@@ -160,11 +160,11 @@ export function HeroLive() {
           />
         </div>
       </div>
-      <p className="mt-3 text-[12px] leading-[1.5] text-muted lg:ml-auto lg:max-w-[55%] lg:text-right">
+      <p className="mt-3 text-[12px] leading-[1.5] text-muted xl:ml-auto xl:max-w-[55%] xl:text-right">
         Real prices: Binance ETH perpetual, 1-minute bars. The guard&apos;s real rules, a reserve the size of the
         margin, and the 38 s a rescue took on mainnet.
       </p>
-      <div className="relative z-10 mx-auto mt-6 w-[88%] max-w-[420px] lg:absolute lg:-bottom-28 lg:-left-24 lg:mt-0 lg:w-[min(400px,62%)]">
+      <div className="relative z-10 mx-auto mt-6 w-[88%] max-w-[420px] xl:absolute xl:-bottom-28 xl:-left-24 xl:mt-0 xl:w-[min(400px,62%)]">
         <Card3D>
           <GuardCard
             label="ETH long · 10×"

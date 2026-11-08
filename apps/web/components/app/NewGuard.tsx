@@ -23,6 +23,7 @@ import { guardOf, guardsFor, labelOf, watchedDistance } from '../../lib/guards';
 import type { Holding } from '../../lib/hl';
 import { markedPreset, replayFigure } from '../../lib/replay';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
+import { accountUrl, REGISTRY } from '../../lib/near';
 import { radioKeys } from '../../lib/radio';
 import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } from '../../lib/store';
 import { pct, price, usd } from '../format';
@@ -478,9 +479,17 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           <div className="step-in flex flex-col items-start gap-4">
             <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Sealed.</h2>
             <p className="max-w-[34rem] text-[15px] text-text-2">
-              Only a fingerprint is public. Keep your seal file somewhere safe: it proves what you sealed, and it&apos;s
-              how you close the guard from another device.
+              Your settings went to OutLayer&apos;s enclave on NEAR, encrypted on this device. The guard registry on
+              NEAR holds only a fingerprint. Keep your seal file somewhere safe: it proves what you sealed, and
+              it&apos;s how you close the guard from another device.
             </p>
+            <a
+              href={accountUrl(REGISTRY)}
+              className="inline-flex min-h-9 items-center gap-1.5 text-[14px] font-medium underline decoration-line-3 underline-offset-4 hover:decoration-text"
+            >
+              The guard registry on NEAR
+              <span aria-hidden="true">↗</span>
+            </a>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -568,6 +577,9 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
             Mark {price(holding.mark)} · Liq{' '}
             <span className="text-red">{holding.liquidation === null ? '—' : price(holding.liquidation)}</span>, public
             to everyone.
+          </p>
+          <p className="border-t border-line pt-2.5 text-[13px] text-muted">
+            Sealed on this device to OutLayer&apos;s enclave on NEAR. Nobody can read these, Ripcord included.
           </p>
         </div>
       </aside>

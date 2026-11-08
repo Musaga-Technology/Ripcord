@@ -334,3 +334,29 @@ p {
     filter var(--dur-4) var(--ease),
     transform var(--dur-4) var(--ease);
 }
+
+/* "How NEAR keeps it hidden.": a rescue travels the path once when it is seen (components/site/NearPath.tsx). */
+.near-path .near-pulse {
+  opacity: 0;
+}
+.near-path.run .near-pulse {
+  animation: near-pulse 2600ms var(--ease) forwards;
+}
+@keyframes near-pulse {
+  0% {
+    top: 24px;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+    background: var(--amber);
+  }
+  100% {
+    top: calc(100% - 22px);
+    opacity: 1;
+    background: var(--green);
+  }
+}

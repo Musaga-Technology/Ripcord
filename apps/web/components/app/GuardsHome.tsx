@@ -9,6 +9,7 @@ import { usd } from '../format';
 import { AppShell } from './AppShell';
 import { Connect } from './Connect';
 import { OpenSeal } from './OpenSeal';
+import { accountUrl, REGISTRY } from '../../lib/near';
 
 function Home() {
   const { ready, session } = useSession();
@@ -55,13 +56,17 @@ function Home() {
         <Stat label="Median landing" value={isDemo ? '38 s' : '—'} note={isDemo ? undefined : 'no rescues yet'} />
       </section>
       <Dashboard holdings={account.holdings} guards={guards} activity={isDemo ? EXAMPLE_ACTIVITY : []} />
-      {session.kind === 'demo' ? (
-        <p className="text-[13px] text-muted">
-          An example account and example guards. No wallet is connected and no funds move.
-        </p>
-      ) : (
-        <p className="text-[13px] text-muted">Read from Hyperliquid just now, in this browser.</p>
-      )}
+      <p className="text-[13px] text-muted">
+        {session.kind === 'demo'
+          ? 'An example account and example guards. No wallet is connected and no funds move. '
+          : 'Positions read from Hyperliquid just now, in this browser. '}
+        Every guard runs on NEAR: checks in OutLayer&apos;s enclave, reserves in Confidential Intents, and a public
+        registry of hashes at{' '}
+        <a href={accountUrl(REGISTRY)} className="underline decoration-line-3 underline-offset-4 hover:text-text">
+          {REGISTRY}
+        </a>
+        .
+      </p>
       <OpenSeal isDemo={session.kind === 'demo'} onOpened={() => setLocal(loadGuards())} />
     </div>
   );

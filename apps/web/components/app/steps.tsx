@@ -85,8 +85,9 @@ export function Approve({
     <div className="step-in flex flex-col items-start gap-4">
       <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">One approval on Hyperliquid.</h2>
       <p className="max-w-[34rem] text-[15px] text-text-2">
-        Isolated margin, so this guard needs one approval on Hyperliquid. Its code only adds margin. You can revoke it
-        there at any time, and it ends with the guard.
+        Isolated margin, so this guard needs one approval on Hyperliquid. The key you approve belongs to this
+        guard&apos;s own wallet and never leaves OutLayer&apos;s keystore on NEAR; its code only adds margin. You can
+        revoke it on Hyperliquid at any time, and it ends with the guard.
       </p>
       <button type="button" className={primaryBtn} onClick={approve} disabled={busy}>
         {busy ? 'Waiting for your wallet…' : 'Approve on Hyperliquid'}
@@ -208,8 +209,9 @@ export function Fund({
       <div className="flex flex-col gap-2">
         <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">Fund the reserve.</h2>
         <p className="max-w-[34rem] text-[15px] text-text-2">
-          Send {amount} {asset.symbol} from {asset.chain}. It lands in a confidential balance, so its size stays
-          private.
+          Send {amount} {asset.symbol} from {asset.chain}. NEAR Intents carries it into a NEAR Confidential Intents
+          balance held by this guard&apos;s own wallet, so its size stays private and it can pay only your Hyperliquid
+          account.
         </p>
       </div>
       {error ? (

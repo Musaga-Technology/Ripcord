@@ -23,6 +23,7 @@ import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
 import { GuardActions, NO_CONTROL, type Control } from './GuardActions';
+import { OnNear } from './OnNear';
 import { Approve, assetOf, Fund } from './steps';
 
 const DOTS = '••••••';
@@ -603,6 +604,7 @@ function ExampleGuard({
               Prices are simulated. The decisions are the guard&apos;s real rules.
             </p>
           )}
+          <OnNear guardId={g.id} example={!!g.example} />
         </div>
         <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
           <Card3D>
@@ -766,7 +768,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
         </section>
       )}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <div className="order-2 min-w-0 lg:order-1">
+        <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-1">
           {h ? (
             <Hunter h={h} mark={mark} liq={liq} note="live from Hyperliquid">
               <RescueChart
@@ -784,6 +786,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
               This position isn&apos;t open on the connected account.
             </p>
           )}
+          <OnNear guardId={g.id} example={false} />
         </div>
         <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
           <Card3D>

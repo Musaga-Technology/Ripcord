@@ -38,7 +38,8 @@ export function Connect() {
           Guard a position.
         </h1>
         <p className="text-[17px] text-text-2">
-          Ripcord reads your positions from Hyperliquid. Connecting signs nothing and moves nothing.
+          Ripcord reads your positions from Hyperliquid. Connecting signs nothing and moves nothing. Your guard then
+          runs on NEAR: its line sealed in an enclave, its reserve in a balance nobody can see.
         </p>
         <div className="flex flex-wrap gap-3">
           <button type="button" className={primaryBtn} onClick={wallet}>

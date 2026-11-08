@@ -7,6 +7,7 @@ import { Levels } from '../components/site/Levels';
 import { Count, Reveal } from '../components/site/Reveal';
 import { Edge } from '../components/site/Edge';
 import { AppPreview } from '../components/site/AppPreview';
+import { NearPath } from '../components/site/NearPath';
 
 // Home (docs/DESIGN.md §4.1): one bold object per section, few words, every public number with its source and date.
 
@@ -97,26 +98,6 @@ const TRUST = [
   ],
 ];
 
-const NEAR: [string, string, string | null][] = [
-  ['NEAR Intents', 'Turns a reserve on 35+ chains into Hyperliquid margin.', src('checker/src/check.rs#L152')],
-  [
-    'Confidential Intents',
-    'Keeps the reserve private and every rescue unlinkable.',
-    src('checker/src/custody.rs#L237'),
-  ],
-  [
-    'OutLayer',
-    'Runs the guard in a sealed enclave and gives each reserve its own custody wallet.',
-    src('checker/src/main.rs'),
-  ],
-  [
-    'NEAR contract',
-    'Holds each guard as hashes, and its wallet rules, which only your signature changes.',
-    src('contracts/guard-registry/src/lib.rs#L211'),
-  ],
-  ['NEAR AI Cloud', 'Coming next: reads your plain-English setup privately.', null],
-];
-
 const FAQ = [
   [
     'Why not just add margin, or run a bot that does?',
@@ -164,6 +145,9 @@ export default function Home() {
             <a href="#app" className="hover:text-text">
               The app
             </a>
+            <a href="#near" className="hover:text-text">
+              On NEAR
+            </a>
             <a href="#hunt" className="hover:text-text">
               Try to hunt it
             </a>
@@ -200,6 +184,15 @@ export default function Home() {
                 Try to hunt it
               </a>
             </div>
+            <a href="#near" className="group flex w-fit flex-col gap-1 text-[13px] text-muted">
+              <span className="font-medium text-text-2">Runs on NEAR</span>
+              <span>
+                Sealed by OutLayer · hidden in Confidential Intents · moved by NEAR Intents{' '}
+                <span aria-hidden="true" className="transition-transform duration-[120ms] group-hover:translate-x-0.5">
+                  →
+                </span>
+              </span>
+            </a>
           </div>
           <HeroLive />
         </section>
@@ -241,6 +234,10 @@ export default function Home() {
             </p>
           </Reveal>
           <Levels />
+        </section>
+
+        <section id="near" className={`${wrap} scroll-mt-20 py-24`}>
+          <NearPath />
         </section>
 
         <section className={`${wrap} py-24`}>
@@ -325,28 +322,6 @@ export default function Home() {
                   <span aria-hidden="true">↗</span>
                 </a>
               </Reveal>
-            ))}
-          </div>
-        </section>
-
-        <section className={`${wrap} py-24`}>
-          <Reveal>
-            <h2 className={h2}>Built on NEAR.</h2>
-          </Reveal>
-          <div className="mt-12 grid gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
-            {NEAR.map(([t, b, href]) => (
-              <div key={t} className="flex flex-col gap-2 bg-ground p-6">
-                <span className="text-[17px] font-semibold">{t}</span>
-                <span className="text-[15px] text-text-2">{b}</span>
-                {href ? (
-                  <a href={href} className={`${proof} mt-auto`}>
-                    The code
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                ) : (
-                  <span className="mt-auto pt-1 text-[13px] text-muted">Next</span>
-                )}
-              </div>
             ))}
           </div>
         </section>
