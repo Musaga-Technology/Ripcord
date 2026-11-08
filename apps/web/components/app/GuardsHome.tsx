@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { guardOf, guardsFor } from '../../lib/guards';
 import { SessionProvider, useAccount, useSession } from '../../lib/session';
 import { loadGuards, type LocalGuard } from '../../lib/store';
-import { Dashboard } from '../Dashboard';
+import { Dashboard, type Activity } from '../Dashboard';
 import { usd } from '../format';
 import { AppShell } from './AppShell';
 import { Connect } from './Connect';
@@ -36,7 +36,8 @@ function Home() {
     );
   }
 
-  const guards = guardsFor(session.address, session.kind === 'demo', local);
+  const isDemo = session.kind === 'demo';
+  const guards = guardsFor(session.address, isDemo, local);
   const guarded = account.holdings.filter((h) => guardOf(h, guards)?.state === 'guarded');
   const notional = guarded.reduce((s, h) => s + h.notional, 0);
 
@@ -45,13 +46,15 @@ function Home() {
       <h1 className="sr-only">Your guards</h1>
       <section
         aria-label="Summary"
-        className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-line bg-panel md:grid-cols-3"
+        className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-line bg-panel md:grid-cols-5"
       >
         <Stat label="Account value" value={usd(account.value, 2)} />
         <Stat label="Guarded notional" value={usd(notional)} note={`${guarded.length} of ${account.holdings.length}`} />
         <ReserveStat reserves={guards.flatMap((g) => (g.example ? [g.example.reserve] : []))} />
+        <Stat label="Rescues · 30 days" value={isDemo ? '2' : '0'} note={isDemo ? '1 saved' : undefined} />
+        <Stat label="Median landing" value={isDemo ? '38 s' : '—'} note={isDemo ? undefined : 'no rescues yet'} />
       </section>
-      <Dashboard holdings={account.holdings} guards={guards} />
+      <Dashboard holdings={account.holdings} guards={guards} activity={isDemo ? EXAMPLE_ACTIVITY : []} />
       {session.kind === 'demo' ? (
         <p className="text-[13px] text-muted">
           An example account and example guards. No wallet is connected and no funds move.
@@ -63,6 +66,14 @@ function Home() {
     </div>
   );
 }
+
+/** The example account's history, newest first. */
+const EXAMPLE_ACTIVITY: Activity[] = [
+  { when: 'Oct 29', text: 'Saved: ETH passed the old liquidation price', tone: 'green' },
+  { when: 'Oct 28', text: 'Rescue landed: +1,486.18 USDC in 38 s', tone: 'green' },
+  { when: 'Oct 28', text: 'Close call: +1,373 USDC stayed as margin', tone: 'muted' },
+  { when: 'Oct 21', text: 'HYPE guard sealed and funded', tone: 'amber' },
+];
 
 function Notice({ title, text }: { title: string; text: string }) {
   return (
@@ -92,7 +103,7 @@ function ReserveStat({ reserves }: { reserves: string[] }) {
         {reserves.length > 0 && (
           <button
             type="button"
-            className="min-h-9 select-none rounded-full border border-line-3 px-3 text-[13px] font-medium text-text"
+            className="min-h-9 select-none whitespace-nowrap rounded-full border border-line-3 px-3 text-[13px] font-medium text-text"
             onPointerDown={() => setPeek(true)}
             onPointerUp={() => setPeek(false)}
             onPointerLeave={() => setPeek(false)}

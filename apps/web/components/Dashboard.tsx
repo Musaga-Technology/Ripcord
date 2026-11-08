@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { guardName, guardOf, labelOf, STATE_TEXT, watchedDistance, type ShownGuard } from '../lib/guards';
 import type { Holding } from '../lib/hl';
-import { price, pct } from './format';
+import { price, pct, usd } from './format';
 import { GuardCard, type CardState } from './GuardCard';
 
 type View = 'yours' | 'hunter';
@@ -22,11 +22,38 @@ interface Row extends Holding {
 const newGuardHref = (coin: string) => `/guards/new?coin=${encodeURIComponent(coin)}`;
 
 /** Positions with their guards, and the selected guard in two views: yours (the card) and a hunter's. */
-export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: ShownGuard[] }) {
-  const rows: Row[] = holdings.map((h) => ({ ...h, guard: guardOf(h, guards) }));
-  const firstGuarded = rows.findIndex((r) => r.guard !== null);
-  const [selected, setSelected] = useState(firstGuarded < 0 ? 0 : firstGuarded);
+/** One line of what happened on a guard, newest first. */
+export interface Activity {
+  when: string;
+  text: string;
+  tone: 'green' | 'amber' | 'muted';
+}
+
+/** Amber under 10% from liquidation, red under 5%: the same thresholds everywhere a distance is drawn. */
+const barTone = (d: number | null) => (d === null ? 'bg-muted' : d < 5 ? 'bg-red' : d < 10 ? 'bg-amber' : 'bg-muted');
+/** Bars read 0–25% from liquidation; anything farther is full. */
+const barWidth = (d: number | null) => `${Math.min(100, ((d ?? 25) / 25) * 100)}%`;
+
+export function Dashboard({
+  holdings,
+  guards,
+  activity = [],
+}: {
+  holdings: Holding[];
+  guards: ShownGuard[];
+  activity?: Activity[];
+}) {
+  const [nearestFirst, setNearestFirst] = useState(true);
+  const listed: Row[] = holdings.map((h) => ({ ...h, guard: guardOf(h, guards) }));
+  const rows = nearestFirst ? [...listed].sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity)) : listed;
+  const firstGuarded = rows.find((r) => r.guard !== null) ?? rows[0]!;
+  const [selectedCoin, setSelectedCoin] = useState(firstGuarded.coin);
   const [view, setView] = useState<View>('yours');
+  const selected = Math.max(
+    0,
+    rows.findIndex((r) => r.coin === selectedCoin),
+  );
+  const setSelected = (i: number) => setSelectedCoin(rows[i]!.coin);
   const row = rows[selected]!;
   const g = row.guard;
   const guardedCount = rows.filter((r) => r.guard).length;
@@ -51,7 +78,7 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
                 type="button"
                 onClick={() => setSelected(i)}
                 aria-pressed={i === selected}
-                className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-5 py-3.5 text-left tabular-nums ${i === selected ? 'bg-line/40' : ''}`}
+                className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-5 py-3.5 text-left tabular-nums ${i === selected ? 'bg-line/70' : ''}`}
               >
                 <span className="font-semibold">
                   {r.coin}{' '}
@@ -82,9 +109,20 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
               <tr className="text-left text-[13px] text-muted">
                 <th className="px-5 py-3 font-medium">Market</th>
                 <th className="px-3 py-3 text-right font-medium">Size</th>
+                <th className="px-3 py-3 text-right font-medium">Margin</th>
                 <th className="px-3 py-3 text-right font-medium">Mark</th>
                 <th className="px-3 py-3 text-right font-medium">Liquidation</th>
-                <th className="min-w-[150px] px-3 py-3 font-medium">Distance</th>
+                <th className="min-w-[150px] px-3 py-1.5 font-medium" aria-sort={nearestFirst ? 'ascending' : 'none'}>
+                  <button
+                    type="button"
+                    onClick={() => setNearestFirst((v) => !v)}
+                    className="inline-flex min-h-9 items-center gap-1.5 hover:text-text"
+                  >
+                    Distance
+                    <span aria-hidden="true">{nearestFirst ? '↑' : '↕'}</span>
+                    <span className="sr-only">{nearestFirst ? ', nearest first' : ', as listed'}</span>
+                  </button>
+                </th>
                 <th className="px-5 py-3 text-right font-medium">Guard</th>
               </tr>
             </thead>
@@ -92,7 +130,7 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
               {rows.map((r, i) => (
                 <tr
                   key={r.coin}
-                  className={`cursor-pointer border-t border-line ${i === selected ? 'bg-line/40' : 'hover:bg-line/25'}`}
+                  className={`cursor-pointer border-t border-line ${i === selected ? 'bg-line/70' : 'hover:bg-line/30'}`}
                   onClick={() => setSelected(i)}
                   aria-selected={i === selected}
                 >
@@ -107,6 +145,10 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
                   <td className="px-3 py-4 text-right">
                     {r.size.toLocaleString('en-US')} {r.coin}
                   </td>
+                  <td className="px-3 py-4 text-right">
+                    {usd(r.marginUsed)}
+                    <span className="block text-[13px] text-muted">{r.margin}</span>
+                  </td>
                   <td className="px-3 py-4 text-right">{price(r.mark)}</td>
                   <td className="px-3 py-4 text-right">
                     <span className="inline-flex items-center gap-2">
@@ -118,8 +160,8 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
                     <div className="flex items-center gap-2.5">
                       <span className="relative h-1 flex-1 overflow-hidden rounded bg-line">
                         <span
-                          className={`absolute inset-y-0 left-0 rounded ${r.distance !== null && r.distance < 5 ? 'bg-red' : 'bg-muted'}`}
-                          style={{ width: `${Math.min(100, ((r.distance ?? 40) / 40) * 100)}%` }}
+                          className={`absolute inset-y-0 left-0 rounded ${barTone(r.distance)}`}
+                          style={{ width: barWidth(r.distance) }}
                         />
                       </span>
                       <span className="min-w-[48px] text-right">{r.distance === null ? '—' : pct(r.distance)}</span>
@@ -204,6 +246,28 @@ export function Dashboard({ holdings, guards }: { holdings: Holding[]; guards: S
                 →
               </span>
             </Link>
+            {activity.length > 0 && (
+              <section
+                aria-label="Recent activity"
+                className="hidden rounded-[20px] border border-line bg-panel px-5 py-4 md:block"
+              >
+                <h3 className="text-[13px] text-muted">Recent activity</h3>
+                <ul className="mt-2 flex flex-col">
+                  {activity.map((a) => (
+                    <li
+                      key={a.when + a.text}
+                      className="flex items-baseline gap-3 border-t border-line py-2.5 text-[14px] first:border-t-0"
+                    >
+                      <span
+                        className={`h-[7px] w-[7px] shrink-0 translate-y-[-1px] rounded-full ${a.tone === 'green' ? 'bg-green' : a.tone === 'amber' ? 'bg-amber' : 'bg-muted'}`}
+                      />
+                      <span className="flex-1">{a.text}</span>
+                      <span className="shrink-0 text-[13px] tabular-nums text-muted">{a.when}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         ) : view === 'yours' ? (
           <div className="flex flex-col items-start gap-3 rounded-[20px] border border-line bg-panel px-5 py-6">

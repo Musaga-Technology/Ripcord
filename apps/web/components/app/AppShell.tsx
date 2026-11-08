@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Logo />
               Ripcord
             </Link>
-            <nav aria-label="App" className="flex gap-1 text-[15px]">
+            <nav aria-label="App" className="hidden gap-1 text-[15px] sm:flex">
               <Link href="/guards" className="rounded-full bg-line px-3 py-2">
                 Guards
               </Link>

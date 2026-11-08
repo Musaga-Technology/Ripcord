@@ -261,6 +261,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:gap-16">
       <div className="order-2 flex min-w-0 flex-col gap-9 lg:order-1">
+        {phase !== 'edit' && phase !== 'sealing' && <Progress phase={phase} isolated={holding.margin === 'isolated'} />}
         {phase === 'edit' || phase === 'sealing' ? (
           <>
             <div className="flex flex-col gap-2">
@@ -570,6 +571,52 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
         </div>
       </aside>
     </div>
+  );
+}
+
+/** Where setup stands once the guard is sealed: done steps ticked, the current one marked. */
+function Progress({ phase, isolated }: { phase: Phase; isolated: boolean }) {
+  const steps: [Phase, string][] = [
+    ['sealing', 'Sealed'],
+    ['save', 'Seal file saved'],
+    ...(isolated ? ([['approve', 'Approved on Hyperliquid']] as [Phase, string][]) : []),
+    ['fund', 'Reserve funded'],
+  ];
+  const order: Phase[] = ['edit', 'sealing', 'save', 'approve', 'fund', 'guarded'];
+  const at = order.indexOf(phase);
+  return (
+    <ol aria-label="Setup" className="flex flex-wrap gap-x-5 gap-y-2 text-[13px]">
+      {steps.map(([p, label]) => {
+        const i = order.indexOf(p);
+        const done = i < at || (p === 'sealing' && at > 1) || phase === 'guarded';
+        const current = p === phase;
+        return (
+          <li
+            key={p}
+            aria-current={current ? 'step' : undefined}
+            className={`flex items-center gap-2 ${done ? 'text-text-2' : current ? 'font-medium text-text' : 'text-muted'}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`grid h-4 w-4 place-items-center rounded-full border ${done ? 'border-green bg-green text-ground' : current ? 'border-amber' : 'border-line-3'}`}
+            >
+              {done && (
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                  <path
+                    d="M2 5.2 4.1 7.3 8 2.8"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </span>
+            {label}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

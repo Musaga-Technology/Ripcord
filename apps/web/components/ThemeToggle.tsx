@@ -37,11 +37,15 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={change}
-      className="min-h-10 whitespace-nowrap rounded-full border border-line-3 px-3 text-[13px] text-muted hover:text-text"
+      className="inline-flex min-h-10 min-w-10 items-center justify-center whitespace-nowrap rounded-full border border-line-3 px-3 text-[13px] text-muted hover:text-text"
       aria-label={`Theme: ${LABEL[choice]}. Change theme`}
     >
-      <span className="hidden sm:inline">Theme: </span>
-      {LABEL[choice]}
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" className="sm:hidden">
+        <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+        {choice !== 'light' && <path d="M8 2.5a5.5 5.5 0 0 1 0 11Z" fill="currentColor" />}
+        {choice === 'dark' && <path d="M8 2.5a5.5 5.5 0 0 0 0 11Z" fill="currentColor" />}
+      </svg>
+      <span className="hidden sm:inline">Theme: {LABEL[choice]}</span>
     </button>
   );
 }
