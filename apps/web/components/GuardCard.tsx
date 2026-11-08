@@ -114,7 +114,11 @@ export function GuardCard(p: GuardCardProps) {
           >
             {p.fingerprint}
           </span>
-          <span className="flex flex-col items-end gap-0.5">
+          {/* A backing of the card's own material, so the rosette never runs through the label or the dots. */}
+          <span
+            className="flex flex-col items-end gap-0.5 rounded-[8px] px-2 py-1"
+            style={{ background: 'color-mix(in srgb, var(--card) 86%, transparent)', marginRight: '-0.5rem' }}
+          >
             <span style={{ fontSize: 'clamp(11px, 1.95cqw, 13px)', color: 'var(--card-muted)' }}>Reserve</span>
             <span
               className="whitespace-nowrap font-mono"

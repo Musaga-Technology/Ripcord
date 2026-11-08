@@ -65,7 +65,7 @@ export function Dashboard({
         className="order-2 min-w-0 flex-[999_1_720px] overflow-hidden rounded-[20px] border border-line bg-panel md:order-1"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 className="text-[17px] font-semibold">Positions</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Positions</h2>
           <span className="text-[13px] text-muted">
             {guardedCount} of {rows.length} guarded
           </span>
@@ -251,7 +251,7 @@ export function Dashboard({
                 aria-label="Recent activity"
                 className="hidden rounded-[20px] border border-line bg-panel px-5 py-4 md:block"
               >
-                <h3 className="text-[13px] text-muted">Recent activity</h3>
+                <h3 className="text-[15px] font-semibold">Recent activity</h3>
                 <ul className="mt-2 flex flex-col">
                   {activity.map((a) => (
                     <li

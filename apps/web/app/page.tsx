@@ -377,7 +377,7 @@ export default function Home() {
                     +
                   </span>
                 </summary>
-                <p className="mt-3 max-w-[36rem] text-[15px] text-text-2">{a}</p>
+                <p className="mt-3 max-w-[32rem] text-[15px] text-text-2">{a}</p>
               </details>
             ))}
           </div>

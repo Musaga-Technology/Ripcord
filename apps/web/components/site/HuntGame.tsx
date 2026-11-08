@@ -33,12 +33,15 @@ export function HuntGame() {
   const [, setN] = useState(0);
   const [running, setRunning] = useState(false);
   const [without, setWithout] = useState<number | null | undefined>(undefined);
+  // "Hunt it for me": sells every time the book allows, the strategy the tests prove never beats the guard.
+  const auto = useRef(false);
 
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
       const h = hunt.current;
       tick(h);
+      if (auto.current && !h.over && canPush(h)) push(h);
       // A hunt ends when the money runs out, the position is gone, or ten minutes of market pass.
       if (!h.over && !canPush(h) && h.spent + pushCost(h) > BUDGET) h.over = 'broke';
       if (h.over) {
@@ -63,6 +66,7 @@ export function HuntGame() {
   }, [running]);
 
   const again = () => {
+    auto.current = false;
     seed.current += 1;
     hunt.current = start(seed.current);
     setRunning(false);
@@ -162,7 +166,16 @@ export function HuntGame() {
           </button>
           {!done && !ready && h.pushes > 0 && <span className="text-[13px] text-muted">The book is refilling…</span>}
           {h.pushes === 0 && !done && (
-            <span className="text-[13px] text-muted">Sell to push the price toward the red line.</span>
+            <button
+              type="button"
+              onClick={() => {
+                auto.current = true;
+                sell();
+              }}
+              className="min-h-11 rounded-full px-2 text-[15px] font-medium underline decoration-line-3 underline-offset-4 hover:decoration-text"
+            >
+              Hunt it for me
+            </button>
           )}
         </div>
       </div>
