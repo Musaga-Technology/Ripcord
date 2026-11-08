@@ -22,11 +22,17 @@ function Logo() {
 
 const wrap =
   'mx-auto w-full max-w-[1240px] pl-[max(16px,env(safe-area-inset-left))] pr-[max(16px,env(safe-area-inset-right))] sm:px-8';
+const proof =
+  'inline-flex min-h-11 w-fit items-center gap-1.5 text-[14px] font-medium text-text underline decoration-line-3 underline-offset-4 transition-colors duration-[120ms] hover:decoration-text';
 const h2 = 'text-[36px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[56px]';
 const primary =
   'inline-flex min-h-11 items-center rounded-full bg-text px-6 text-[15px] font-semibold text-ground transition-opacity duration-[120ms] hover:opacity-90 active:opacity-80';
 const ghost =
   'inline-flex min-h-11 items-center rounded-full border border-line-3 px-6 text-[15px] font-medium transition-colors duration-[120ms] hover:border-muted';
+
+/** The public repository; every proof link opens the file that backs the claim. */
+const REPO = 'https://github.com/Musaga-Technology/Ripcord';
+const src = (path: string) => `${REPO}/blob/main/${path}`;
 
 const STATS: { to?: number; prefix?: string; suffix?: string; text?: string; src: string }[] = [
   {
@@ -57,35 +63,59 @@ const TRUST = [
   [
     'Pays only you.',
     'A rescue can only send USDC to your own Hyperliquid account. The worst a false alarm can do is add to your margin.',
+    "The wallet's policy",
+    src('checker/src/policy.rs#L15'),
   ],
   [
     'Nobody can link it.',
     'Your reserve sits in a confidential balance. When USDC lands, no one can trace it back or see what is left.',
+    'The test: no address on chain',
+    src('contracts/guard-registry/src/tests.rs#L477'),
   ],
   [
     'A line nobody can learn.',
     'Ripcord picks the rescue point privately inside your range, and changes it after every rescue. Watching rescues teaches a hunter nothing.',
+    'The replays',
+    src('crates/replay'),
   ],
   [
     'Code you can check.',
     'The guard runs in a sealed enclave built from public source. Every rescue comes with a receipt anyone can verify.',
+    'The enclave build',
+    src('checker/build.sh'),
   ],
   [
     'Freeze it yourself.',
     'Each reserve has its own wallet, and its rules change only with your signature. One signature freezes it, even if Ripcord disappears.',
+    'The freeze, on chain',
+    src('contracts/guard-registry/src/lib.rs#L434'),
   ],
   [
     'We pay if we fail.',
     'If a guard misses because of us, our make-good fund pays back what the liquidation took, up to your reserve or $10,000, whichever is lower.',
+    'How a claim is decided',
+    src('docs/ARCHITECTURE.md'),
   ],
 ];
 
-const NEAR = [
-  ['NEAR Intents', 'Turns a reserve on 35+ chains into Hyperliquid margin.'],
-  ['Confidential Intents', 'Keeps the reserve private and every rescue unlinkable.'],
-  ['OutLayer', 'Runs the guard in a sealed enclave and gives each reserve its own custody wallet.'],
-  ['NEAR contract', 'Holds each guard as hashes, and its wallet rules, which only your signature changes.'],
-  ['NEAR AI Cloud', 'Coming next: reads your plain-English setup privately.'],
+const NEAR: [string, string, string | null][] = [
+  ['NEAR Intents', 'Turns a reserve on 35+ chains into Hyperliquid margin.', src('checker/src/check.rs#L152')],
+  [
+    'Confidential Intents',
+    'Keeps the reserve private and every rescue unlinkable.',
+    src('checker/src/custody.rs#L237'),
+  ],
+  [
+    'OutLayer',
+    'Runs the guard in a sealed enclave and gives each reserve its own custody wallet.',
+    src('checker/src/main.rs'),
+  ],
+  [
+    'NEAR contract',
+    'Holds each guard as hashes, and its wallet rules, which only your signature changes.',
+    src('contracts/guard-registry/src/lib.rs#L211'),
+  ],
+  ['NEAR AI Cloud', 'Coming next: reads your plain-English setup privately.', null],
 ];
 
 const FAQ = [
@@ -128,8 +158,14 @@ export default function Home() {
             <a href="#pricing" className="hover:text-text">
               Pricing
             </a>
+            <a href="#app" className="hover:text-text">
+              The app
+            </a>
             <a href="#hunt" className="hover:text-text">
               Try to hunt it
+            </a>
+            <a href={REPO} className="hover:text-text">
+              GitHub
             </a>
           </nav>
           <div className="flex items-center gap-3">
@@ -215,7 +251,12 @@ export default function Home() {
           <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
             {STEPS.map(([title, body], i) => (
               <Reveal key={title} className="flex flex-col gap-3 border-t border-line pt-6">
-                <span className="font-mono text-[13px] text-muted">0{i + 1}</span>
+                <span className="inline-flex w-fit items-center gap-2 rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium">
+                  <span
+                    className={`h-[7px] w-[7px] rounded-full ${i === 2 ? 'bg-amber' : 'bg-muted'} ${i === 0 ? 'chip-pulse' : ''}`}
+                  />
+                  {['Sealing…', 'Waiting for reserve', 'Guarded'][i]}
+                </span>
                 <h3 className="text-[28px] font-semibold tracking-[-0.03em]">{title}</h3>
                 <p className="text-[15px] text-text-2">{body}</p>
               </Reveal>
@@ -251,10 +292,10 @@ export default function Home() {
 
         <section id="pricing" className={`${wrap} scroll-mt-20 py-24`}>
           <Reveal className="flex max-w-[44rem] flex-col gap-5">
-            <h2 className={h2}>Paid only when it saves you.</h2>
+            <h2 className={h2}>Pay for saves, not alarms.</h2>
             <p className="text-[17px] text-text-2">
               Most rescues end with the price bouncing. Those cost you nothing but the network fee, and the USDC stays
-              yours.
+              yours. The only other charge is $1 a month for the checks.
             </p>
           </Reveal>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -285,10 +326,14 @@ export default function Home() {
             <h2 className={h2}>Built so you don&apos;t have to trust us.</h2>
           </Reveal>
           <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {TRUST.map(([t, b]) => (
+            {TRUST.map(([t, b, label, href]) => (
               <Reveal key={t} className="flex flex-col gap-2 border-t border-line pt-6">
                 <h3 className="text-[20px] font-semibold tracking-[-0.02em]">{t}</h3>
                 <p className="text-[15px] text-text-2">{b}</p>
+                <a href={href} className={proof}>
+                  {label}
+                  <span aria-hidden="true">↗</span>
+                </a>
               </Reveal>
             ))}
           </div>
@@ -299,10 +344,18 @@ export default function Home() {
             <h2 className={h2}>Built on NEAR.</h2>
           </Reveal>
           <div className="mt-12 grid gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
-            {NEAR.map(([t, b]) => (
+            {NEAR.map(([t, b, href]) => (
               <div key={t} className="flex flex-col gap-2 bg-ground p-6">
                 <span className="text-[17px] font-semibold">{t}</span>
                 <span className="text-[15px] text-text-2">{b}</span>
+                {href ? (
+                  <a href={href} className={`${proof} mt-auto`}>
+                    The code
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <span className="mt-auto pt-1 text-[13px] text-muted">Next</span>
+                )}
               </div>
             ))}
           </div>
@@ -374,11 +427,39 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-line">
-        <div className={`${wrap} flex flex-wrap items-center justify-between gap-4 py-8 text-[13px] text-muted`}>
-          <span className="flex items-center gap-2 text-text">
-            <Logo /> Ripcord
-          </span>
-          <span>Built at NEAR HACKATHON, 2026</span>
+        <div className={`${wrap} grid gap-10 py-12 text-[15px] sm:grid-cols-[1.4fr_1fr_1fr]`}>
+          <div className="flex flex-col gap-3">
+            <span className="flex items-center gap-2 font-semibold">
+              <Logo /> Ripcord
+            </span>
+            <span className="max-w-[22rem] text-[13px] text-muted">
+              Hidden margin for Hyperliquid. Built at NEAR HACKATHON, 2026.
+            </span>
+          </div>
+          <nav aria-label="Product" className="flex flex-col gap-1 text-text-2">
+            <span className="pb-1 text-[13px] text-muted">Product</span>
+            <Link href="/guards" className="min-h-9 hover:text-text">
+              Guard a position
+            </Link>
+            <Link href="/guards?example" className="min-h-9 hover:text-text">
+              Example account
+            </Link>
+            <a href="#hunt" className="min-h-9 hover:text-text">
+              Try to hunt it
+            </a>
+          </nav>
+          <nav aria-label="Proof" className="flex flex-col gap-1 text-text-2">
+            <span className="pb-1 text-[13px] text-muted">Proof</span>
+            <a href={REPO} className="min-h-9 hover:text-text">
+              Source code
+            </a>
+            <a href={src('docs/EVIDENCE.md')} className="min-h-9 hover:text-text">
+              Evidence for every claim
+            </a>
+            <a href={src('docs/ARCHITECTURE.md')} className="min-h-9 hover:text-text">
+              How it works, in full
+            </a>
+          </nav>
         </div>
       </footer>
     </div>
