@@ -176,9 +176,14 @@ describe('numbers on screen', () => {
     expect(replayFigure('DOGE', 7, 1, 'lean')?.source).toContain('ETH 10×');
   });
 
-  it('marks Lean only from 1.5× margin', () => {
-    expect(markedPreset(1.49)).toBe('balanced');
-    expect(markedPreset(1.5)).toBe('lean');
+  it('marks the choice with the fewest liquidations in the replays, then the fewest close calls', () => {
+    const p = markedPreset('SOL', 5, 2);
+    const f = replayFigure('SOL', 5, 2, p)!;
+    for (const q of ['safer', 'balanced', 'lean'] as const) {
+      const g = replayFigure('SOL', 5, 2, q)!;
+      expect(f.liquidated <= g.liquidated).toBe(true);
+    }
+    expect(markedPreset('ETH', 10, 0.2)).toBe('balanced');
   });
 });
 

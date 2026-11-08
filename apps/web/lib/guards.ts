@@ -13,7 +13,7 @@ export interface ShownGuard {
   cardLabel?: string;
   margin: 'cross' | 'isolated';
   /** Example guards in demo mode show their sealed settings in words; real ones open with the seal file. */
-  example: { reserve: string; range: string; target: string; reserveX: number } | null;
+  example: { reserve: string; range: string; target: string } | null;
   local: LocalGuard | null;
   state: 'approval' | 'waiting' | 'guarded';
 }
@@ -35,7 +35,7 @@ const EXAMPLES = DEMO_GUARDS.filter((g) => g.coin !== 'BTC').map((g): ShownGuard
   coin: g.coin,
   label: g.label,
   margin: g.settings.isolated ? 'isolated' : 'cross',
-  example: { ...g.sealed, reserveX: 1.4 },
+  example: { ...g.sealed },
   local: null,
   state: 'guarded',
 }));

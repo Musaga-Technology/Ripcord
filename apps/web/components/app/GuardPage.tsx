@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { lastCheck, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
 import { CrashRun, marginFor } from '../../lib/crash';
 import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
+import { ASSETS } from '../../lib/assets';
 import { readCandles, readMark, type Holding } from '../../lib/hl';
 import { distance as distanceOf } from '../../lib/sim';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
@@ -54,7 +55,7 @@ function exampleSettings(id: string): GuardSettings | null {
   return DEMO_GUARDS.find((g) => g.guardId === id)?.settings ?? null;
 }
 
-function useCrash(h: Holding, settings: GuardSettings | null, reserveX: number) {
+function useCrash(h: Holding, settings: GuardSettings | null, reserveUsd: number) {
   const run = useRef<CrashRun | null>(null);
   const [, tick] = useState(0);
   const [seed, setSeed] = useState(7);
@@ -68,12 +69,12 @@ function useCrash(h: Holding, settings: GuardSettings | null, reserveX: number) 
         lineRange: settings?.line_range_pct ?? ([5, 8] as [number, number]),
         targetRange: settings?.target_range_pct ?? ([9, 13] as [number, number]),
         speedAware: true,
-        reserveX: reserveX > 0 ? reserveX * (h.notional / h.leverage / margin) : 1,
+        reserveX: reserveUsd / margin,
         landS: 38,
         cooldownS: 60,
       },
     };
-  }, [h, settings, reserveX]);
+  }, [h, settings, reserveUsd]);
 
   const range = useRef<[number, number]>([0, 0]);
   const fresh = () => {
@@ -154,18 +155,38 @@ function Hunter({
   liq,
   children,
   note,
+  mine,
+  onMine,
 }: {
   h: Holding;
   mark: number;
   liq: number | null;
   children: React.ReactNode;
   note: string;
+  /** The owner's view: the sealed band drawn on the chart. Absent when the band can't be read. */
+  mine?: boolean;
+  onMine?(): void;
 }) {
   return (
-    <section aria-label="What a hunter sees" className="min-w-0 rounded-[20px] border border-line bg-panel p-5 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 className="text-[15px] font-semibold">What a hunter sees</h2>
-        <span className="font-mono text-[12px] text-muted">{note}</span>
+    <section
+      aria-label="Price and liquidation"
+      className="min-w-0 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <h2 className="text-[15px] font-semibold">{mine ? 'What you see' : 'What a hunter sees'}</h2>
+        <span className="flex items-center gap-3">
+          <span className="font-mono text-[12px] text-muted">{note}</span>
+          {onMine && (
+            <button
+              type="button"
+              aria-pressed={!!mine}
+              onClick={onMine}
+              className={`min-h-9 rounded-full border px-3 text-[13px] font-medium transition-colors duration-[120ms] ${mine ? 'border-amber text-amber' : 'border-line-3 hover:border-muted'}`}
+            >
+              {mine ? 'Hide my band' : 'Show my band'}
+            </button>
+          )}
+        </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[15px] tabular-nums">
         <span className="text-muted">
@@ -267,7 +288,7 @@ function Sealed({
       </div>
       {[
         ['Rescue range', range],
-        ['Tops up to', target],
+        ['Tops up to', target === DOTS ? target : `${target} away`],
         ['Reserve', reserveText],
       ].map(([label, text]) => (
         <div key={label} className="flex items-center justify-between gap-4 border-t border-line pt-2.5">
@@ -408,30 +429,37 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       sub: `rescue on its way · ${mmss(run.t - f.firedAt)}`,
     };
   }
-  if (run.savedAt !== null && run.oldLiq !== null && run.landedAt !== null) {
-    return {
-      state: 'rescued',
-      status: 'Saved',
-      health: `Saved. ${coin} ${moved} past your old liquidation price (${price(run.oldLiq)}). Your reserve had moved it to ${price(G.liq)}, ${run.savedAt - run.landedAt} s earlier.`,
-      sub: 'from liquidation',
-      dot: 'bg-green',
-    };
-  }
-  if (run.landedAt !== null && run.oldLiq !== null && run.t < run.landedAt + 20) {
+  const landed = G.rescues.filter((r) => r.landedAt !== null);
+  /** Where a rescue left the liquidation price: the next rescue's starting line, or today's. */
+  const after = (i: number) => G.rescues[i + 1]?.liqBefore ?? G.liq;
+  const saveIx = G.rescues.findIndex((r) => r.outcome === 'saved');
+  const justLanded = last && last.landedAt !== null && run.t < last.landedAt + 20;
+  if (justLanded) {
     return {
       state: 'rescued',
       status: 'Rescued',
-      health: `Rescued · landed in ${landedIn} s · Liq ${price(run.oldLiq)} → ${price(G.liq)}`,
+      health: `Rescued · landed in ${landedIn} s · Liq ${price(last.liqBefore)} → ${price(after(G.rescues.length - 1))}`,
       sub: `landed in ${landedIn} s`,
       dot: 'bg-green',
     };
   }
-  if (run.landedAt !== null && run.oldLiq !== null) {
+  if (saveIx >= 0 && run.savedAt !== null) {
+    const r = G.rescues[saveIx]!;
+    const lead = Math.max(0, run.savedAt - (r.landedAt ?? run.savedAt));
+    return {
+      state: 'rescued',
+      status: 'Saved',
+      health: `Saved. ${coin} ${moved} past your old liquidation price (${price(r.liqBefore)}). Your reserve had moved it to ${price(after(saveIx))}, ${lead} s earlier.`,
+      sub: 'from liquidation',
+      dot: 'bg-green',
+    };
+  }
+  if (landed.length > 0) {
     // Until the price crosses the old line (a save) or 24 h pass (a close call), the rescue is settling.
     return {
       state: 'guarded',
       status: 'Settling',
-      health: `Settling · it counts as a save if ${coin} ${moved === 'fell' ? 'falls' : 'rises'} past ${price(run.oldLiq)} in the next 24 h`,
+      health: `Settling · it counts as a save if ${coin} ${moved === 'fell' ? 'falls' : 'rises'} past ${price(landed[0]!.liqBefore)} in the next 24 h`,
       sub: 'from liquidation',
     };
   }
@@ -447,12 +475,13 @@ function ExampleGuard({
   g,
   h,
   settings,
-  reserveX,
+  reserveUsd,
 }: {
   g: ShownGuard;
   h: Holding;
   settings: GuardSettings | null;
-  reserveX: number;
+  /** The sealed reserve's value at the example prices. */
+  reserveUsd: number;
 }) {
   const [control, setControl] = useState<Control>(NO_CONTROL);
   const [opened, setOpened] = useState<SealContents | null>(g.local ? openedSeal(g.id) : null);
@@ -469,15 +498,21 @@ function ExampleGuard({
       ? assetOf(opened.settings.reserve_asset).symbol
       : '';
   const addedTotal = control.added.reduce((a, b) => a + b, 0);
+  const unitPrice = priceOf(asset);
+  const { run, range, start, again } = useCrash(h, ruled, reserveUsd + addedTotal * unitPrice);
+  // What the rescues so far took out of the reserve, in its own asset.
+  const spentUsd = run.guard.rescues.reduce((s, r) => s + r.amount, 0);
   const base = /^([\d.]+) (\w+)$/.exec(baseReserve.replace(/,/g, ''));
-  // A top-up adds to the reserve's own figure when there is one ("0.057 BTC" + 0.02 → "0.077 BTC").
-  const reserveText = !addedTotal
-    ? baseReserve
-    : base
-      ? `${+(Number(base[1]) + addedTotal).toFixed(6)} ${base[2]}`
-      : `${baseReserve} + ${addedTotal} ${asset}`;
-  const { run, range, start, again } = useCrash(h, ruled, reserveX);
+  const leftUnits = base ? Number(base[1]) + addedTotal - spentUsd / unitPrice : null;
+  const leftUsd = reserveUsd + addedTotal * unitPrice - spentUsd;
+  const reserveText =
+    base && leftUnits !== null
+      ? `${+Math.max(0, leftUnits).toPrecision(3)} ${base[2]}`
+      : addedTotal
+        ? `${baseReserve} + ${addedTotal} ${asset}`
+        : baseReserve;
   const [openedAt] = useState(() => Date.now());
+  const [mine, setMine] = useState(false);
   const G = run.guard;
   const crashing = run.crashing;
   const shownSettings = g.example ? ruled : (opened?.settings ?? null);
@@ -519,6 +554,9 @@ function ExampleGuard({
         reserve={reserveText || 'your reserve'}
         asset={asset}
         distance={d0}
+        current={control.preset ?? shownSettings?.preset ?? null}
+        priceAt={(pct) => (h.liquidation ?? h.mark) / (1 + (run.pos.side > 0 ? -1 : 1) * (pct / 100))}
+        busy={G.inFlight ? 'A rescue is on its way. Changes to the reserve wait until it lands.' : null}
       />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
@@ -527,6 +565,8 @@ function ExampleGuard({
             mark={run.price}
             liq={G.liq}
             note={`simulated${crashing && !run.over ? ` · ${G.inFlight ? FLIGHT_SPEED : CALM_SPEED}× speed` : ''}`}
+            mine={mine && !!shownSettings}
+            onMine={shownSettings ? () => setMine((v) => !v) : undefined}
           >
             <RescueChart
               pts={run.pts}
@@ -535,13 +575,18 @@ function ExampleGuard({
               lo={range[0]}
               hi={range[1]}
               liq={G.liq}
-              oldLiq={run.oldLiq}
-              landed={run.landedAt !== null ? [run.landedAt, run.landedPrice] : null}
+              oldLiq={run.landedAt !== null ? run.openLiq : null}
+              landed={G.rescues
+                .filter((r) => r.landedAt !== null)
+                .map((r): [number, number] => [r.landedAt!, run.pts.find(([t]) => t >= r.landedAt!)?.[1] ?? run.price])}
               timeLabel={simClock}
+              band={mine && shownSettings ? bandOf(run.pos.side, G.liq, shownSettings.line_range_pct) : null}
               label="The position's price and its public liquidation price."
             />
           </Hunter>
-          {control.closed ? null : control.frozen && !crashing ? (
+          {control.closed ? null : !crashing && leftUsd < 5 ? (
+            <p className="text-[15px] text-text-2">The reserve is spent. Top it up to guard this position again.</p>
+          ) : control.frozen && !crashing ? (
             <p className="text-[15px] text-text-2">
               Frozen, so a crash would liquidate this position: nothing can leave the reserve, rescues included.
             </p>
@@ -589,6 +634,21 @@ function ExampleGuard({
 function rangeFrom(pts: [number, number][], liq: number | null): { lo: number; hi: number } {
   const [lo, hi] = rangeOf(pts.map((p) => p[1]).concat(liq ?? []), 0.08);
   return { lo, hi };
+}
+
+/** An example price for a reserve asset by its symbol (demo mode only). */
+const priceOf = (symbol: string) => ASSETS.find((a) => a.symbol === symbol)?.demoPrice ?? 1;
+
+/** "0.057 BTC" → its value in USD at the example prices. */
+function reserveUsdOf(text: string): number {
+  const m = /^([\d.,]+) (\w+)$/.exec(text);
+  return m ? Number(m[1]!.replace(/,/g, '')) * priceOf(m[2]!) : 0;
+}
+
+/** The sealed rescue range as prices: where the distance from today's liquidation price equals the range's ends. */
+function bandOf(side: 1 | -1, liq: number, range: [number, number]): [number, number] {
+  const s = side > 0 ? -1 : 1;
+  return [liq / (1 + s * (range[0] / 100)), liq / (1 + s * (range[1] / 100))];
 }
 
 const reserveWords = (s: GuardSettings) => `${usd(s.budget_usd)} in ${assetOf(s.reserve_asset).symbol}`;
@@ -785,8 +845,8 @@ function Page({ id }: { id: string }) {
   if (isDemo && h) {
     const settings = exampleSettings(g.id) ?? openedSeal(g.id)?.settings ?? null;
     const budget = openedSeal(g.id)?.settings.budget_usd;
-    const reserveX = g.example?.reserveX ?? (budget ? budget / h.marginUsed : 1.4);
-    return <ExampleGuard g={g} h={h} settings={settings} reserveX={reserveX} />;
+    const reserveUsd = g.example ? reserveUsdOf(g.example.reserve) : (budget ?? h.marginUsed);
+    return <ExampleGuard g={g} h={h} settings={settings} reserveUsd={reserveUsd} />;
   }
   return <LiveGuard g={g} h={h} />;
 }

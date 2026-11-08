@@ -100,7 +100,7 @@ export const DEMO_GUARDS: DemoGuard[] = [
       speed_aware: true,
       isolated: { coin: 'HYPE' },
     }),
-    '9.8 SOL',
+    '86 SOL',
     0x33,
   ),
 ];

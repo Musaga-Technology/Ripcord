@@ -52,4 +52,15 @@ describe('a crash through the real rules', () => {
     );
     expect(lost.length).toBe(20);
   });
+
+  it('never spends more than the reserve, and a save is measured from the rescue it saved', () => {
+    const pos = position(1, 81.98, 55.3);
+    for (let seed = 1; seed <= 40; seed++) {
+      const r = play(pos, 1, seed);
+      const spent = r.guard.rescues.reduce((s, x) => s + x.amount, 0);
+      expect(spent, `seed ${seed}`).toBeLessThanOrEqual(r.guard.margin0 + 1e-6);
+      const saved = r.guard.rescues.find((x) => x.outcome === 'saved');
+      if (saved && r.savedAt !== null) expect(r.savedAt - saved.landedAt!, `seed ${seed}`).toBeGreaterThanOrEqual(0);
+    }
+  });
 });

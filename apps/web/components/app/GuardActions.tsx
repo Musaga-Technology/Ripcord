@@ -6,6 +6,7 @@
 import { presetRanges, type Preset } from '@ripcord/shared';
 import { useEffect, useState } from 'react';
 import { radioKeys } from '../../lib/radio';
+import { price } from '../format';
 import { fieldCls, ghostBtn, primaryBtn } from './AppShell';
 
 export interface Control {
@@ -35,6 +36,9 @@ export function GuardActions({
   reserve,
   asset,
   distance,
+  current = null,
+  priceAt,
+  busy = null,
 }: {
   example: boolean;
   control: Control;
@@ -44,10 +48,16 @@ export function GuardActions({
   asset: string;
   /** Distance from liquidation now: a new range is drawn from it. */
   distance: number;
+  /** The preset the guard is sealed with now. */
+  current?: Preset | null;
+  /** The price at a distance from liquidation, % (for showing a range as prices). */
+  priceAt?: (pct: number) => number;
+  /** Why changes to the reserve are paused right now (a rescue in flight), if they are. */
+  busy?: string | null;
 }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const [amount, setAmount] = useState('');
-  const [preset, setPreset] = useState<Preset>(control.preset ?? 'balanced');
+  const [preset, setPreset] = useState<Preset>(control.preset ?? current ?? 'balanced');
   const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,13 +95,18 @@ export function GuardActions({
             type="button"
             aria-expanded={panel === b.id}
             onClick={() => open(b.id)}
-            disabled={control.frozen && (b.id === 'topup' || b.id === 'range' || b.id === 'close')}
+            disabled={(control.frozen || !!busy) && (b.id === 'topup' || b.id === 'range' || b.id === 'close')}
             className={`${ghostBtn} min-h-11 px-4 text-[14px] ${panel === b.id ? 'border-text' : ''}`}
           >
             {b.label}
           </button>
         ))}
       </div>
+      {(busy || control.frozen) && (
+        <p className="text-[13px] text-muted">
+          {busy ?? 'Top up, change range and close wait until you unfreeze the reserve.'}
+        </p>
+      )}
       {done && (
         <p aria-live="polite" className="flex items-center gap-2 text-[15px] text-text-2">
           <span className="h-[7px] w-[7px] rounded-full bg-green" />
@@ -152,9 +167,16 @@ export function GuardActions({
                       onClick={() => setPreset(p.id)}
                       className={`flex min-h-11 flex-col rounded-[16px] border px-4 py-2 text-left text-[14px] transition-colors duration-[120ms] ${preset === p.id ? 'border-text' : 'border-line hover:border-line-3'}`}
                     >
-                      <span className="font-semibold">{p.name}</span>
+                      <span className="flex items-center gap-2 font-semibold">
+                        {p.name}
+                        {p.id === current && <span className="text-[12px] font-medium text-muted">Current</span>}
+                      </span>
                       <span className="tabular-nums text-text-2">
-                        {r ? `${pctRange(r.line_range_pct)} away` : 'Too close'}
+                        {r
+                          ? priceAt
+                            ? `Near ${price(priceAt((r.line_range_pct[0] + r.line_range_pct[1]) / 2))} · ${pctRange(r.line_range_pct)} away`
+                            : `${pctRange(r.line_range_pct)} away`
+                          : 'Too close'}
                       </span>
                     </button>
                   );

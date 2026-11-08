@@ -15,6 +15,8 @@ export class CrashRun {
   pts: [number, number][] = [];
   crashing = false;
   readonly guard: GuardedPosition;
+  /** The liquidation price the position opened the run with: the public line a save is measured against. */
+  readonly openLiq: number;
   oldLiq: number | null = null;
   landedAt: number | null = null;
   landedPrice = 0;
@@ -31,6 +33,7 @@ export class CrashRun {
   ) {
     this.u = rng(seed);
     this.guard = new GuardedPosition(pos, spec, this.u);
+    this.openLiq = this.guard.liq;
     this.price = pos.entry;
     this.pts = [[0, this.price]];
     for (let i = 0; i < windowS; i++) this.step();

@@ -36,5 +36,15 @@ export function replayFigure(coin: string, leverage: number, reserveX: number, p
   };
 }
 
-/** The choice marked for you follows the reserve (DESIGN §4.4). */
-export const markedPreset = (reserveX: number): Preset => (reserveX >= 1.5 ? 'lean' : 'balanced');
+const ALL: Preset[] = ['safer', 'balanced', 'lean'];
+
+/**
+ * The choice marked for you: the preset with the lowest share liquidated in the replays at this reserve, and among
+ * equals the fewest close calls a month. Balanced when the replays don't cover the reserve.
+ */
+export function markedPreset(coin: string, leverage: number, reserveX: number): Preset {
+  const figs = ALL.map((p) => [p, replayFigure(coin, leverage, reserveX, p)] as const).filter(([, f]) => f !== null);
+  if (figs.length === 0) return 'balanced';
+  figs.sort(([, a], [, b]) => a!.liquidated - b!.liquidated || a!.earlyMonth - b!.earlyMonth);
+  return figs[0]![0];
+}

@@ -116,7 +116,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   const amountStr = amount ?? suggestion;
   const reserveUsd = assetPrice ? (Number(amountStr) || 0) * assetPrice : 0;
   const reserveX = margin > 0 ? reserveUsd / margin : 0;
-  const marked = markedPreset(reserveX);
+  const marked = markedPreset(holding.coin, holding.leverage, reserveX);
   const preset = chosen ?? marked;
   const ranges = presetRanges(preset, distance);
   const figure = replayFigure(holding.coin, holding.leverage, reserveX, preset);
@@ -314,8 +314,11 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                 <span className="text-[15px] tabular-nums text-text-2">
                   {assetPrice ? (
                     <>
-                      {usd(reserveUsd)} · <span className="font-medium text-text">{reserveX.toFixed(1)}×</span> your{' '}
-                      {usd(margin)} margin
+                      {usd(reserveUsd)} ·{' '}
+                      <span className="font-medium text-text">
+                        {reserveX < 1 ? reserveX.toPrecision(2) : reserveX.toFixed(1)}×
+                      </span>{' '}
+                      your {usd(margin)} margin
                     </>
                   ) : (
                     'Reading prices…'
@@ -397,9 +400,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                 {figure ? (
                   <>
                     <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-amber" />
-                    {marked === 'lean'
-                      ? 'Lean suits a reserve of 1.5× your margin or more. '
-                      : 'Balanced suits a reserve under 1.5× your margin. '}
+                    {`${PRESETS.find((p) => p.id === marked)!.name} had the fewest liquidations in the replays at this reserve. `}
                   </>
                 ) : null}
                 {figure?.source ?? ''} A close call still adds to your margin, and costs only the network fee.
