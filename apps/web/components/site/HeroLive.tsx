@@ -26,6 +26,9 @@ export function HeroLive() {
   const [, setTick] = useState(0);
   const [fade, setFade] = useState(false);
   const [reduced, setReduced] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,9 +51,12 @@ export function HeroLive() {
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      if (visible && !document.hidden) {
+      if (visible && !document.hidden && !pausedRef.current) {
         const w = run.current!;
-        acc += dt * (w.guard.inFlight ? FLIGHT_SPEED : CALM_SPEED);
+        // Slow while a rescue is in flight and for the beat after it lands, so both can be read.
+        const landing = w.landings[w.landings.length - 1];
+        const slow = w.guard.inFlight || (landing !== undefined && w.t < landing.t + 25);
+        acc += dt * (slow ? FLIGHT_SPEED : CALM_SPEED);
         while (acc >= 1 && !w.over) {
           w.step();
           acc -= 1;
@@ -96,8 +102,24 @@ export function HeroLive() {
       <div className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <span className="text-[15px] font-semibold">What a hunter sees</span>
-          <span className="font-mono text-[12px] text-muted">
-            ETH-USD · Oct 10, 2025 · {clockOf(w.t)} UTC{reduced ? '' : ` · ${f ? FLIGHT_SPEED : CALM_SPEED}×`}
+          <span className="flex items-center gap-3">
+            <span className="font-mono text-[12px] text-muted">
+              ETH-USD · Oct 10, 2025 · {clockOf(w.t)} UTC
+              {reduced ? '' : ` · ${f || justLanded ? FLIGHT_SPEED : CALM_SPEED}×`}
+            </span>
+            {!reduced && (
+              <button
+                type="button"
+                onClick={() => setPaused((v) => !v)}
+                aria-pressed={paused}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line-3 px-2.5 text-[12px] text-text-2 hover:border-muted"
+              >
+                <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                  {paused ? <path d="M2 1l7 4-7 4z" /> : <path d="M2 1h2v8H2zM6 1h2v8H6z" />}
+                </svg>
+                {paused ? 'Play' : 'Pause'}
+              </button>
+            )}
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[15px] tabular-nums">
@@ -110,7 +132,10 @@ export function HeroLive() {
           </span>
           <span className="text-muted">{d.toFixed(1)}% away</span>
         </div>
-        <p className="mt-1.5 truncate text-[13px] text-muted tabular-nums" aria-live="polite">
+        <p
+          className={`mt-1.5 text-[13px] tabular-nums ${w.unguardedAt !== null ? 'text-[15px] font-medium text-text' : 'truncate text-muted'}`}
+          aria-live="polite"
+        >
           {w.unguardedAt !== null
             ? `Without the hidden reserve, liquidated at ${clockOf(w.unguardedAt)}. With it, still open.`
             : w.feed}
@@ -125,16 +150,21 @@ export function HeroLive() {
             liq={g.liq}
             oldLiq={w.landings.length ? w.unguardedLiq : null}
             landed={w.landings.map((l): [number, number] => [l.t, l.price])}
+            marks={
+              w.unguardedAt !== null
+                ? [{ t: w.unguardedAt, price: w.unguardedLiq, label: 'Liquidated here without Ripcord' }]
+                : []
+            }
             timeLabel={(t) => clockOf(t).slice(0, 5)}
             label="ETH's real price on Oct 10, 2025 falling through the public liquidation price of a 10× long; hidden rescues move the liquidation price away before the price reaches it."
           />
         </div>
       </div>
-      <p className="mt-3 text-[12px] leading-[1.5] text-muted sm:ml-auto sm:max-w-[55%] sm:text-right">
+      <p className="mt-3 text-[12px] leading-[1.5] text-muted lg:ml-auto lg:max-w-[55%] lg:text-right">
         Real prices: Binance ETH perpetual, 1-minute bars. The guard&apos;s real rules, a reserve the size of the
         margin, and the 38 s a rescue took on mainnet.
       </p>
-      <div className="relative z-10 mx-auto -mt-6 w-[88%] max-w-[420px] sm:absolute sm:-bottom-28 sm:-left-14 sm:mt-0 sm:w-[min(400px,62%)] lg:-left-24">
+      <div className="relative z-10 mx-auto mt-6 w-[88%] max-w-[420px] lg:absolute lg:-bottom-28 lg:-left-24 lg:mt-0 lg:w-[min(400px,62%)]">
         <Card3D>
           <GuardCard
             label="ETH long · 10×"

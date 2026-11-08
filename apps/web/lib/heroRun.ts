@@ -27,9 +27,12 @@ export function perSecond(bars: Bar[]): number[] {
 
 const PX = perSecond(BARS);
 const MIN = 60;
-/** Seconds from 19:30 UTC: the position opens at 21:00, the page starts playing at 21:10 and loops at 21:24, after the wick. */
+/**
+ * Seconds from 19:30 UTC: the position opens at 21:00, the page starts playing at 21:12:15 (the first rescue fires
+ * at 21:12:33, so a visitor sees one within two seconds) and loops at 21:24, after the wick.
+ */
 export const ENTRY_T = 90 * MIN;
-export const PLAY_T = 100 * MIN;
+export const PLAY_T = 102 * MIN + 15;
 export const END_T = 114 * MIN;
 export const WINDOW_S = 25 * MIN;
 

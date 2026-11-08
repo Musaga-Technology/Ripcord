@@ -5,7 +5,6 @@ import { HeroLive } from '../components/site/HeroLive';
 import { HuntGame } from '../components/site/HuntGame';
 import { Levels } from '../components/site/Levels';
 import { Count, Reveal } from '../components/site/Reveal';
-import { WatchLine } from '../components/site/WatchLine';
 import { Edge } from '../components/site/Edge';
 import { AppPreview } from '../components/site/AppPreview';
 
@@ -120,6 +119,10 @@ const NEAR: [string, string, string | null][] = [
 
 const FAQ = [
   [
+    'Why not just add margin, or run a bot that does?',
+    'Extra margin sits in your account, where anyone can see it and price it in. A hunter knows exactly how far to push. A Ripcord reserve sits off the exchange in a confidential balance, so nobody knows it exists until it lands, and nobody can tell how much is left.',
+  ],
+  [
     'Does Ripcord hold my funds?',
     "Only the reserve you fund, in a wallet of its own. That wallet can pay just three places: your Hyperliquid account, an address you sign for, and Ripcord's fee after a save. For an isolated position you also approve the guard on Hyperliquid; its published code only adds margin, and Hyperliquid blocks it from withdrawing.",
   ],
@@ -151,7 +154,7 @@ export default function Home() {
             <Logo />
             Ripcord
           </Link>
-          <nav aria-label="Site" className="hidden items-center gap-7 text-[15px] text-muted md:flex">
+          <nav aria-label="Site" className="hidden items-center gap-7 text-[15px] text-muted lg:flex">
             <a href="#how" className="hover:text-text">
               How it works
             </a>
@@ -193,8 +196,8 @@ export default function Home() {
               <Link href="/guards" className={primary}>
                 Guard a position
               </Link>
-              <a href="#rescue" className={ghost}>
-                Watch a rescue
+              <a href="#hunt" className={ghost}>
+                Try to hunt it
               </a>
             </div>
           </div>
@@ -261,19 +264,6 @@ export default function Home() {
                 <p className="text-[15px] text-text-2">{body}</p>
               </Reveal>
             ))}
-          </div>
-        </section>
-
-        <section id="rescue" className={`${wrap} scroll-mt-20 py-24`}>
-          <Reveal className="flex max-w-[36rem] flex-col gap-5">
-            <h2 className={h2}>Watch the line move.</h2>
-            <p className="text-[17px] text-text-2">
-              A wick to 2,205 would have liquidated this ETH long at 2,231. Two hidden rescues moved the line out of
-              reach, then price came back. Only the first was a save, so it&apos;s the only one Ripcord charges for.
-            </p>
-          </Reveal>
-          <div className="mt-12">
-            <WatchLine />
           </div>
         </section>
 

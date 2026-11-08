@@ -16,6 +16,10 @@ export interface RescueChartProps {
   oldLiq?: number | null;
   /** Where rescues landed, as (time, price). */
   landed?: [number, number][] | [number, number] | null;
+  /** Points to call out on the chart, e.g. where the same position dies with no guard. */
+  marks?: { t: number; price: number; label: string }[];
+  /** The owner's sealed band, as prices: drawn only in the owner's view. */
+  band?: [number, number] | null;
   /** Bottom-axis labels for a time. */
   timeLabel?: (t: number) => string;
   label: string;
@@ -34,7 +38,20 @@ function ticksFor(lo: number, hi: number): number[] {
   return out;
 }
 
-export function RescueChart({ pts, t0, t1, lo, hi, liq, oldLiq, landed, timeLabel, label }: RescueChartProps) {
+export function RescueChart({
+  pts,
+  t0,
+  t1,
+  lo,
+  hi,
+  liq,
+  oldLiq,
+  landed,
+  marks = [],
+  band = null,
+  timeLabel,
+  label,
+}: RescueChartProps) {
   if (pts.length < 2 || hi <= lo) {
     return <div aria-busy="true" className="h-[240px] animate-pulse rounded-[12px] bg-line/40 sm:h-[300px]" />;
   }
@@ -113,6 +130,37 @@ export function RescueChart({ pts, t0, t1, lo, hi, liq, oldLiq, landed, timeLabe
               strokeLinejoin="round"
             />
           </svg>
+          {band && (
+            <div
+              aria-hidden="true"
+              className="reveal-line pointer-events-none absolute inset-x-0 border-y border-amber/60 bg-amber/15"
+              style={{
+                top: `${Math.min(yPct(band[0]), yPct(band[1]))}%`,
+                height: `${Math.abs(yPct(band[0]) - yPct(band[1]))}%`,
+              }}
+            >
+              <span className="absolute bottom-full left-2 pb-0.5 text-[12px] font-medium text-amber">
+                Your rescue band · only you see this
+              </span>
+            </div>
+          )}
+          {marks
+            .filter((m) => x(m.t) >= 0)
+            .map((m) => (
+              <span
+                key={m.label}
+                aria-hidden="true"
+                className={`reveal-line absolute flex -translate-y-1/2 items-center gap-1.5 ${x(m.t) > W * 0.55 ? '-translate-x-[calc(100%-6px)] flex-row-reverse' : '-translate-x-[6px]'}`}
+                style={{ left: `${(x(m.t) / W) * 100}%`, top: `${yPct(m.price)}%` }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" className="shrink-0 text-red">
+                  <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="whitespace-nowrap rounded-[4px] bg-ground/90 px-1 text-[12px] font-medium text-red">
+                  {m.label}
+                </span>
+              </span>
+            ))}
           {liq !== null && (
             <div
               aria-hidden="true"

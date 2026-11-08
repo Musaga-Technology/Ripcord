@@ -25,7 +25,8 @@ const date = (iso: string) =>
   });
 
 export function Edge() {
-  const rows = edge.top as Row[];
+  // Nearest to liquidation first; a bar fills as a position nears its line (full at 0%, empty at 10% away).
+  const rows = [...(edge.top as Row[])].sort((a, b) => a.distance_pct - b.distance_pct);
   const when = date(edge.scanned_at);
   const isolated = edge.within_5_count > 0 && edge.within_5_isolated === edge.within_5_count;
   return (
@@ -37,7 +38,9 @@ export function Edge() {
         <p className="max-w-[30rem] text-[17px] text-text-2">
           On {when}, {money(edge.within_10_usd)} in the {edge.accounts.toLocaleString('en-US')} largest Hyperliquid
           accounts sat within 10% of liquidation.
-          {isolated ? ' Every position within 5% was isolated.' : ''}
+          {isolated
+            ? ` ${edge.within_5_count === 2 ? 'Both positions' : `All ${edge.within_5_count} positions`} within 5% were isolated. Below, the five largest near the edge.`
+            : ''}
         </p>
       </Reveal>
       <Reveal className="min-w-0">
@@ -58,8 +61,9 @@ export function Edge() {
                 <span
                   className="block h-full rounded-full"
                   style={{
-                    width: `${Math.min(100, r.distance_pct * 10)}%`,
-                    background: r.distance_pct < 5 ? 'var(--red)' : 'var(--muted)',
+                    width: `${Math.max(4, Math.min(100, (10 - r.distance_pct) * 10))}%`,
+                    background:
+                      r.distance_pct < 5 ? 'var(--red)' : r.distance_pct < 10 ? 'var(--amber)' : 'var(--muted)',
                   }}
                 />
               </span>
@@ -92,8 +96,9 @@ export function Edge() {
                         <span
                           className="block h-full rounded-full"
                           style={{
-                            width: `${Math.min(100, r.distance_pct * 10)}%`,
-                            background: r.distance_pct < 5 ? 'var(--red)' : 'var(--muted)',
+                            width: `${Math.max(4, Math.min(100, (10 - r.distance_pct) * 10))}%`,
+                            background:
+                              r.distance_pct < 5 ? 'var(--red)' : r.distance_pct < 10 ? 'var(--amber)' : 'var(--muted)',
                           }}
                         />
                       </span>

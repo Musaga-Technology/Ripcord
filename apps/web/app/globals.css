@@ -290,26 +290,6 @@ p {
   }
 }
 
-/* "Watch the line move." plays once it is seen (components/site/WatchLine.tsx). */
-.watch .watch-wipe {
-  transform: scaleX(0);
-  transform-origin: left;
-}
-.watch.play .watch-wipe {
-  animation: watch-wipe var(--dur) linear forwards;
-}
-@keyframes watch-wipe {
-  to {
-    transform: scaleX(1);
-  }
-}
-.watch .watch-mark {
-  opacity: 0;
-}
-.watch.play .watch-mark {
-  animation: reveal-line var(--dur-2) var(--ease) forwards;
-}
-
 /* App steps: each arrives quietly; a sealed value changes with a short fade (components/app/NewGuard.tsx). */
 .step-in {
   animation: step-in var(--dur-3) var(--ease) both;
