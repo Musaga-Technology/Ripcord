@@ -186,7 +186,11 @@ async function e2eSteps(acc: Account): Promise<void> {
     encrypted_data: enc.encrypted_base64,
     caller: registry,
   });
-  check('policy encrypted and signed by the wallet for the registry', c1 === 200 && c2 === 200, `${c1}/${c2}`);
+  check(
+    'policy encrypted and signed by the wallet for the registry, unlocked',
+    c1 === 200 && c2 === 200 && sig.locked === false && Number.isInteger(sig.version),
+    `${c1}/${c2} version ${sig.version}`,
+  );
   const walletPubkey = `ed25519:${sig.public_key_hex}`;
 
   // A throwaway owner with a NEAR key (NEP-413), and the guard's hashes.
@@ -225,6 +229,9 @@ async function e2eSteps(acc: Account): Promise<void> {
       wallet_pubkey: walletPubkey,
       encrypted_policy: enc.encrypted_base64,
       wallet_signature: sig.signature_hex,
+      // The version and filing deadline the signature covers (OutLayer's policy_store_message v2, Nov 6 2026).
+      policy_version: sig.version,
+      policy_valid_until: sig.valid_until,
     },
     30n * MILLINEAR,
     200n * TGAS,

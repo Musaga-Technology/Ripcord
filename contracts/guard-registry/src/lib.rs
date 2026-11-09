@@ -174,6 +174,38 @@ fn key(guard_id: &str, n: impl std::fmt::Display) -> String {
     format!("{guard_id}/{n}")
 }
 
+/// Arguments for OutLayer's `store_wallet_policy`. Since Nov 6 2026 (testnet first) the wallet's signature also
+/// covers the policy's next version, its lock and a filing deadline, all three from the keystore's sign-policy; an
+/// OutLayer that predates it takes neither, so both are passed or neither. The registry stores only unlocked
+/// policies, so the owner's freeze and close always reach the wallet.
+fn store_policy_args(
+    wallet_pubkey: &str,
+    encrypted_policy: &str,
+    wallet_signature: &str,
+    version: Option<u64>,
+    valid_until: Option<u64>,
+    storage_refund_to: Option<AccountId>,
+) -> Vec<u8> {
+    let mut a = json!({
+        "wallet_pubkey": wallet_pubkey,
+        "encrypted_data": encrypted_policy,
+        "wallet_signature": wallet_signature,
+    });
+    match (version, valid_until) {
+        (Some(v), Some(t)) => {
+            a["version"] = json!(v);
+            a["locked"] = json!(false);
+            a["valid_until"] = json!(t);
+        }
+        (None, None) => {}
+        _ => env::panic_str("policy_version and policy_valid_until come together"),
+    }
+    if let Some(r) = storage_refund_to {
+        a["storage_refund_to"] = json!(r);
+    }
+    a.to_string().into_bytes()
+}
+
 /// NEP-297 event; data never holds an address.
 fn emit(event: &str, data: near_sdk::serde_json::Value) {
     let e = json!({ "standard": "ripcord", "version": "1.0.0", "event": event, "data": [data] });
@@ -205,7 +237,8 @@ impl Registry {
     // ---------- checker ----------
 
     /// Stores a new guard (Pending) and makes this registry its wallet's policy controller on OutLayer.
-    /// The wallet signature must name this registry as `caller` (OutLayer's `policy_store_message`).
+    /// The wallet signature must name this registry as `caller` (OutLayer's `policy_store_message`). See
+    /// [`store_policy_args`] for `policy_version` and `policy_valid_until`.
     #[payable]
     #[allow(clippy::too_many_arguments)]
     pub fn register_guard(
@@ -218,6 +251,8 @@ impl Registry {
         wallet_pubkey: String,
         encrypted_policy: String,
         wallet_signature: String,
+        policy_version: Option<u64>,
+        policy_valid_until: Option<u64>,
     ) -> Promise {
         self.only_checker();
         require!(commitment::is_guard_id(&guard_id), "invalid guard_id");
@@ -271,14 +306,14 @@ impl Registry {
         Promise::new(self.outlayer.clone())
             .function_call(
                 "store_wallet_policy",
-                json!({
-                    "wallet_pubkey": wallet_pubkey,
-                    "encrypted_data": encrypted_policy,
-                    "wallet_signature": wallet_signature,
-                    "storage_refund_to": env::predecessor_account_id(),
-                })
-                .to_string()
-                .into_bytes(),
+                store_policy_args(
+                    &wallet_pubkey,
+                    &encrypted_policy,
+                    &wallet_signature,
+                    policy_version,
+                    policy_valid_until,
+                    Some(env::predecessor_account_id()),
+                ),
                 POLICY_DEPOSIT,
                 GAS_POLICY,
             )
@@ -461,6 +496,8 @@ impl Registry {
         guard_id: String,
         encrypted_policy: String,
         wallet_signature: String,
+        policy_version: Option<u64>,
+        policy_valid_until: Option<u64>,
         owner: String,
         owner_salt: String,
         sig: String,
@@ -472,13 +509,14 @@ impl Registry {
         emit("policy_updated", json!({ "guard_id": guard_id }));
         Promise::new(self.outlayer.clone()).function_call(
             "store_wallet_policy",
-            json!({
-                "wallet_pubkey": g.wallet_pubkey,
-                "encrypted_data": encrypted_policy,
-                "wallet_signature": wallet_signature,
-            })
-            .to_string()
-            .into_bytes(),
+            store_policy_args(
+                &g.wallet_pubkey,
+                &encrypted_policy,
+                &wallet_signature,
+                policy_version,
+                policy_valid_until,
+                None,
+            ),
             env::attached_deposit(),
             GAS_POLICY,
         )

@@ -155,16 +155,18 @@ fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<Strin
     };
     let p = policy::build(s, NET.fee_wallet, reserve)?;
     let encrypted = custody.encrypt_policy(&c.guard_id, &wallet_id, &p)?;
-    let (signature, wallet_pk) = custody.sign_policy(&c.guard_id, &encrypted, NET.registry)?;
+    let signed = custody.sign_policy(&c.guard_id, &encrypted, NET.registry)?;
     let args = json!({
         "guard_id": c.guard_id,
         "commitment": c.commitment,
         "owner_commitment": c.owner_commitment,
         "account_commitment": c.account_commitment,
         "expires_at": c.expires_at,
-        "wallet_pubkey": format!("ed25519:{wallet_pk}"),
+        "wallet_pubkey": format!("ed25519:{}", signed.public_key),
         "encrypted_policy": encrypted,
-        "wallet_signature": signature,
+        "wallet_signature": signed.signature,
+        "policy_version": signed.version,
+        "policy_valid_until": signed.valid_until,
     });
     registry::call(host, "register_guard", &args, REGISTER_GAS, REGISTER_DEPOSIT)
 }

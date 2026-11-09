@@ -33,14 +33,14 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 | Method | Caller | Does |
 |---|---|---|
 | `new(checker, outlayer)` | deployer | init |
-| `register_guard(guard_id, commitment, owner_commitment, account_commitment, expires_at, wallet_pubkey, encrypted_policy, wallet_signature)` payable | `checker` | stores the guard (`Pending`), indexes `by_owner`, forwards `store_wallet_policy(wallet_pubkey, encrypted_policy, wallet_signature)` to `outlayer` with its storage deposit (0.01213 NEAR measured in G9) so the registry becomes the controller; refunds the rest. The wallet signature names `caller` = the registry |
+| `register_guard(guard_id, commitment, owner_commitment, account_commitment, expires_at, wallet_pubkey, encrypted_policy, wallet_signature, policy_version?, policy_valid_until?)` payable | `checker` | stores the guard (`Pending`), indexes `by_owner`, forwards `store_wallet_policy(wallet_pubkey, encrypted_policy, wallet_signature)` to `outlayer` with its storage deposit (0.01213 NEAR measured in G9) so the registry becomes the controller; refunds the rest. The wallet signature names `caller` = the registry. Since Nov 6 2026 (OutLayer testnet; mainnet to follow) it also covers the policy's next version, its lock and a filing deadline (7 days): the checker passes `version` and `valid_until` from the keystore's sign-policy, both or neither, and the registry forwards them with `locked: false`, so it never stores a policy its owner's freeze and close couldn't reach |
 | `set_status(guard_id, status)` | `checker` | `Pending → Guarding`, `→ Expired` |
 | `record_arm(guard_id, epoch, sealed)` | `checker` | appends `ArmRecord {at, epoch, sealed}` (drawn line and target, encrypted to the owner) |
 | `record_rescue(guard_id, public, sealed)` | `checker` | appends a receipt; `public` = `{at_hour, credit_usd, attestation_ref, latency_s, outcome: pending}` |
 | `record_outcome(guard_id, index, outcome, saved_at_hour?)` | `checker` | settles `pending → saved | early | failed` (was `record_save`) |
 | `publish_proof(guard_id, index, proof, owner, owner_salt, sig, nonce)` | anyone, owner-signed | stores `{at, hl_credit_usd, hl_tx}` on that receipt; message `ripcord:publish:<guard_id>:<index>:<sha256(proof)>:<nonce>` |
 | `freeze_guard(guard_id, owner, owner_salt, sig, nonce)` / `unfreeze_guard(…)` | anyone, owner-signed | checks `sha256(owner ‖ owner_salt) == owner_commitment` and the signature, burns the nonce, calls `outlayer.freeze_wallet / unfreeze_wallet(wallet_pubkey)`; message `ripcord:freeze:<guard_id>:<nonce>` (`unfreeze`) |
-| `update_policy(guard_id, encrypted_policy, wallet_signature, owner, owner_salt, sig, nonce)` | anyone, owner-signed | message `ripcord:policy:<guard_id>:<sha256(encrypted_policy)>:<nonce>`; forwards `store_wallet_policy` (a freeze survives an update) |
+| `update_policy(guard_id, encrypted_policy, wallet_signature, policy_version?, policy_valid_until?, owner, owner_salt, sig, nonce)` | anyone, owner-signed | message `ripcord:policy:<guard_id>:<sha256(encrypted_policy)>:<nonce>`; forwards `store_wallet_policy` (a freeze survives an update), with the version and deadline as for `register_guard` |
 | `close(guard_id)` | `checker` | after the checker paid the close; `Closed`; deletes the wallet policy and refunds storage |
 | `add_check_budget(guard_id)` payable | anyone | tops up `check_budget` |
 | `claim_check_fee(guard_id, checks)` | a `poker` | pays `checks × fee` from `check_budget`, capped per call and per day |
@@ -68,7 +68,7 @@ Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes
 | `reserve` | `{guard_id}` | `{status, sealed}`: the guard wallet's confidential balances, sealed to `receipt_pk`, so a stranger's call learns nothing, not even whether it is funded |
 | `check` | `{guard_id}` | `{status: guarding | rescued | pending | skipped}`, nothing else (rule 4) |
 | `close` | `{guard_id, chain, address, nonce, sig}` | `{status: "closed"}`; owner signs `ripcord:close:<guard_id>:<chain>:<address>:<nonce>`; the address must be on the policy (if not, `policy` first) |
-| `policy` | `{guard_id, close: {chain, address}}` | `{encrypted_policy, wallet_signature}` for an owner-signed `update_policy` |
+| `policy` | `{guard_id, close: {chain, address}}` | `{encrypted_policy, wallet_signature, policy_version?, policy_valid_until?}` for an owner-signed `update_policy` |
 
 **Sealed storage.** Each record is encrypted under the `vault` key with its name as associated data and stored under `v/` + hex(mac(name)), so the storage operator sees neither names nor values. `s/<guard_id>`: settings, salt and the registration transaction. `t/<guard_id>`: `{epoch, drawn_line, drawn_target, history: [(t, distance)] for the last 60 s, pending: [{index, liq_before, at, amount, request_id}], budget_used, last_fee_month}`. `i/<key>`: idempotency records.
 

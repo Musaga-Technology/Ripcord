@@ -166,9 +166,13 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                     json!({ "wallet_id": format!("w-{}", req["seed"].as_str().unwrap()), "near_account_id": "ab".repeat(32) }),
                 ),
                 "wallet/v1/encrypt-policy" => ok(json!({ "encrypted_base64": "ZW5jcnlwdGVk" })),
-                "wallet/v1/sign-policy" => {
-                    ok(json!({ "signature_hex": "5a".repeat(64), "public_key_hex": "cd".repeat(32) }))
-                }
+                "wallet/v1/sign-policy" => ok(json!({
+                    "signature_hex": "5a".repeat(64),
+                    "public_key_hex": "cd".repeat(32),
+                    "version": 1,
+                    "locked": false,
+                    "valid_until": 1_794_146_181u64,
+                })),
                 "wallet/v1/confidential/deposit/cross-chain" => {
                     ok(json!({ "intent_id": "i-1", "deposit_address": "0xDEP0517", "amount": req["amount"] }))
                 }

@@ -17,6 +17,9 @@ const GID: &str = "g-vf6per4bfx";
 const HL_ADDRESS: &str = "0x15a6116aeacaa68fd69a17e8abb9e77e24159fe3";
 const SALT: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
 const NOW: u64 = 1_793_541_381_000_000_000;
+/// What the keystore's sign-policy returns with the signature: the next policy version and the filing deadline.
+const POLICY_VERSION: u64 = 1;
+const VALID_UNTIL: u64 = NOW / 1_000_000_000 + 7 * 86_400;
 
 fn acc(s: &str) -> AccountId {
     s.parse().unwrap()
@@ -97,6 +100,8 @@ fn register(r: &mut Registry, owner: &str) {
         "ed25519:8d37p1f2q3".into(),
         "encrypted-policy".into(),
         "wallet-signature".into(),
+        Some(POLICY_VERSION),
+        Some(VALID_UNTIL),
     );
 }
 
@@ -136,6 +141,77 @@ fn registers_a_pending_guard_of_hashes() {
     assert!(get_logs().iter().any(|l| l.contains("\"event\":\"guard_registered\"")));
 }
 
+/// The arguments the registry sent to OutLayer's `store_wallet_policy`.
+fn stored_policy_args() -> serde_json::Value {
+    let args = near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .flat_map(|r| r.actions)
+        .find_map(|a| match a {
+            near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. }
+                if method_name == b"store_wallet_policy" =>
+            {
+                Some(args)
+            }
+            _ => None,
+        })
+        .expect("a store_wallet_policy call to OutLayer");
+    serde_json::from_slice(&args).unwrap()
+}
+
+#[test]
+fn stores_the_policy_unlocked_with_the_keystores_version_and_deadline() {
+    let owner = EvmOwner::new(7).address();
+    let mut r = registry();
+    register(&mut r, &owner);
+    let v = stored_policy_args();
+    assert_eq!(v["version"], POLICY_VERSION);
+    assert_eq!(v["valid_until"], VALID_UNTIL);
+    assert_eq!(v["locked"], false, "the registry stores only unlocked policies");
+    assert_eq!(v["wallet_signature"], "wallet-signature");
+    assert_eq!(v["storage_refund_to"], CHECKER);
+}
+
+#[test]
+fn an_outlayer_before_policy_versions_gets_neither_field() {
+    let mut r = registry();
+    ctx(CHECKER, NearToken::from_millinear(30));
+    let _ = r.register_guard(
+        GID.into(),
+        "aa".repeat(32),
+        "bb".repeat(32),
+        "cc".repeat(32),
+        U64(NOW + 1),
+        "ed25519:k".into(),
+        "p".into(),
+        "s".into(),
+        None,
+        None,
+    );
+    let v = stored_policy_args();
+    for field in ["version", "locked", "valid_until"] {
+        assert!(v.get(field).is_none(), "{field} sent to an OutLayer that predates it");
+    }
+}
+
+#[test]
+#[should_panic(expected = "policy_version and policy_valid_until come together")]
+fn a_version_without_its_deadline_is_refused() {
+    let mut r = registry();
+    ctx(CHECKER, NearToken::from_millinear(30));
+    let _ = r.register_guard(
+        GID.into(),
+        "aa".repeat(32),
+        "bb".repeat(32),
+        "cc".repeat(32),
+        U64(NOW + 1),
+        "ed25519:k".into(),
+        "p".into(),
+        "s".into(),
+        Some(POLICY_VERSION),
+        None,
+    );
+}
+
 #[test]
 #[should_panic(expected = "only the checker")]
 fn only_the_checker_registers() {
@@ -150,6 +226,8 @@ fn only_the_checker_registers() {
         "ed25519:k".into(),
         "p".into(),
         "s".into(),
+        Some(POLICY_VERSION),
+        Some(VALID_UNTIL),
     );
 }
 
@@ -167,6 +245,8 @@ fn rejects_an_address_where_a_hash_belongs() {
         "ed25519:k".into(),
         "p".into(),
         "s".into(),
+        Some(POLICY_VERSION),
+        Some(VALID_UNTIL),
     );
 }
 
@@ -184,6 +264,8 @@ fn needs_the_policy_deposit() {
         "ed25519:k".into(),
         "p".into(),
         "s".into(),
+        Some(POLICY_VERSION),
+        Some(VALID_UNTIL),
     );
 }
 

@@ -289,9 +289,16 @@ fn the_registry_transaction_carries_hashes_only() {
             "expires_at",
             "guard_id",
             "owner_commitment",
+            "policy_valid_until",
+            "policy_version",
             "wallet_pubkey",
             "wallet_signature"
         ]
+    );
+    assert_eq!(
+        (&args["policy_version"], &args["policy_valid_until"]),
+        (&json!(1), &json!(1_794_146_181u64)),
+        "the keystore's version and deadline, passed through"
     );
     assert_eq!(args["commitment"], commitment(&settings(), SALT).unwrap());
     // The keys above already rule out amounts; these are the values that could slip into a hash's place.

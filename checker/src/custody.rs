@@ -7,6 +7,16 @@ use crate::near_tx::bs58_encode;
 use base64::Engine;
 use serde_json::{json, Value};
 
+/// What the keystore's sign-policy returns: the wallet's signature over OutLayer's `policy_store_message`, and,
+/// since Nov 6 2026 (testnet first), the policy version and filing deadline (unix seconds) it covers. The registry
+/// passes them to `store_wallet_policy` unchanged; an OutLayer that predates them returns neither.
+pub struct PolicySignature {
+    pub signature: String,
+    pub public_key: String,
+    pub version: Option<u64>,
+    pub valid_until: Option<u64>,
+}
+
 pub struct Custody<'a> {
     host: &'a dyn Host,
     api: &'a str,
@@ -108,16 +118,27 @@ impl<'a> Custody<'a> {
     }
 
     /// The wallet signs the encrypted policy for `caller` (the registry), so only the registry can store it.
-    /// Returns (signature hex, wallet public key hex).
-    pub fn sign_policy(&self, seed: &str, encrypted: &str, caller: &str) -> Result<(String, String), String> {
+    pub fn sign_policy(&self, seed: &str, encrypted: &str, caller: &str) -> Result<PolicySignature, String> {
         let t = self.token(seed)?;
         let body = json!({ "encrypted_data": encrypted, "caller": caller });
         let v = self.ok(
             "sign-policy",
             self.request("POST", "/wallet/v1/sign-policy", Some(&t), Some(&body), None)?,
         )?;
+        if v["locked"].as_bool() == Some(true) {
+            return Err("sign-policy: the keystore signed a locked policy; a guard's policy is never locked".into());
+        }
+        let (version, valid_until) = (v["version"].as_u64(), v["valid_until"].as_u64());
+        if version.is_some() != valid_until.is_some() {
+            return Err("sign-policy: a version without its deadline".into());
+        }
         match (v["signature_hex"].as_str(), v["public_key_hex"].as_str()) {
-            (Some(s), Some(p)) => Ok((s.into(), p.into())),
+            (Some(s), Some(p)) => Ok(PolicySignature {
+                signature: s.into(),
+                public_key: p.into(),
+                version,
+                valid_until,
+            }),
             _ => Err("sign-policy: incomplete answer".into()),
         }
     }
