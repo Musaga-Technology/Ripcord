@@ -59,8 +59,14 @@ pub fn owner_salt(signature_hex: &str) -> Result<String, HashError> {
 }
 
 pub fn owner_commitment(owner: &str, salt: &str) -> Result<String, HashError> {
+    owner_commitment_with(owner, salt, |b| Sha256::digest(b).into())
+}
+
+/// `owner_commitment` with the caller's sha256: the registry passes NEAR's host function, so the contract carries
+/// no sha256 code of its own.
+pub fn owner_commitment_with(owner: &str, salt: &str, sha256: impl Fn(&[u8]) -> [u8; 32]) -> Result<String, HashError> {
     need_salt(salt)?;
-    Ok(sha256_hex(&(normalize_owner(owner)? + salt)))
+    Ok(hex::encode(sha256((normalize_owner(owner)? + salt).as_bytes())))
 }
 
 pub fn account_commitment(hl_address: &str, salt: &str) -> Result<String, HashError> {

@@ -644,7 +644,8 @@ impl Registry {
             .cloned()
             .unwrap_or_else(|| env::panic_str("no such guard"));
         require!(is_nonce(nonce), "nonce: 1-64 characters of [A-Za-z0-9_-]");
-        let ok = commitment::owner_commitment(owner, owner_salt).is_ok_and(|c| c == g.owner_commitment);
+        let ok = commitment::owner_commitment_with(owner, owner_salt, |b| env::sha256_array(b))
+            .is_ok_and(|c| c == g.owner_commitment);
         require!(ok, "owner does not match the guard");
         require!(
             sig::verify(owner, message, nonce, sig, env::current_account_id().as_str()),
