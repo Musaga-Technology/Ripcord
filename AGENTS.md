@@ -11,6 +11,8 @@ Notes for coding agents and reviewers working with this repository.
 pnpm install && pnpm -r test && pnpm -r build
 cargo test --workspace            # shared rules, checker, guard-registry contract
 cargo build -p guard-registry --release --target wasm32-unknown-unknown
+bash contracts/guard-registry/build.sh   # the deployed contract: paths remapped, wasm-opt -Oz, prints its NEAR code hash
+bash checker/build.sh                    # the enclave binary OutLayer runs, with its sha256
 ```
 
 **Where the evidence is.** The README's "Built on NEAR" table links each NEAR piece to its code (`file:line`) and to a test or mainnet transaction. `docs/EVIDENCE.md` maps every claim in the README to a test, file or transaction. Design and trust model: `docs/ARCHITECTURE.md`; exact interfaces: `docs/SPEC.md`; product design: `docs/DESIGN.md`.

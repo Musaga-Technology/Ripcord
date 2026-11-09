@@ -26,7 +26,8 @@ const RPC = 'https://rpc.testnet.near.org';
 const OUTLAYER = 'outlayer.testnet';
 const OUTLAYER_API = 'https://testnet-api.outlayer.ai';
 const ALLOWED = 'ripcord-test-allowed.testnet';
-const WASM = 'target/wasm32-unknown-unknown/release/guard_registry.wasm';
+/** What `bash contracts/guard-registry/build.sh` writes: the contract exactly as it is deployed. */
+const WASM = 'target/near/guard_registry.wasm';
 const CREDS = join(homedir(), '.near-credentials', 'testnet');
 const STATE = join(homedir(), '.ripcord', 'testnet.json');
 const TGAS = 10n ** 12n;
