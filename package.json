@@ -17,7 +17,8 @@
     "vectors": "python3 scripts/vectors.py",
     "demo": "bash scripts/demo.sh",
     "testnet:registry": "tsx scripts/testnet/registry.ts",
-    "testnet:checker": "tsx scripts/testnet/checker.ts"
+    "testnet:checker": "tsx scripts/testnet/checker.ts",
+    "mainnet:deploy": "tsx scripts/mainnet/deploy.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
