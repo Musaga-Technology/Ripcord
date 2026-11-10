@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Account, actions, JsonRpcProvider, KeyPair, type KeyPairString } from 'near-api-js';
+import { check, failed, hex, NEAR, random, send, serves, TGAS, upload } from '../near/lib';
 import {
   accountCommitment,
   commitment,
@@ -38,8 +39,6 @@ const MAINNET_CREDS = join(homedir(), '.near-credentials', 'mainnet');
 const DIR = join(homedir(), '.ripcord');
 const STATE = join(DIR, 'testnet.json');
 const PAYKEY = join(DIR, 'paykey-testnet');
-const TGAS = 10n ** 12n;
-const NEAR = 10n ** 24n;
 
 interface State {
   registry?: string;
@@ -52,8 +51,6 @@ interface State {
   enc_pk?: string;
 }
 
-const hex = (b: Uint8Array) => Buffer.from(b).toString('hex');
-const random = (n: number) => new Uint8Array(randomBytes(n));
 const readState = (): State => (existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : {});
 function saveState(patch: State): void {
   mkdirSync(DIR, { recursive: true, mode: 0o700 });
@@ -73,42 +70,6 @@ const ops = () => account(readState().ops, 'ops (run `account`)');
 
 /** OutLayer API answers and the checker's output: flat JSON objects. */
 type Body = Record<string, string | undefined>;
-
-interface Outcome {
-  id: string;
-  outcome: { status?: { Failure?: unknown; SuccessValue?: string } };
-}
-interface TxResult {
-  transaction_outcome: Outcome;
-  receipts_outcome: Outcome[];
-}
-
-async function send(
-  acc: Account,
-  contractId: string,
-  method: string,
-  args: object | Uint8Array,
-  deposit = 0n,
-  gas = 100n * TGAS,
-) {
-  try {
-    const r = (await acc.signAndSendTransaction({
-      receiverId: contractId,
-      actions: [actions.functionCall(method, args as never, gas, deposit)],
-      throwOnFailure: false,
-    })) as unknown as TxResult;
-    const failure = [r.transaction_outcome, ...r.receipts_outcome].map((o) => o.outcome.status?.Failure).find(Boolean);
-    return { ok: !failure, tx: r.transaction_outcome.id, error: failure ? JSON.stringify(failure).slice(0, 300) : '' };
-  } catch (e) {
-    return { ok: false, tx: '', error: String((e as Error).message ?? e).slice(0, 300) };
-  }
-}
-
-let failures = 0;
-function check(label: string, pass: boolean, detail = ''): void {
-  if (!pass) failures++;
-  console.log(`${pass ? '✓' : '✗'} ${label}${detail ? ` — ${detail}` : ''}`);
-}
 
 async function api(path: string, body: unknown, headers: Record<string, string> = {}): Promise<[number, Body]> {
   const res = await fetch(OUTLAYER_API + path, {
@@ -155,60 +116,6 @@ async function createAccount(): Promise<void> {
   if (res.ok) saveState({ ops: id });
 }
 
-const borshStr = (s: string) => Buffer.concat([u32(Buffer.byteLength(s)), Buffer.from(s)]);
-function u32(n: number): Buffer {
-  const b = Buffer.alloc(4);
-  b.writeUInt32LE(n);
-  return b;
-}
-
-/**
- * FastFS payloads, as OutLayer's CLI writes them: up to 1 MB, one `Simple` (borsh variant 0: relative_path,
- * Some({mime_type, content})); larger, 1 MB `Partial` chunks (variant 1: relative_path, offset, full_size, mime_type,
- * content_chunk, nonce). Each is recorded by a call that reverts by design.
- */
-function fastfsPayloads(path: string, mime: string, content: Uint8Array): Uint8Array[] {
-  const CHUNK = 1 << 20;
-  if (content.length <= CHUNK) {
-    const body = [Buffer.from([0]), borshStr(path), Buffer.from([1]), borshStr(mime), u32(content.length), content];
-    return [new Uint8Array(Buffer.concat(body))];
-  }
-  const nonce = Math.floor(Date.now() / 1000) - 1_769_376_240;
-  const out: Uint8Array[] = [];
-  for (let off = 0; off < content.length; off += CHUNK) {
-    const chunk = content.subarray(off, off + CHUNK);
-    const body = [
-      Buffer.from([1]),
-      borshStr(path),
-      u32(off),
-      u32(content.length),
-      borshStr(mime),
-      u32(chunk.length),
-      chunk,
-      u32(nonce),
-    ];
-    out.push(new Uint8Array(Buffer.concat(body)));
-  }
-  return out;
-}
-
-/** Uploads `wasm` to FastFS through `receiver`; true when every chunk reached the chain. */
-async function upload(acc: Account, receiver: string, hash: string, wasm: Uint8Array, where: string): Promise<boolean> {
-  const parts = fastfsPayloads(`${hash}.wasm`, 'application/wasm', wasm);
-  let ok = true;
-  for (const [i, p] of parts.entries()) {
-    const up = await send(acc, receiver, '__fastdata_fastfs', p, 0n, 1n);
-    const label = parts.length > 1 ? ` (chunk ${i + 1}/${parts.length})` : '';
-    check(
-      `uploaded ${wasm.length.toLocaleString()} bytes to ${where}${label} (the call reverts by design)`,
-      !!up.tx,
-      up.tx || up.error,
-    );
-    ok &&= !!up.tx;
-  }
-  return ok;
-}
-
 async function deploy(): Promise<void> {
   const acc = ops();
   const wasm = new Uint8Array(readFileSync(WASM));
@@ -220,21 +127,6 @@ async function deploy(): Promise<void> {
   else console.log(`… FastFS is not serving it yet (${url}); the project is created anyway`);
   saveState({ wasm_url: url, wasm_hash: hash });
   await setVersion(url, hash);
-}
-
-async function serves(url: string, hash: string): Promise<boolean> {
-  for (let i = 0; i < 20; i++) {
-    const r = await fetch(url).catch(() => null);
-    if (
-      r?.ok &&
-      createHash('sha256')
-        .update(new Uint8Array(await r.arrayBuffer()))
-        .digest('hex') === hash
-    )
-      return true;
-    await new Promise((ok) => setTimeout(ok, 3000));
-  }
-  return false;
 }
 
 /** Creates the project, or adds and activates a version: the wasm at `url`, pinned to its sha256. */
@@ -567,4 +459,4 @@ if (!run) {
   process.exit(2);
 }
 await run();
-if (failures) process.exit(1);
+if (failed()) process.exit(1);
