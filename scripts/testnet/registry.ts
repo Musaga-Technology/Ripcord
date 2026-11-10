@@ -61,6 +61,13 @@ interface TxResult {
 }
 /** OutLayer API answers: flat JSON objects of strings. */
 type Body = Record<string, string | undefined>;
+interface SignedPolicy {
+  signature_hex?: string;
+  public_key_hex?: string;
+  version?: number;
+  valid_until?: number;
+  locked?: boolean;
+}
 
 function registryAccount(): Account {
   const id = readState().registry;
@@ -182,10 +189,12 @@ async function e2eSteps(acc: Account): Promise<void> {
     },
   };
   const [c1, enc] = await outlayer('POST', '/wallet/v1/encrypt-policy', { wallet_id: wallet!.wallet_id, ...policy });
-  const [c2, sig] = await outlayer('POST', '/wallet/v1/sign-policy', {
+  const [c2, answer] = await outlayer('POST', '/wallet/v1/sign-policy', {
     encrypted_data: enc.encrypted_base64,
     caller: registry,
   });
+  // Since OutLayer's Nov 6 contract the answer also carries the policy's version, deadline and lock flag.
+  const sig = answer as unknown as SignedPolicy;
   check(
     'policy encrypted and signed by the wallet for the registry, unlocked',
     c1 === 200 && c2 === 200 && sig.locked === false && Number.isInteger(sig.version),
