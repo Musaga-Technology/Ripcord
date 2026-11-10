@@ -13,6 +13,7 @@ cargo test --workspace            # shared rules, checker, guard-registry contra
 cargo build -p guard-registry --release --target wasm32-unknown-unknown
 bash contracts/guard-registry/build.sh   # the deployed contract: paths remapped, wasm-opt -Oz, prints its NEAR code hash
 bash checker/build.sh                    # the enclave binary OutLayer runs, with its sha256
+RIPCORD_FEE_WALLET=<64-hex> bash checker/build.sh mainnet   # the mainnet enclave (mainnet OutLayer, RPC, registry)
 ```
 
 **Where the evidence is.** The README's "Built on NEAR" table links each NEAR piece to its code (`file:line`) and to a test or mainnet transaction. `docs/EVIDENCE.md` maps every claim in the README to a test, file or transaction. Design and trust model: `docs/ARCHITECTURE.md`; exact interfaces: `docs/SPEC.md`; product design: `docs/DESIGN.md`.
