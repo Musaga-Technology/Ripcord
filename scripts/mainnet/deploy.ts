@@ -3,7 +3,7 @@
 //
 // Keys stay out of the repo: ~/.near-credentials/mainnet (NEAR CLI format), and OUTLAYER_PAYMENT_KEY in .env.
 //
-// usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | status
+// usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | storage [NEAR] | status
 // Build first: bash contracts/guard-registry/build.sh && bash checker/build.sh mainnet
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -318,6 +318,19 @@ async function topup(): Promise<void> {
   check("the enclave's account can pay for a registration", after >= 100n * MILLINEAR, `${near(after)} NEAR`);
 }
 
+/** Sends NEAR from the deploy account to the registry, for the storage a larger contract locks when it is upgraded. */
+async function storage(): Promise<void> {
+  const amount = BigInt(Math.round(Number(process.argv[3] ?? '0.05') * 1e4)) * 10n ** 20n;
+  const dep = deployer();
+  const has = spendable(await viewAccount(dep.accountId));
+  if (has < amount + 5n * MILLINEAR)
+    return check('the deploy account holds enough', false, `${near(has)} of ${near(amount)} NEAR`);
+  const t = await sendActions(dep, REGISTRY, [actions.transfer(amount)]);
+  check(`sent ${near(amount)} NEAR to ${REGISTRY}`, t.ok, t.tx || t.error);
+  const reg = await viewAccount(REGISTRY);
+  console.log(`  ${REGISTRY}: ${reg ? near(spendable(reg)) : '?'} NEAR spendable`);
+}
+
 /** What is live, read from the chain and compared with the local builds; signs nothing. */
 async function status(): Promise<void> {
   const s = readState();
@@ -346,9 +359,11 @@ async function status(): Promise<void> {
 }
 
 const stage = process.argv[2] ?? 'plan';
-const run = { plan, registry, checker: checkerStage, pubkey, wire, topup, status }[stage as 'plan'];
+const run = { plan, registry, checker: checkerStage, pubkey, wire, topup, storage, status }[stage as 'plan'];
 if (!run) {
-  console.log('usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | status');
+  console.log(
+    'usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | storage [NEAR] | status',
+  );
   process.exit(2);
 }
 await run();
