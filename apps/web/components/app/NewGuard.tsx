@@ -380,7 +380,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                     {reserveX < 2 && atTwo ? ` At 2×, ${atTwo.liquidated}%.` : ''}
                   </>
                 ) : (
-                  'Under half your margin, the replays have no figure. A rescue may not be enough.'
+                  "Below half your margin, the replays can't say how often it holds."
                 )}
               </p>
             </section>
@@ -422,7 +422,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                       <span className="text-[13px] text-muted">{p.line}</span>
                       <span className="mt-1.5 text-[15px] tabular-nums">
                         {r && watched.liquidation !== null
-                          ? `Near ${price(stepsInAt(watched, r.line_range_pct))} · ${pctRange(r.line_range_pct)} away`
+                          ? `Steps in near ${price(stepsInAt(watched, r.line_range_pct))}`
                           : 'Too close'}
                       </span>
                       {f && (

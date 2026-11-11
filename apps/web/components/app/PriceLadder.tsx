@@ -51,8 +51,8 @@ export function PriceLadder({
           at={x(after)}
           label={
             <>
-              <span className="sm:hidden">After ≈ </span>
-              <span className="hidden sm:inline">After a rescue ≈ </span>
+              <span className="sm:hidden">New liq ≈ </span>
+              <span className="hidden sm:inline">Liq after a rescue ≈ </span>
               {price(after)}
             </>
           }
