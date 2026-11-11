@@ -8,6 +8,7 @@ import {
   accountCommitment,
   base58,
   commitment,
+  fromBase58,
   createInput,
   isGuardId,
   isSealFile,
@@ -145,5 +146,10 @@ describe('base58', () => {
   it('encodes as NEAR expects, keeping leading zeros', () => {
     expect(base58(new Uint8Array([0, 0, 1]))).toBe('112');
     expect(base58(hexToBytes('61'))).toBe('2g');
+  });
+
+  it('decodes what it encodes, leading zeros included, and refuses other characters', () => {
+    for (const b of [new Uint8Array([0, 0, 1]), hexToBytes('61'), random(32)]) expect(fromBase58(base58(b))).toEqual(b);
+    expect(() => fromBase58('0OIl')).toThrow('not base58');
   });
 });

@@ -30,6 +30,9 @@ export interface GuardDraft {
   /** The coin, for an isolated position. */
   isolated: string | null;
   days: number;
+  /** A NEAR wallet as the owner instead of a key the app makes: its public key, the salt its signature gives, and
+   * the account, shown on the guard. Its owner actions then name that account on chain (docs/SPEC.md §1). */
+  owner?: { key: string; salt: string; account: string };
 }
 
 export interface PreparedGuard {
@@ -47,9 +50,9 @@ export function prepareGuard(d: GuardDraft, random: (n: number) => Uint8Array, n
   const ranges = presetRanges(d.preset, d.distance);
   if (!ranges) throw new Error('this position is too close to liquidation for this preset');
   if (d.budget_usd < MIN_RESERVE_USD) throw new Error(`the reserve must be at least $${MIN_RESERVE_USD}`);
-  const ownerSecret = random(32);
+  const ownerSecret = d.owner ? null : random(32);
   const receiptSecret = random(32);
-  const owner = `ed25519:${base58(ed25519.getPublicKey(ownerSecret))}`;
+  const owner = d.owner?.key ?? `ed25519:${base58(ed25519.getPublicKey(ownerSecret!))}`;
   const budget = Math.floor(d.budget_usd * 100) / 100;
   const settings: GuardSettings = {
     owner,
@@ -69,7 +72,8 @@ export function prepareGuard(d: GuardDraft, random: (n: number) => Uint8Array, n
     expires_at: (BigInt(nowMs + d.days * DAY_MS) * 1_000_000n).toString(),
   };
   const salt = randomSalt(random);
-  const owner_salt = ownerSalt(bytesToHex(ed25519.sign(utf8ToBytes('ripcord:owner-salt:v1'), ownerSecret)));
+  const owner_salt =
+    d.owner?.salt ?? ownerSalt(bytesToHex(ed25519.sign(utf8ToBytes('ripcord:owner-salt:v1'), ownerSecret!)));
   const c = commitment(settings, salt);
   return {
     contents: {
@@ -77,7 +81,8 @@ export function prepareGuard(d: GuardDraft, random: (n: number) => Uint8Array, n
       settings,
       salt,
       owner_salt,
-      owner_secret: bytesToHex(ownerSecret),
+      owner_secret: ownerSecret ? bytesToHex(ownerSecret) : '',
+      ...(d.owner ? { owner_account: d.owner.account } : {}),
       receipt_secret: bytesToHex(receiptSecret),
       agent_name: d.isolated ? bytesToHex(random(4)) : null,
     },

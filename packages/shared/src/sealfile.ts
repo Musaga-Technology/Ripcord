@@ -11,8 +11,10 @@ export interface SealContents {
   settings: GuardSettings;
   salt: string;
   owner_salt: string;
-  /** 32 bytes of hex: the ed25519 owner key and the X25519 receipt key. */
+  /** 32 bytes of hex: the ed25519 owner key and the X25519 receipt key. The owner key is empty when a NEAR wallet
+   * owns the guard (`owner_account`); that wallet signs instead. */
   owner_secret: string;
+  owner_account?: string;
   receipt_secret: string;
   /** An isolated guard's agent name on Hyperliquid; random, so it can't announce the guard. */
   agent_name: string | null;
