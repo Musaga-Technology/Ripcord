@@ -24,7 +24,6 @@ import type { Holding } from '../../lib/hl';
 import { markedPreset, replayFigure } from '../../lib/replay';
 import { reserveToSurvive, type Intent } from '../../lib/copilot';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
-import { accountUrl, REGISTRY } from '../../lib/near';
 import { radioKeys } from '../../lib/radio';
 import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } from '../../lib/store';
 import { pct, price, usd } from '../format';
@@ -206,15 +205,17 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
       ? 'Reading prices…'
       : reserveUsd < MIN_RESERVE_USD
         ? `A reserve needs at least $${MIN_RESERVE_USD}.`
-        : pass.length < 8
-          ? 'Your passphrase needs 8 or more characters.'
-          : pass !== pass2
-            ? "The two passphrases don't match yet."
-            : pasted && !mine
-              ? 'Confirm the account is yours.'
-              : ownBy === 'near' && !nearOwner
-                ? 'Connect your NEAR wallet first.'
-                : '';
+        : pass.length === 0
+          ? 'Choose a passphrase above to seal.'
+          : pass.length < 8
+            ? 'Your passphrase needs 8 or more characters.'
+            : pass !== pass2
+              ? "The two passphrases don't match yet."
+              : pasted && !mine
+                ? 'Confirm the account is yours.'
+                : ownBy === 'near' && !nearOwner
+                  ? 'Connect your NEAR wallet first.'
+                  : '';
   const canSeal = phase === 'edit' && blocker === '';
 
   /** The seal (DESIGN §8.1): the rosette prints, each sealed value collapses, the fingerprint types in. */
@@ -323,7 +324,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   return (
     <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:gap-16">
       <div className="order-2 flex min-w-0 flex-col gap-9 lg:order-1">
-        {phase !== 'edit' && phase !== 'sealing' && <Progress phase={phase} isolated={holding.margin === 'isolated'} />}
+        <Progress phase={phase} isolated={holding.margin === 'isolated'} />
         {phase === 'edit' || phase === 'sealing' ? (
           <>
             <div className="flex flex-col gap-2">
@@ -474,64 +475,87 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
               )}
             </section>
 
-            <section aria-label="Seal" className="flex flex-col gap-3 border-t border-line pt-7">
-              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Your seal file</h2>
-              <p className="text-[15px] text-text-2">
-                It holds your settings and the key to your reserve. Choose a passphrase to lock it. Nobody can reset it.
-              </p>
+            <section aria-label="Seal" className="flex flex-col gap-5 border-t border-line pt-7">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Seal it</h2>
+                <p className="max-w-[36rem] text-[15px] text-text-2">
+                  Sealing encrypts these settings on this device and hands them to a sealed enclave on NEAR. After that
+                  nobody can read them, Ripcord included. Nothing goes on chain and nothing is paid until you fund the
+                  reserve.
+                </p>
+              </div>
               <form
-                className="flex flex-col gap-3"
+                className="flex flex-col gap-5"
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (canSeal) void seal();
                 }}
               >
+                <div className="flex flex-col gap-2">
+                  <div className="grid max-w-[520px] gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1.5 text-[13px] text-muted">
+                      Passphrase for your seal file
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        aria-describedby="seal-file-note seal-blocker"
+                        className={fieldCls}
+                        value={pass}
+                        disabled={phase !== 'edit'}
+                        onChange={(e) => setPass(e.target.value)}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-[13px] text-muted">
+                      Repeat it
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        aria-describedby="seal-blocker"
+                        className={fieldCls}
+                        value={pass2}
+                        disabled={phase !== 'edit'}
+                        onChange={(e) => setPass2(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <p id="seal-file-note" className="max-w-[36rem] text-[13px] text-muted">
+                    The seal file is your copy of this guard and its key. You save it in the next step; this passphrase
+                    locks it, and nobody can reset it.
+                  </p>
+                </div>
+
                 {!isDemo && (
-                  <fieldset className="flex max-w-[640px] flex-col gap-2" disabled={phase !== 'edit'}>
-                    <legend className="pb-2 text-[13px] text-muted">Who signs for this guard</legend>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {(
-                        [
-                          ['key', 'Your seal file', 'Most private: nothing on chain points to you.'],
-                          [
-                            'near',
-                            'Your NEAR wallet',
-                            'Freeze it from any device with just your wallet. Your NEAR account is named on chain when you freeze, top up or change the range.',
-                          ],
-                        ] as const
-                      ).map(([id, name, note]) => (
-                        <label
-                          key={id}
-                          className={`flex cursor-pointer items-start gap-3 rounded-[16px] border px-4 py-3 text-[14px] transition-colors duration-[120ms] ${ownBy === id ? 'border-text' : 'border-line hover:border-line-3'}`}
-                        >
-                          <input
-                            type="radio"
-                            name="owner"
-                            className="mt-1 accent-[var(--text)]"
-                            checked={ownBy === id}
-                            onChange={() => {
-                              setOwnBy(id);
-                              setPrepared(null);
-                            }}
-                          />
-                          <span className="flex flex-col gap-0.5">
-                            <span className="font-semibold">{name}</span>
-                            <span className="text-text-2">{note}</span>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                  <div className="flex max-w-[640px] flex-col gap-3">
+                    <label className="flex items-start gap-3 text-[15px] text-text-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 accent-[var(--text)]"
+                        checked={ownBy === 'near'}
+                        disabled={phase !== 'edit'}
+                        onChange={(e) => {
+                          setOwnBy(e.target.checked ? 'near' : 'key');
+                          setPrepared(null);
+                        }}
+                      />
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-text">Sign with my NEAR wallet instead (optional)</span>
+                        <span className="text-[13px] text-muted">
+                          Then you can freeze this guard from any device with just your wallet. Your NEAR account is
+                          named on chain when you freeze, top up or change the range; your Hyperliquid account never is.
+                        </span>
+                      </span>
+                    </label>
                     {ownBy === 'near' && (
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
-                        {nearOwner ? (
+                      <div className="flex flex-wrap items-center gap-3 pl-7">
+                        {nearOwner && (
                           <p className="text-[15px] text-text-2">
                             Signs as <span className="font-mono text-[13px] text-text">{nearOwner.account}</span>
                           </p>
-                        ) : null}
+                        )}
                         <button
                           type="button"
                           className={`${ghostBtn} min-h-11 px-4 text-[14px]`}
-                          disabled={connecting}
+                          disabled={connecting || phase !== 'edit'}
                           onClick={() => void connectNear()}
                         >
                           {connecting
@@ -547,70 +571,52 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                         )}
                       </div>
                     )}
-                  </fieldset>
+                  </div>
                 )}
-                <div className="grid max-w-[520px] gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1.5 text-[13px] text-muted">
-                    Passphrase
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      aria-describedby="seal-blocker"
-                      className={fieldCls}
-                      value={pass}
-                      disabled={phase !== 'edit'}
-                      onChange={(e) => setPass(e.target.value)}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5 text-[13px] text-muted">
-                    Repeat it
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      aria-describedby="seal-blocker"
-                      className={fieldCls}
-                      value={pass2}
-                      disabled={phase !== 'edit'}
-                      onChange={(e) => setPass2(e.target.value)}
-                    />
-                  </label>
-                </div>
-                {pasted && session && (
-                  <label className="flex items-start gap-3 text-[15px] text-text-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 accent-[var(--text)]"
-                      checked={mine}
-                      disabled={phase !== 'edit'}
-                      onChange={(e) => setMine(e.target.checked)}
-                    />
-                    <span>
-                      This is my Hyperliquid account. The guard only ever pays{' '}
-                      <span className="font-mono text-[13px] text-text">
-                        {session.address.slice(0, 6)}…{session.address.slice(-4)}
+
+                <div className="flex max-w-[640px] flex-col gap-3 rounded-[20px] border border-line bg-panel p-5">
+                  <h3 className="text-[15px] font-semibold">Before you seal</h3>
+                  {pasted && session && (
+                    <label className="flex items-start gap-3 text-[15px] text-text-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 accent-[var(--text)]"
+                        checked={mine}
+                        disabled={phase !== 'edit'}
+                        onChange={(e) => setMine(e.target.checked)}
+                      />
+                      <span>
+                        This is my Hyperliquid account. The guard only ever pays{' '}
+                        <span className="font-mono text-[13px] text-text">
+                          {session.address.slice(0, 6)}…{session.address.slice(-4)}
+                        </span>
+                        .
                       </span>
-                      .
-                    </span>
-                  </label>
-                )}
-                <div className="flex flex-col gap-1 pt-2 text-[13px] text-muted">
-                  <p>A rescue takes under a minute. A move faster than that can still liquidate you.</p>
-                  <p>
-                    No Ripcord fee unless a rescue saves you, then 3% of it · $1 a month · about $0.32 network cost per
-                    rescue
-                  </p>
+                    </label>
+                  )}
+                  <ul className="flex flex-col gap-1.5 text-[14px] text-text-2">
+                    <li>A rescue lands in under a minute. A move faster than that can still liquidate you.</li>
+                    <li>
+                      No Ripcord fee unless a rescue saves you, then 3% of it. $1 a month. About $0.32 network cost per
+                      rescue.
+                    </li>
+                  </ul>
                 </div>
+
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
                     type="submit"
-                    className={`${primaryBtn} mt-1 w-full sm:w-fit`}
+                    className={`${primaryBtn} w-full sm:w-fit`}
                     disabled={!canSeal}
                     aria-describedby="seal-blocker"
                   >
                     {phase === 'sealing' ? 'Sealing…' : 'Seal guard'}
                   </button>
                   <p id="seal-blocker" className="text-[13px] text-muted">
-                    {phase === 'edit' ? blocker : ''}
+                    {phase === 'edit'
+                      ? blocker ||
+                        `Next: save your seal file${holding.margin === 'isolated' ? ', approve on Hyperliquid' : ''}, then fund the reserve.`
+                      : ''}
                   </p>
                 </div>
               </form>
@@ -621,19 +627,17 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           </>
         ) : phase === 'save' && local ? (
           <div className="step-in flex flex-col items-start gap-4">
-            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Sealed.</h2>
+            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">
+              Sealed. Now save your seal file.
+            </h2>
             <p className="max-w-[34rem] text-[15px] text-text-2">
-              Your settings went to OutLayer&apos;s enclave on NEAR, encrypted on this device. The guard registry on
-              NEAR holds only a fingerprint. Keep your seal file somewhere safe: it proves what you sealed, and
-              it&apos;s how you close the guard from another device.
+              Your settings are in the enclave, where nobody can read them. The seal file is your own copy, locked with
+              your passphrase: you need it to see your settings, check what the guard did, and{' '}
+              {prepared?.contents.owner_account
+                ? `top up or change the range from another device (your NEAR wallet, ${prepared.contents.owner_account}, signs).`
+                : 'top up, change the range or close the guard from another device.'}{' '}
+              Keep it somewhere safe.
             </p>
-            <a
-              href={accountUrl(REGISTRY)}
-              className="inline-flex min-h-9 items-center gap-1.5 text-[14px] font-medium underline decoration-line-3 underline-offset-4 hover:decoration-text"
-            >
-              The guard registry on NEAR
-              <span aria-hidden="true">↗</span>
-            </a>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -643,7 +647,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                 {saved ? 'Save it again' : 'Save seal file'}
               </button>
               <button type="button" className={saved ? primaryBtn : ghostBtn} disabled={!saved} onClick={afterSave}>
-                {holding.margin === 'isolated' ? 'Continue to approval' : 'Fund reserve'}
+                {holding.margin === 'isolated' ? 'Next: approve on Hyperliquid' : 'Next: fund the reserve'}
               </button>
             </div>
             <p aria-live="polite" className="min-h-5 text-[13px] text-muted">
@@ -735,10 +739,11 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
 /** Where setup stands once the guard is sealed: done steps ticked, the current one marked. */
 function Progress({ phase, isolated }: { phase: Phase; isolated: boolean }) {
   const steps: [Phase, string][] = [
-    ['sealing', 'Sealed'],
-    ['save', 'Seal file saved'],
-    ...(isolated ? ([['approve', 'Approved on Hyperliquid']] as [Phase, string][]) : []),
-    ['fund', 'Reserve funded'],
+    ['edit', 'Set it up'],
+    ['sealing', 'Seal'],
+    ['save', 'Save seal file'],
+    ...(isolated ? ([['approve', 'Approve on Hyperliquid']] as [Phase, string][]) : []),
+    ['fund', 'Fund reserve'],
   ];
   const order: Phase[] = ['edit', 'sealing', 'save', 'approve', 'fund', 'guarded'];
   const at = order.indexOf(phase);
@@ -746,7 +751,7 @@ function Progress({ phase, isolated }: { phase: Phase; isolated: boolean }) {
     <ol aria-label="Setup" className="flex flex-wrap gap-x-5 gap-y-2 text-[13px]">
       {steps.map(([p, label]) => {
         const i = order.indexOf(p);
-        const done = i < at || (p === 'sealing' && at > 1) || phase === 'guarded';
+        const done = i < at || phase === 'guarded';
         const current = p === phase;
         return (
           <li
