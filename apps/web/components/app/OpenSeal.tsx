@@ -1,6 +1,7 @@
 'use client';
 
 import { fingerprint, isSealFile, openSealFile, type SealFile } from '@ripcord/shared';
+import Link from 'next/link';
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { keepOpened, saveGuard } from '../../lib/store';
 import { fieldCls, ghostBtn } from './AppShell';
@@ -87,6 +88,14 @@ export function OpenSeal({ isDemo, onOpened }: { isDemo: boolean; onOpened(): vo
         >
           Guarded this account on another device? Open its seal file
         </button>
+      )}
+      {!isDemo && (
+        <Link
+          href="/freeze"
+          className="inline-flex min-h-11 items-center underline decoration-line-3 underline-offset-4 hover:text-text"
+        >
+          Lost your seal file? Freeze with your NEAR wallet
+        </Link>
       )}
       {error && (
         <span role="alert" className="text-red">

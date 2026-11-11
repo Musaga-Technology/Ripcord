@@ -226,6 +226,9 @@ export async function readFrozen(id: string): Promise<boolean | null> {
   return p ? p.frozen : null;
 }
 export const readGuardHashes = (id: string) => view<OnChainGuard>('get_guard', { guard_id: id });
+/** The guards an owner commitment holds: found by hash alone, so only the owner can look them up. */
+export const readOwnerGuards = (ownerCommitment: string) =>
+  view<{ guard_id: string; status: string }[]>('guards_for_owner', { owner_commitment: ownerCommitment });
 export const readArms = (id: string) => view<OnChainArm[]>('get_arms', { guard_id: id, from: 0, limit: 100 });
 /** The build OutLayer runs for the checker: its project's active version, the wasm's sha256. */
 export const readRunningBuild = async () =>
