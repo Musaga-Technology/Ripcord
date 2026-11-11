@@ -4,6 +4,8 @@
 
 On Hyperliquid, everyone can see the price where your position gets liquidated, and some traders push price toward it. Ripcord keeps a hidden reserve, in any asset on any chain, and moves it into your margin account seconds before liquidation. You give no keys and use no new exchange, and nobody can see how deep your defence goes.
 
+**Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data. All six held. Of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin: the same 20 as posting that reserve on the exchange, where hunters can see it. `bash scripts/demo.sh` checks the seal and rescores the result ([evidence](docs/EVIDENCE.md)).
+
 Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`, `agents`.
 
 Design notes, research and feasibility tests were prepared from Oct 20 (results summarised in `docs/EVIDENCE.md`), inside the hackathon window that opened with the Oct 19 announcement. All code in this repository is written from Oct 30 to Nov 14; the October test scripts are not part of it. Libraries are listed under "Built with".
