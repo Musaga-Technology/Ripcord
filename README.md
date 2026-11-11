@@ -13,7 +13,7 @@ Design notes, research and feasibility tests were prepared from Oct 20, inside t
 - **Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data, and committed only their hash. All six held: of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin, the same 20 as posting that reserve openly on the exchange. `bash scripts/demo.sh` checks the hash and rescores the result ([evidence](docs/EVIDENCE.md)).
 - **Live on NEAR mainnet.** The guard registry [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) and the checker `ripcord-registry.near/checker` on OutLayer run exactly the code in this repo: rebuild them and compare the hashes (table below), or open `/verify?example` and watch the app check the running build live.
 - **The money route is real.** In October we sent 4.79 USDC from a guard-style custody wallet into a Hyperliquid account's margin on mainnet; it landed 33.6 s after the call ([ARCHITECTURE §2](docs/ARCHITECTURE.md)).
-- **Tested.** 279 tests: 27 for the contract, 53 for the enclave, 14 for the Rust rules and replays, 120 shared, 43 web and 22 for the poker. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
+- **Tested.** 280 tests: 27 for the contract, 53 for the enclave, 14 for the Rust rules and replays, 120 shared, 44 web and 22 for the poker. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
 
 ## The problem
 
