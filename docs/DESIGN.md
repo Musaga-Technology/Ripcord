@@ -106,22 +106,28 @@ Rescue history: when · margin added · before → after · landed in · outcome
 ## 6. Quality floor
 Responsive to 360 px; both themes, following the system setting with a toggle; keyboard focus is a 2 px Amber ring; contrast AA in both themes (Muted on Ground ≥ 7:1 in each); `prefers-reduced-motion` turns every signature moment into a 120 ms cross-fade to the same end state.
 
-## 7. Demo video storyboard (≤ 2 min, made for the grand prize)
-Captions burned in (X autoplays muted), one idea per beat, real mainnet footage wherever possible, and an honest timer. One beat is a real mainnet rescue shown **unedited and in real time** (about 45 s, a visible clock; recorded Day 7): judges in other hackathons explicitly reward "a live, unedited demo".
+## 7. Demo video (≤ 2 min, made for the grand prize)
+The hackathon's own rules for a demo (HACKATHON.md, "A good demo post"): lead with the user problem, in a first line anyone understands; show **one complete moment**, a real user action going to a visible result; say concretely what NEAR enables; end with a next step and a genuine question. So: no title card, no architecture slide, no sped-up setup. NEAR's pieces appear **inside the story, at the moment each one does its work**, as callouts on the real screens, never as a diagram. One guard is shown end to end; both margin types are explained.
 
-| Time | Beat | On screen | Caption |
+Production (Jero, Nov 11: "graphics and demo flow seamless and strong"):
+- **One visual language.** Every graphic is the app's own component (the card and its rosette, the liquidation stack, "The edge, right now", the NEAR path, Verify's envelope), played as a scripted sequence on a `/film` page at 1920×1080. Nothing from a stock library and no slides, so footage and graphics cut together without a seam.
+- **The real moment is real.** The rescue beat is a mainnet screen recording, **unedited and in real time**, with a clock in frame (Hyperliquid on the left, Ripcord on the right). The film page plays it as recorded, without cuts or speed-ups.
+- Captions burned in (X autoplays muted), one idea per beat, every number real and dated, the replays labelled as replays, no individual named, no jargon in a caption that a NEAR callout doesn't explain. A 16:9 cut for the submission and a 30–40 s vertical cut for X (beats 1, 4, 5 and 9).
+
+| Time | Beat | On screen | Caption · NEAR callout |
 |---|---|---|---|
-| 0:00 | The hunt | A liquidation heatmap, then "The edge, right now" with real, dated data | "On Hyperliquid, everyone can see where your position dies." |
-| 0:07 | The stakes | A cascade replay running through clusters of red lines | "$3.21B was liquidated across crypto in one minute on Oct 10, 2025." |
-| 0:14 | Title | The card appears and its rosette prints itself | "Ripcord keeps a reserve nobody can see, and moves it in first." |
-| 0:20 | Setup, sped up | Real position → "Keep my ETH long alive through a 20% drop" → reserve first, then timing, marked "computed privately ✓" → **Seal** → fund with BTC from Bitcoin | "Say it in plain words. Only a fingerprint is public." |
-| 0:38 | The rescue, on mainnet | Split screen: Hyperliquid's public red line beside the sealed card. Margin pulled to 2% from liquidation, the timer runs, USDC lands, the line slides away; transaction links | "46 s, mainnet, from a reserve nobody can trace." (use the Day 7 measurement) |
-| 1:05 | The hunted whale | "The positions closest to the edge are isolated." One approval, then the same rescue on an isolated position | "Isolated positions too." |
-| 1:17 | Why hunters lose | "Learn the line": inferred trigger points scatter across the sealed range; the hunter's budget drains | "Every rescue redraws the line." |
-| 1:30 | Trust and business | Ledger: "Saved · 3% fee" and "Close call · no fee"; Verify's three green ticks; Freeze | "It can only pay you. Freeze it yourself. Paid only when it saves you." |
-| 1:45 | Close | The NEAR pieces in one picture, then "Your line is public. Your defence isn't." | "Built on NEAR." |
+| 0:00 | 1. The problem | A real Hyperliquid position, its liquidation price in red; the stack of other traders' liquidation lines rising behind it | "On Hyperliquid, everyone can see the price that liquidates you." |
+| 0:05 | 2. The hunt | The Oct 10, 2025 ETH crash from the hero: price driven into a cluster of lines; the unguarded position dies at 21:16:37 | "Traders push the price to those lines. $3.21B was liquidated in one minute on Oct 10, 2025 (Kaiko)." |
+| 0:12 | 3. The guard | The card lands over the same position and its rosette prints | "Ripcord adds margin before the liquidator gets there, from a reserve nobody can see." |
+| 0:18 | 4. Sealed | The real seal moment: the values collapse to `••••••`, a fingerprint types in | "The line is sealed on your device to a TEE." · **OutLayer on NEAR**: the guard runs in an enclave; not even Ripcord can read the line. |
+| 0:26 | 5. Hidden reserve | The fund step, then the card's reserve `••••••` | "The reserve sits where no one can size it." · **NEAR Confidential Intents**: private balance, funded from 35+ chains. |
+| 0:34 | 6. The moment (unedited, clock in frame) | Split screen. Margin is pulled from the real position, the distance falls past the hidden line, the guard fires; about 20 s later USDC lands, Hyperliquid's red line slides away, the card turns green: Rescued | "We pull margin to push a real position toward liquidation. Mainnet, unedited." · **NEAR Intents**: moved the reserve into the Hyperliquid account in about 20 s. |
+| 1:04 | 7. Cross and isolated | Cross: the one guard covering every cross position (as filmed). Isolated: "The edge, right now", every position within 5% isolated, then the one approval on Hyperliquid | "Cross margin: one guard covers every position. Isolated: one approval, and the guard's own key can only add margin, never withdraw." |
+| 1:16 | 8. Proof, without the account | The rescue on the Ledger (the hour and a rounded amount), its NEAR transaction, Verify's veil sliding off and three ticks, then Freeze | "On chain: an hour and a rounded amount, never the account. Verify it. Freeze it with one signature." · **A NEAR contract** holds the rules, the record and the owner's freeze. |
+| 1:30 | 9. Tested blind | 211 → 20, counted down over the October holdout | "Predictions sealed before the prices existed: 211 of 992 liquidated without a guard, 20 with one." |
+| 1:38 | 10. Next step | The card, the link and the repository | "Your line is public. Your defence isn't. Traders: how far from liquidation would you hide your line?" |
 
-Production: record the raw mainnet runs on Day 7 with a real clock in frame; the "Saved" entry is the controlled save, labelled as our own test; every number real and dated, replays labelled as replays; no jargon in captions until the close; no individuals named; a 16:9 cut for the submission and a 30–45 s vertical cut for X; the agents track gets its own 20-second clip of the sample agent hiring a guard.
+The agents track gets its own 20-second clip only if the agent tool ships; otherwise the agents are a roadmap line in the README.
 
 ## 8. The breathtaking bar
 
