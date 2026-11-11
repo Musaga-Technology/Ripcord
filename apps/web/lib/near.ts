@@ -21,7 +21,7 @@ const NETS = {
     rpc: 'https://rpc.testnet.near.org',
     explorer: 'https://testnet.nearblocks.io',
     checkerProject: 'ripcord-ops-57834db8.testnet/checker',
-    checkerHash: 'fbf779407d7927d702e5788c2a995c8457569420116176f6cd5dcaefe79232c6',
+    checkerHash: '187b8b5e52b40aaaff49130a1f5da11f0ee25fab676959bb6964eb2fe0a17533',
     publishedGuards: [] as string[],
   },
 } as const;
