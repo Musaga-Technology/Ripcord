@@ -16,6 +16,15 @@ interface Step {
 
 const STEPS: Step[] = [
   {
+    piece: 'NEAR AI Cloud',
+    title: 'You say what you want.',
+    body: '"Keep my SOL long alive through a 25% drop." Your words are encrypted on your device to a model in an enclave, so Ripcord passes them on without being able to read them. The model fills in the form; the amounts are worked out by code you can read.',
+    proof: [
+      { label: 'The encrypted request', href: codeUrl('apps/web/lib/copilot.ts') },
+      { label: '64 of 64 in the eval', href: codeUrl('scripts/copilot-eval.ts') },
+    ],
+  },
+  {
     piece: 'OutLayer, on NEAR',
     title: 'Your line is sealed.',
     body: 'Your rescue range is encrypted on your device to a sealed enclave on OutLayer. The guard reads Hyperliquid and decides inside it. Nobody can read your line, Ripcord included.',
@@ -45,8 +54,8 @@ const STEPS: Step[] = [
     body: "A public registry holds each guard as hashes, never an address. It controls the reserve wallet's rules, so only your signature can freeze it, even if Ripcord disappears.",
     proof: [
       { label: 'The registry', href: accountUrl(REGISTRY) },
-      { label: 'A guard registered', href: REGISTER_TX_URL },
-      { label: 'A reserve frozen', href: FREEZE_TX_URL },
+      { label: 'A guard registered on testnet', href: REGISTER_TX_URL },
+      { label: 'A reserve frozen on testnet', href: FREEZE_TX_URL },
     ],
   },
 ];
@@ -80,8 +89,7 @@ export function NearPath() {
           code or the transaction that proves it.
         </p>
         <p className="text-[13px] text-muted">
-          Transactions are on NEAR testnet until the mainnet launch. NEAR AI Cloud is next: say your guard in plain
-          words, read privately.
+          Live on NEAR mainnet: the registry at {REGISTRY} and the enclave build {short(CHECKER_HASH)}.
         </p>
       </div>
       <ol ref={box} className={`near-path relative flex flex-col ${run ? 'run' : ''}`}>
