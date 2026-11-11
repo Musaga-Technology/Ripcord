@@ -1,6 +1,6 @@
 # Evidence
 
-Every claim in the README, with the test, file or transaction that proves it. Testnet transactions open on testnet.nearblocks.io; mainnet ones arrive from Day 3.
+Every claim in the README, with the test, file or transaction that proves it. Mainnet transactions open on nearblocks.io and testnet ones on testnet.nearblocks.io.
 
 | Claim | Proof |
 |---|---|
