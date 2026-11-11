@@ -1,6 +1,6 @@
 'use client';
 
-import { fingerprint, isSealFile, readSealFile, type SealFile } from '@ripcord/shared';
+import { fingerprint, isSealFile, openSealFile, type SealFile } from '@ripcord/shared';
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { keepOpened, saveGuard } from '../../lib/store';
 import { fieldCls, ghostBtn } from './AppShell';
@@ -29,8 +29,8 @@ export function OpenSeal({ isDemo, onOpened }: { isDemo: boolean; onOpened(): vo
     e.preventDefault();
     if (!file) return;
     try {
-      const c = await readSealFile(file, pass);
-      keepOpened(c);
+      const { contents: c, key } = await openSealFile(file, pass);
+      keepOpened(c, key);
       const coin = c.settings.isolated?.coin ?? 'Cross';
       saveGuard({
         id: c.guard_id,

@@ -10,7 +10,7 @@ import {
   MIN_RESERVE_USD,
   prepareGuard,
   presetRanges,
-  writeSealFile,
+  writeSealFileKeyed,
   type PreparedGuard,
   type Preset,
 } from '@ripcord/shared';
@@ -243,11 +243,12 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
       setPrepared(p);
       keepOpened(p.contents);
       const animation = playSeal(p.fingerprint);
-      const [file] = await Promise.all([
-        writeSealFile(p.contents, p.commitment, pass, random),
+      const [{ file, key }] = await Promise.all([
+        writeSealFileKeyed(p.contents, p.commitment, pass, random),
         backend.pubkey().then((pk) => backend.create(createInput(p, pk, random), p.contents.receipt_secret)),
         animation,
       ]);
+      keepOpened(p.contents, key);
       const g: LocalGuard = {
         id: p.contents.guard_id,
         commitment: p.commitment,

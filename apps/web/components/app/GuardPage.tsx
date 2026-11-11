@@ -4,25 +4,43 @@
 // rescue history. An example guard can be run through a simulated crash; a real one reads Hyperliquid and the registry.
 import { DEMO_GUARDS } from '@ripcord/shared/mock';
 import {
+  fingerprint as fingerprintOf,
   MIN_RESCUE_USD,
   open,
   presetRanges,
-  readSealFile,
+  openSealFile,
+  rewriteSealFile,
   type GuardSettings,
   type SealContents,
 } from '@ripcord/shared';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { lastCheck, readFrozen, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
-import { signClose, signFreeze } from '../../lib/ownerActions';
+import { lastCheck, random, readFrozen, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
+import {
+  resealed,
+  signClose,
+  signFreeze,
+  signReseal,
+  signTopup,
+  withRange,
+  type TopupInput,
+} from '../../lib/ownerActions';
 import { CrashRun, marginFor } from '../../lib/crash';
 import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
 import { ASSETS } from '../../lib/assets';
 import { readCandles, readMark, type Holding } from '../../lib/hl';
 import { distance as distanceOf } from '../../lib/sim';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
-import { downloadSealFile, keepOpened, loadGuards, openedSeal, patchGuard, type LocalGuard } from '../../lib/store';
+import {
+  downloadSealFile,
+  keepOpened,
+  loadGuards,
+  openedKey,
+  openedSeal,
+  patchGuard,
+  type LocalGuard,
+} from '../../lib/store';
 import { pct, price, usd } from '../format';
 import { GuardCard, type CardState } from '../GuardCard';
 import { rangeOf, RescueChart } from '../RescueChart';
@@ -224,8 +242,8 @@ function Unlock({ g, onOpen }: { g: LocalGuard; onOpen(c: SealContents): void })
     setBusy(true);
     setError(null);
     try {
-      const c = await readSealFile(g.file, pass);
-      keepOpened(c);
+      const { contents: c, key } = await openSealFile(g.file, pass);
+      keepOpened(c, key);
       onOpen(c);
     } catch {
       setError("That passphrase doesn't open this seal file.");
@@ -661,7 +679,8 @@ function bandOf(side: 1 | -1, liq: number, range: [number, number]): [number, nu
   return [liq / (1 + s * (range[0] / 100)), liq / (1 + s * (range[1] / 100))];
 }
 
-const reserveWords = (s: GuardSettings) => `${usd(s.budget_usd)} in ${assetOf(s.reserve_asset).symbol}`;
+const reserveWords = (s: GuardSettings, added = 0) =>
+  `${usd(s.budget_usd + added)} in ${assetOf(s.reserve_asset).symbol}`;
 
 function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const local = g.local as LocalGuard;
@@ -675,6 +694,10 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const [receipts, setReceipts] = useState<OnChainReceipt[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [control, setControl] = useState<Control>(NO_CONTROL);
+  // A new range rewrites the seal file and changes the fingerprint; a top-up adds to the reserve.
+  const [seal, setSeal] = useState({ file: local.file, commitment: local.commitment, fingerprint: local.fingerprint });
+  const [added, setAdded] = useState(local.added_usd ?? 0);
+  const [topping, setTopping] = useState<{ input: TopupInput; usd: number } | null>(null);
 
   useEffect(() => {
     const read = () => {
@@ -697,7 +720,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
     return () => clearInterval(t);
   }, [g.id]);
 
-  // Freeze and close are signed here with the owner key from the opened seal file.
+  // Every owner action is signed here with the owner key from the opened seal file.
   const owner: OwnerActions | null = opened
     ? {
         freeze: (frozen) => backend.freeze(signFreeze(opened, frozen)),
@@ -708,6 +731,23 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
             await new Promise((r) => setTimeout(r, 8_000));
           }
           throw new Error('still closing: the payout is taking longer than usual. Check again in a minute');
+        },
+        async topup(amountUsd) {
+          setTopping({ input: signTopup(opened, amountUsd, await backend.pubkey()), usd: amountUsd });
+        },
+        async reseal(preset) {
+          const key = openedKey(g.id);
+          if (!key) throw new Error('open your seal file again first: the new range is written into it');
+          const next = h?.distance ? withRange(opened.settings, preset, h.distance) : null;
+          if (!next) throw new Error("that range doesn't fit this close to liquidation");
+          const input = signReseal(opened, next, await backend.pubkey());
+          const contents = resealed(opened, next, await backend.reseal(opened, input));
+          const file = rewriteSealFile(contents, input.commitment, key, seal.file.kdf, random);
+          const changed = { file, commitment: input.commitment, fingerprint: fingerprintOf(input.commitment) };
+          patchGuard(g.id, changed);
+          keepOpened(contents, key);
+          setOpened(contents);
+          setSeal(changed);
         },
       }
     : null;
@@ -758,10 +798,35 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
           owner={owner}
           control={control}
           onChange={setControl}
-          reserve={opened ? reserveWords(opened.settings) : 'your reserve'}
+          reserve={opened ? reserveWords(opened.settings, added) : 'your reserve'}
           asset={opened ? assetOf(opened.settings.reserve_asset).symbol : ''}
           distance={h.distance ?? 10}
+          current={opened?.settings.preset ?? null}
         />
+      )}
+      {state === 'guarded' && topping && opened && (
+        <section
+          aria-label="Top up"
+          className="flex flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
+        >
+          <Fund
+            contents={opened}
+            backend={backend}
+            isDemo={session?.kind === 'demo'}
+            wallet={session?.kind === 'wallet' ? session.address : null}
+            fallback={String(topping.usd)}
+            topup={topping.input}
+            onFunded={() => {
+              const total = added + topping.usd;
+              patchGuard(g.id, { added_usd: total });
+              setAdded(total);
+              setTopping(null);
+            }}
+          />
+          <button type="button" className={`${ghostBtn} w-fit`} onClick={() => setTopping(null)}>
+            Not now
+          </button>
+        </section>
       )}
       {state !== 'guarded' && (
         <section aria-label="Finish setting up" className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
@@ -823,8 +888,8 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
               label={g.cardLabel ?? g.label}
               distance={d === null ? '—' : pct(d)}
               sub="from liquidation"
-              fingerprint={g.fingerprint}
-              commitment={g.commitment}
+              fingerprint={seal.fingerprint}
+              commitment={seal.commitment}
               state={shownState}
               status={status}
               reserve={DOTS}
@@ -834,11 +899,11 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
           <Sealed
             g={g}
             settings={opened?.settings ?? null}
-            reserveText={opened ? reserveWords(opened.settings) : DOTS}
+            reserveText={opened ? reserveWords(opened.settings, added) : DOTS}
             onOpen={setOpened}
             askElsewhere={state !== 'guarded'}
           />
-          <button type="button" className={ghostBtn} onClick={() => downloadSealFile(local)}>
+          <button type="button" className={ghostBtn} onClick={() => downloadSealFile(seal)}>
             Save seal file
           </button>
         </aside>

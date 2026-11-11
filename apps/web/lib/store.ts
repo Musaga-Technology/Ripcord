@@ -14,6 +14,8 @@ export interface LocalGuard {
   /** Reserve seen in the guard's wallet; an isolated guard's agent approved on Hyperliquid. */
   funded: boolean;
   approved: boolean;
+  /** What the owner's top-ups added to the reserve, in US dollars (shown with the sealed budget). */
+  added_usd?: number;
   file: SealFile;
   created_at: number;
 }
@@ -49,10 +51,16 @@ export function patchGuard(id: string, patch: Partial<LocalGuard>): void {
   save(loadGuards().map((g) => (g.id === id ? { ...g, ...patch } : g)));
 }
 
-// Opened seal files, for this page's life only.
+// Opened seal files, and the keys their passphrases gave, for this page's life only: a change to a guard (a new
+// range) rewrites its seal file without asking for the passphrase again.
 const opened = new Map<string, SealContents>();
+const keys = new Map<string, Uint8Array>();
 export const openedSeal = (id: string) => opened.get(id) ?? null;
-export const keepOpened = (c: SealContents) => void opened.set(c.guard_id, c);
+export const openedKey = (id: string) => keys.get(id) ?? null;
+export function keepOpened(c: SealContents, key?: Uint8Array): void {
+  opened.set(c.guard_id, c);
+  if (key) keys.set(c.guard_id, key);
+}
 
 /** Saves the seal file and returns the name it was saved under. */
 export function downloadSealFile(g: Pick<LocalGuard, 'file' | 'fingerprint'>): string {

@@ -15,7 +15,7 @@ import {
 } from '@ripcord/shared';
 import { CHECKER_PROJECT, NEAR_RPC, OUTLAYER, REGISTRY } from './near';
 import type { Stats } from './ledger';
-import type { CloseInput, FreezeInput } from './ownerActions';
+import type { CloseInput, FreezeInput, ResealInput, TopupInput } from './ownerActions';
 import type { OnChainArm, OnChainGuard } from './verify';
 
 export const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
@@ -40,6 +40,10 @@ export interface Backend {
   freeze(input: FreezeInput): Promise<void>;
   /** One step of the owner's signed close: `closed` once the rest of the reserve is on its way and it's off chain. */
   close(input: CloseInput): Promise<'pending' | 'closed'>;
+  /** The owner's signed top-up, from one source: the budget rises once, and each source gets its own address. */
+  topup(c: SealContents, input: TopupInput, source: string): Promise<Deposit>;
+  /** The owner's signed new range: the epoch whose line is the first drawn from it. */
+  reseal(c: SealContents, input: ResealInput): Promise<number>;
 }
 
 const opened = <T>(sealed: string, receiptSecret: string, guardId: string): T =>
@@ -51,6 +55,7 @@ interface Answer {
   sealed?: string;
   enc_pk?: string;
   error?: string;
+  from_epoch?: number;
 }
 
 async function call(input: object): Promise<Answer> {
@@ -63,6 +68,15 @@ async function call(input: object): Promise<Answer> {
   if (a.refused) throw new Refused(a.refused);
   if (!r.ok) throw new Refused(a.error ?? 'the guard did not answer');
   return a;
+}
+
+function deposit(c: SealContents, a: Answer): Deposit {
+  const d = opened<{ deposit_address: string; amount: string; decimals: number }>(
+    a.sealed ?? '',
+    c.receipt_secret,
+    c.guard_id,
+  );
+  return { address: d.deposit_address, amount: d.amount, decimals: d.decimals };
 }
 
 const toBalances = (b: { balances: { token: string; balance: string }[] }) =>
@@ -78,13 +92,13 @@ export const live: Backend = {
     return { agent };
   },
   async fund(c, source) {
-    const a = await call({ action: 'fund', guard_id: c.guard_id, source_asset: source });
-    const d = opened<{ deposit_address: string; amount: string; decimals: number }>(
-      a.sealed ?? '',
-      c.receipt_secret,
-      c.guard_id,
-    );
-    return { address: d.deposit_address, amount: d.amount, decimals: d.decimals };
+    return deposit(c, await call({ action: 'fund', guard_id: c.guard_id, source_asset: source }));
+  },
+  async topup(c, input, source) {
+    return deposit(c, await call({ ...input, source_asset: source }));
+  },
+  async reseal(_c, input) {
+    return (await call(input)).from_epoch ?? 0;
   },
   async reserve(c) {
     const a = await call({ action: 'reserve', guard_id: c.guard_id });
@@ -103,7 +117,12 @@ export const DEMO_ARRIVES_MS = 8_000;
 
 function demoBackend(): Backend {
   const secret = random(32);
-  const funded = new Map<string, number>();
+  // When each guard was funded, then topped up: the reserve shows one unit per funding that has arrived.
+  const funded = new Map<string, number[]>();
+  const epochs = new Map<string, number>();
+  const sent = (id: string) => funded.set(id, [...(funded.get(id) ?? []), Date.now()]);
+  const opens = <T>(guardId: string, hex: string): T =>
+    JSON.parse(new TextDecoder().decode(open(secret, hexToBytes(hex), guardId))) as T;
   const sealFor = (c: { receipt_pk: string }, guardId: string, v: unknown) =>
     bytesToHex(seal(hexToBytes(c.receipt_pk.slice('x25519:'.length)), utf8ToBytes(JSON.stringify(v)), guardId, random));
   return {
@@ -125,12 +144,31 @@ function demoBackend(): Backend {
       return { agent: opened<{ agent: string }>(sealed, receiptSecret, input.guard_id).agent };
     },
     async fund(c) {
-      funded.set(c.guard_id, Date.now());
+      sent(c.guard_id);
       return { address: `example-${bytesToHex(random(16))}`, amount: '0', decimals: 0 };
     },
     async reserve(c) {
-      const since = funded.get(c.guard_id);
-      return since !== undefined && Date.now() - since >= DEMO_ARRIVES_MS ? { [c.settings.reserve_asset]: '1' } : {};
+      const arrived = (funded.get(c.guard_id) ?? []).filter((t) => Date.now() - t >= DEMO_ARRIVES_MS).length;
+      return arrived ? { [c.settings.reserve_asset]: String(arrived) } : {};
+    },
+    async topup(c, input) {
+      await new Promise((r) => setTimeout(r, 700));
+      const { cents } = opens<{ cents: number }>(c.guard_id, input.enc_amount);
+      if (!(cents >= 200)) throw new Refused('a top-up is $2 or more');
+      sent(c.guard_id);
+      return { address: `example-${bytesToHex(random(16))}`, amount: '0', decimals: 0 };
+    },
+    async reseal(c, input) {
+      await new Promise((r) => setTimeout(r, 900));
+      const r = opens<Pick<SealContents['settings'], 'preset' | 'line_range_pct' | 'target_range_pct'>>(
+        c.guard_id,
+        input.enc_range,
+      );
+      if (commitment({ ...c.settings, ...r }, c.salt) !== input.commitment)
+        throw new Refused('the new range does not match the signed fingerprint');
+      const epoch = (epochs.get(c.guard_id) ?? 0) + 1;
+      epochs.set(c.guard_id, epoch);
+      return epoch;
     },
     async freeze() {
       await new Promise((r) => setTimeout(r, 700));

@@ -1,10 +1,9 @@
 'use client';
 
 // What the owner can do with a guard (DESIGN §4.3): top up the reserve, change the rescue range, freeze the reserve,
-// close the guard. In the simulation each one works. A real guard offers freeze and close, signed with the owner key
-// from the opened seal file; topping up or changing its range means resealing it, so those stay in the simulation for
-// now. One panel at a time; Escape closes it.
-import { presetRanges, type Preset } from '@ripcord/shared';
+// close the guard. In the simulation each one works on the example. On a real guard each is signed with the owner key
+// from the opened seal file. One panel at a time; Escape closes it.
+import { MIN_RESCUE_USD, presetRanges, type Preset } from '@ripcord/shared';
 import { useEffect, useState } from 'react';
 import { radioKeys } from '../../lib/radio';
 import { price } from '../format';
@@ -24,7 +23,17 @@ export const NO_CONTROL: Control = { frozen: false, closed: false, added: [], pr
 export interface OwnerActions {
   freeze(frozen: boolean): Promise<void>;
   close(): Promise<void>;
+  /** Signs a top-up of this many dollars; the page then shows where to send it. */
+  topup(usd: number): Promise<void>;
+  reseal(preset: Preset): Promise<void>;
 }
+
+const VERB: Record<Panel, string> = {
+  topup: 'topping up',
+  range: 'changing the range',
+  freeze: 'freezing',
+  close: 'closing',
+};
 
 type Panel = 'topup' | 'range' | 'freeze' | 'close';
 
@@ -114,12 +123,8 @@ export function GuardActions({
     ) : null;
 
   const buttons: { id: Panel; label: string }[] = [
-    ...(example
-      ? [
-          { id: 'topup' as const, label: 'Top up reserve' },
-          { id: 'range' as const, label: 'Change range' },
-        ]
-      : []),
+    { id: 'topup', label: 'Top up reserve' },
+    { id: 'range', label: 'Change range' },
     { id: 'freeze', label: control.frozen ? 'Unfreeze reserve' : 'Freeze reserve' },
     { id: 'close', label: 'Close guard' },
   ];
@@ -142,10 +147,7 @@ export function GuardActions({
       </div>
       {(busy || control.frozen) && (
         <p className="text-[13px] text-muted">
-          {busy ??
-            (example
-              ? 'Top up, change range and close wait until you unfreeze the reserve.'
-              : 'Closing waits until you unfreeze the reserve.')}
+          {busy ?? 'Top up, change range and close wait until you unfreeze the reserve.'}
         </p>
       )}
       {done && (
@@ -158,8 +160,8 @@ export function GuardActions({
         <div className="step-in flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-5">
           {!example && !owner ? (
             <p className="text-[15px] text-text-2">
-              Open your seal file above: {panel === 'freeze' ? 'freezing' : 'closing'} is signed with the owner key it
-              holds.
+              Enter your passphrase under Sealed settings first: {VERB[panel]} is signed with the owner key your seal
+              file holds.
             </p>
           ) : panel === 'topup' ? (
             <form
@@ -167,19 +169,21 @@ export function GuardActions({
               onSubmit={(e) => {
                 e.preventDefault();
                 const n = Number(amount);
-                if (n > 0)
-                  finish(
-                    { ...control, added: [...control.added, n] },
-                    `Added ${amount} ${asset}. Its size stays private.`,
-                  );
+                if (example) {
+                  if (n > 0)
+                    finish(
+                      { ...control, added: [...control.added, n] },
+                      `Added ${amount} ${asset}. Its size stays private.`,
+                    );
+                } else if (owner && n >= MIN_RESCUE_USD) void act(() => owner.topup(n), control, '');
               }}
             >
               <p className="text-[15px] text-text-2">
                 More reserve means a bigger rescue, or a second one. It goes to a new private deposit address, like the
-                first.
+                first{example ? '' : ', and only the enclave learns the amount'}.
               </p>
               <label className="flex max-w-[240px] flex-col gap-1.5 text-[13px] text-muted">
-                Amount in {asset}
+                {example ? `Amount in ${asset}` : 'Amount in US dollars'}
                 <input
                   inputMode="decimal"
                   className={fieldCls}
@@ -187,9 +191,19 @@ export function GuardActions({
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                 />
               </label>
-              <button type="submit" className={`${primaryBtn} w-fit`} disabled={!(Number(amount) > 0)}>
-                Top up reserve
+              <button
+                type="submit"
+                className={`${primaryBtn} w-fit`}
+                disabled={working || !(Number(amount) >= (example ? Number.MIN_VALUE : MIN_RESCUE_USD))}
+              >
+                {working ? 'Signing…' : 'Top up reserve'}
               </button>
+              {!example && <p className="text-[13px] text-muted">$2 or more, the smallest rescue the route carries.</p>}
+              {failed && (
+                <p role="alert" className="text-[15px] text-red">
+                  {failed}
+                </p>
+              )}
             </form>
           ) : panel === 'range' ? (
             <div className="flex flex-col gap-3">
@@ -229,12 +243,25 @@ export function GuardActions({
               <button
                 type="button"
                 className={`${primaryBtn} w-fit`}
-                onClick={() =>
-                  finish({ ...control, preset }, `Resealed: ${PRESETS.find((p) => p.id === preset)!.name}.`)
-                }
+                disabled={working || preset === current}
+                onClick={() => {
+                  const name = PRESETS.find((p) => p.id === preset)!.name;
+                  if (example || !owner) finish({ ...control, preset }, `Resealed: ${name}.`);
+                  else
+                    void act(
+                      () => owner.reseal(preset),
+                      { ...control, preset },
+                      `Resealed: ${name}. Your seal file changed with it, so save the new one below.`,
+                    );
+                }}
               >
-                Reseal range
+                {working ? 'Sealing…' : 'Reseal range'}
               </button>
+              {failed && (
+                <p role="alert" className="text-[15px] text-red">
+                  {failed}
+                </p>
+              )}
             </div>
           ) : panel === 'freeze' ? (
             <div className="flex flex-col gap-3">

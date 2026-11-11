@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Carries a browser's sealed requests to the checker with Ripcord's payment key, which must stay on the server.
 // It only ever sees hashes and ciphertext: settings are sealed before they leave the device, and answers are sealed
 // to the owner. `check` isn't here, since only pokers ask for checks. Nothing is logged.
-const ALLOWED = new Set(['pubkey', 'create', 'fund', 'reserve', 'freeze', 'close']);
+const ALLOWED = new Set(['pubkey', 'create', 'fund', 'reserve', 'freeze', 'close', 'topup', 'reseal']);
 const MAX_BODY = 8192;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 30;

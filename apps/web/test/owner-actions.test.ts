@@ -1,12 +1,23 @@
 // The owner's freeze and close, signed in the browser: they verify for the owner key and this registry only, and a
 // close names the owner's own Hyperliquid account as the one place the rest of the reserve can go.
-import { ed25519 } from '@noble/curves/ed25519.js';
-import { hexToBytes } from '@noble/hashes/utils.js';
-import { base58, closeMessage, freezeMessage, nep413Hash, prepareGuard } from '@ripcord/shared';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import {
+  base58,
+  closeMessage,
+  commitment,
+  freezeMessage,
+  nep413Hash,
+  open,
+  prepareGuard,
+  resealMessage,
+  topupDigest,
+  topupMessage,
+} from '@ripcord/shared';
 import { describe, expect, it } from 'vitest';
-import { random } from '../lib/backend';
+import { demo, random } from '../lib/backend';
 import { REGISTRY } from '../lib/near';
-import { signClose, signFreeze } from '../lib/ownerActions';
+import { resealed, signClose, signFreeze, signReseal, signTopup, withRange } from '../lib/ownerActions';
 
 const contents = prepareGuard(
   {
@@ -41,5 +52,59 @@ describe("the owner's own actions", () => {
     expect(ed25519.verify(hexToBytes(c.sig), nep413Hash(own, c.nonce, REGISTRY), ownerKey)).toBe(true);
     expect(ed25519.verify(hexToBytes(c.sig), nep413Hash(other, c.nonce, REGISTRY), ownerKey)).toBe(false);
     expect(c.nonce).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+  });
+
+  const enclave = random(32);
+  const enclavePk = bytesToHex(x25519.getPublicKey(enclave));
+  const opens = (hex: string) =>
+    JSON.parse(new TextDecoder().decode(open(enclave, hexToBytes(hex), contents.guard_id))) as Record<string, unknown>;
+
+  it('tops up with an amount only the enclave reads, and a signature over its hidden digest', () => {
+    const t = signTopup(contents, 12.5, enclavePk);
+    const { cents, salt } = opens(t.enc_amount) as { cents: number; salt: string };
+    expect(cents).toBe(1250);
+    expect(JSON.stringify(t)).not.toContain('1250');
+    const message = topupMessage(contents.guard_id, topupDigest(contents.guard_id, cents, salt), t.nonce);
+    expect(ed25519.verify(hexToBytes(t.sig), nep413Hash(message, t.nonce, REGISTRY), ownerKey)).toBe(true);
+    const more = topupMessage(contents.guard_id, topupDigest(contents.guard_id, 99_999, salt), t.nonce);
+    expect(ed25519.verify(hexToBytes(t.sig), nep413Hash(more, t.nonce, REGISTRY), ownerKey)).toBe(false);
+  });
+
+  it('signs a new range as the fingerprint of the new settings, and seals the range to the enclave', () => {
+    const next = withRange(contents.settings, 'safer', 17.3)!;
+    expect(next.preset).toBe('safer');
+    expect(next.line_range_pct).not.toEqual(contents.settings.line_range_pct);
+    expect(withRange(contents.settings, 'lean', 0.6)).toBeNull();
+    const r = signReseal(contents, next, enclavePk);
+    expect(r.commitment).toBe(commitment(next, contents.salt));
+    expect(opens(r.enc_range)).toEqual({
+      preset: 'safer',
+      line_range_pct: next.line_range_pct,
+      target_range_pct: next.target_range_pct,
+    });
+    const message = resealMessage(contents.guard_id, r.commitment, r.nonce);
+    expect(ed25519.verify(hexToBytes(r.sig), nep413Hash(message, r.nonce, REGISTRY), ownerKey)).toBe(true);
+    expect(JSON.stringify(r)).not.toContain(String(next.line_range_pct[0]));
+
+    const after = resealed(contents, next, 4);
+    expect(after.settings).toEqual(next);
+    expect(after.earlier).toEqual([
+      {
+        until_epoch: 4,
+        line_range_pct: contents.settings.line_range_pct,
+        target_range_pct: contents.settings.target_range_pct,
+      },
+    ]);
+  });
+
+  it('runs the same in the simulation, which refuses a range that differs from the one signed', async () => {
+    const b = demo();
+    const pk = await b.pubkey();
+    const next = withRange(contents.settings, 'safer', 17.3)!;
+    expect(await b.reseal(contents, signReseal(contents, next, pk))).toBe(1);
+    const other = withRange(contents.settings, 'lean', 17.3)!;
+    const forged = { ...signReseal(contents, next, pk), enc_range: signReseal(contents, other, pk).enc_range };
+    await expect(b.reseal(contents, forged)).rejects.toThrow('does not match the signed fingerprint');
+    await expect(b.topup(contents, signTopup(contents, 1.5, pk), 'x')).rejects.toThrow('$2 or more');
   });
 });

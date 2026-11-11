@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ASSETS, sourcesFor } from '../../lib/assets';
 import { DEMO_ARRIVES_MS, random, Refused, type Backend, type Deposit } from '../../lib/backend';
 import { readAgents } from '../../lib/hl';
+import type { TopupInput } from '../../lib/ownerActions';
 import { approveAgent, sendFromHyperliquid } from '../../lib/wallet';
 import { ghostBtn, primaryBtn } from './AppShell';
 
@@ -137,6 +138,7 @@ export function Fund({
   wallet,
   fallback,
   onFunded,
+  topup = null,
 }: {
   contents: SealContents;
   backend: Backend;
@@ -146,6 +148,8 @@ export function Fund({
   /** The amount as first chosen, in words: shown in demo mode, where no price is quoted. */
   fallback: string;
   onFunded(): void;
+  /** A signed top-up: its own address, and it has arrived once the reserve holds more than before. */
+  topup?: TopupInput | null;
 }) {
   const sources = sourcesFor(assetOf(contents.settings.reserve_asset));
   const [srcIx, setSrcIx] = useState(0);
@@ -165,19 +169,28 @@ export function Fund({
   const [arrived, setArrived] = useState(false);
   const done = useRef(onFunded);
   done.current = onFunded;
+  // What the reserve held before this funding: a top-up has arrived once it holds more.
+  const before = useRef<bigint | null>(topup ? null : 0n);
+
+  useEffect(() => {
+    if (!topup) return;
+    backend
+      .reserve(contents)
+      .then((b) => (before.current = BigInt(b[contents.settings.reserve_asset] ?? '0')))
+      .catch(() => (before.current = 0n));
+  }, [backend, contents, topup]);
 
   useEffect(() => {
     let stop = false;
     setError(null);
     setDeposit(null);
-    backend
-      .fund(contents, asset.source)
+    (topup ? backend.topup(contents, topup, asset.source) : backend.fund(contents, asset.source))
       .then((d) => !stop && setDeposit(d))
       .catch((e: unknown) => !stop && setError(explain(e, 'a deposit address')));
     return () => {
       stop = true;
     };
-  }, [backend, contents, asset, attempt]);
+  }, [backend, contents, asset, attempt, topup]);
 
   useEffect(() => {
     if (!deposit) return;
@@ -186,7 +199,7 @@ export function Fund({
       try {
         const balances = await backend.reserve(contents);
         const held = balances[contents.settings.reserve_asset];
-        if (!stop && held && BigInt(held) > 0n) {
+        if (!stop && held && before.current !== null && BigInt(held) > before.current) {
           stop = true;
           setArrived(true);
           setTimeout(() => done.current(), 1400);
@@ -246,7 +259,9 @@ export function Fund({
   return (
     <div className="step-in flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">Fund the reserve.</h2>
+        <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">
+          {topup ? 'Top up the reserve.' : 'Fund the reserve.'}
+        </h2>
         <p className="max-w-[34rem] text-[15px] text-text-2">
           {asset.extra
             ? `Send ${amount} ${asset.symbol} from ${asset.chain}: ${reserveAmount} for the reserve and $${asset.extra} for the transfer.`
@@ -355,7 +370,7 @@ export function Fund({
           {arrived ? (
             <>
               <span className="h-[7px] w-[7px] rounded-full bg-green" />
-              Reserve received: {reserveAmount} {asset.symbol}.
+              {topup ? 'Top-up received' : 'Reserve received'}: {reserveAmount} {asset.symbol}.
             </>
           ) : (
             <>
