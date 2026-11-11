@@ -221,11 +221,15 @@ def speed_target(drawn_target, speed_aware, v, horizon_s=60):
     return drawn_target + (SPEED_BOOST * v * horizon_s if speed_aware else 0)
 
 
+# The smallest rescue the private route to Hyperliquid carries ($2 lands $1.68 in about 20 s; $1 is refused).
+MIN_RESCUE_USD = 2
+
+
 def rescue_size(drawn_target, distance, mark, szi, maint_frac, max_rescue_usd, budget_left_usd, reserve_usd):
     side = 1 if szi > 0 else -1
-    t = (drawn_target - distance) / 100 * mark * abs(szi) * (1 - maint_frac * side)
-    t = min(t, max_rescue_usd, budget_left_usd, reserve_usd)
-    return None if t < 5 else t
+    need = (drawn_target - distance) / 100 * mark * abs(szi) * (1 - maint_frac * side)
+    room = min(max_rescue_usd, budget_left_usd, reserve_usd)
+    return None if room < MIN_RESCUE_USD else min(max(need, MIN_RESCUE_USD), room)
 
 
 def save_fee(t):
@@ -393,7 +397,9 @@ def vectors_guard():
     sizes = [dict(zip(['drawn_target', 'distance', 'mark', 'szi', 'maint_frac', 'max_rescue_usd', 'budget_left_usd', 'reserve_usd'], a))
              for a in [(11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 5000, 5000), (11.0, 4.9, 2205.0, 12.4, 0.02, 1500, 5000, 5000),
                        (11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 900, 5000), (11.0, 4.9, 83000.0, -0.8, 0.02, 9000, 9000, 9000),
-                       (5.0, 4.95, 2205.0, 1.0, 0.02, 5000, 5000, 5000), (11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 5000, 4.0)]]
+                       (5.0, 4.95, 2205.0, 1.0, 0.02, 5000, 5000, 5000), (11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 5000, 4.0),
+                       # Too little left for the route's minimum: no rescue. A $10 position gets the minimum.
+                       (11.0, 4.9, 2205.0, 12.4, 0.02, 5000, 1.5, 5000), (11.0, 4.9, 100000.0, 0.0001, 0.0125, 2.7, 2.7, 2.7)]]
     for s in sizes:
         s['size_usd'] = rescue_size(**s)
     fees = [{'t': t, 'fee': save_fee(t)} for t in [1486.18, 50000, 60000, 5]]

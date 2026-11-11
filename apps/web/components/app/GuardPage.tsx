@@ -3,7 +3,14 @@
 // Guard (docs/DESIGN.md §4.3): what a hunter sees beside the card and its sealed settings, the health line, and the
 // rescue history. An example guard can be run through a simulated crash; a real one reads Hyperliquid and the registry.
 import { DEMO_GUARDS } from '@ripcord/shared/mock';
-import { open, presetRanges, readSealFile, type GuardSettings, type SealContents } from '@ripcord/shared';
+import {
+  MIN_RESCUE_USD,
+  open,
+  presetRanges,
+  readSealFile,
+  type GuardSettings,
+  type SealContents,
+} from '@ripcord/shared';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -585,7 +592,7 @@ function ExampleGuard({
               label="The position's price and its public liquidation price."
             />
           </Hunter>
-          {control.closed ? null : !crashing && leftUsd < 5 ? (
+          {control.closed ? null : !crashing && leftUsd < MIN_RESCUE_USD ? (
             <p className="text-[15px] text-text-2">The reserve is spent. Top it up to guard this position again.</p>
           ) : control.frozen && !crashing ? (
             <p className="text-[15px] text-text-2">

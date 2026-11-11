@@ -143,13 +143,13 @@ fn refuses_unsafe_settings() {
             "top-up range must sit above the rescue range and below 80 %",
         ),
         (
-            |s| s.max_rescue_usd = 2.0,
-            "max rescue must be at least $5 and within the budget",
+            |s| s.max_rescue_usd = 1.5,
+            "max rescue must be at least $2 and within the budget",
         ),
         (|s| s.expires_at = "1000".into(), "the guard has already expired"),
         (
             |s| s.budget_usd = 1000.0,
-            "max rescue must be at least $5 and within the budget",
+            "max rescue must be at least $2 and within the budget",
         ),
         (|s| s.cooldown_s = 5, "cooldown must be at least 30 s"),
         (

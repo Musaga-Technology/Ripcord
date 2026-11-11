@@ -1,6 +1,7 @@
 // "Try a crash" on an example guard: one position stepped through a simulated fall, through the guard's real rules
 // (`GuardedPosition`, the enclave's own decisions). The path is choreographed to test the rescue, as in Home's live
 // view, and a reserve too small for it really does end in a liquidation.
+import { MIN_RESCUE_USD } from '@ripcord/shared';
 import { gauss, GuardedPosition, rng, type GuardSpec, type PositionSpec } from './sim';
 
 /** Margin that puts the liquidation price where Hyperliquid shows it: the inverse of `liqPrice`. */
@@ -56,7 +57,7 @@ export class CrashRun {
         k = 0.03;
       } else {
         // Down to the guard's line, and past the liquidation price once the reserve can't pay for another rescue.
-        target = g.left < 5 ? g.liq * (1 - s * 0.012) : g.liq * (1 + s * 0.02);
+        target = g.left < MIN_RESCUE_USD ? g.liq * (1 - s * 0.012) : g.liq * (1 + s * 0.02);
         k = 0.03;
       }
     }

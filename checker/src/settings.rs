@@ -1,5 +1,6 @@
 //! What the checker accepts as a guard's sealed settings before it opens a wallet for them. Refusal reasons name the
 //! rule, never the value, so a refusal can't leak a setting.
+use ripcord_rules::guard::MIN_RESCUE_USD;
 use ripcord_rules::types::GuardSettings;
 
 fn is_address(s: &str) -> bool {
@@ -24,8 +25,8 @@ pub fn validate(s: &GuardSettings, now_ms: u64) -> Result<(), &'static str> {
     if tlo <= hi || tlo > thi || thi > 80.0 {
         return Err("top-up range must sit above the rescue range and below 80 %");
     }
-    if s.max_rescue_usd < 5.0 || s.budget_usd < s.max_rescue_usd {
-        return Err("max rescue must be at least $5 and within the budget");
+    if s.max_rescue_usd < MIN_RESCUE_USD || s.budget_usd < s.max_rescue_usd {
+        return Err("max rescue must be at least $2 and within the budget");
     }
     if s.cooldown_s < 30 {
         return Err("cooldown must be at least 30 s");

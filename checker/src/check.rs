@@ -491,9 +491,10 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
     }
 
     if !should_fire(distance, t.line, s.speed_aware, v, HORIZON_S) {
-        // Hourly, preview a $5 rescue: a guard whose route is down says so ("paused") instead of claiming to guard.
+        // Hourly, preview the smallest rescue ($2): a guard whose route is down says so ("paused") instead of
+        // claiming to guard.
         if o.canary && now.saturating_sub(t.canary_ms) >= 3_600_000 {
-            if !custody.withdraw_works(guard_id, &s.hl_address, "5000000", policy::USDC)? {
+            if !custody.withdraw_works(guard_id, &s.hl_address, "2000000", policy::USDC)? {
                 vault::put(host, &key, &t)?;
                 return Ok(CheckStatus::Skipped);
             }

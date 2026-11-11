@@ -66,15 +66,20 @@ pub struct SizeInput {
     pub reserve_usd: f64,
 }
 
-/// USDC needed to lift the distance to the drawn target, clamped; None when under the $5 minimum.
+/// The smallest rescue the private route to Hyperliquid carries ($2 lands $1.68 in about 20 s; $1 is refused).
+pub const MIN_RESCUE_USD: f64 = 2.0;
+
+/// USDC needed to lift the distance to the drawn target, at least the route's minimum (a small position gets the
+/// minimum rather than no rescue), within the cap, the budget left and the reserve; None when they allow less than
+/// the minimum.
 pub fn rescue_size(i: &SizeInput) -> Option<f64> {
     let side = if i.szi > 0.0 { 1.0 } else { -1.0 };
-    let t = (i.drawn_target - i.distance) / 100.0 * i.mark * i.szi.abs() * (1.0 - i.maint_frac * side);
-    let t = t.min(i.max_rescue_usd).min(i.budget_left_usd).min(i.reserve_usd);
-    if t < 5.0 {
+    let need = (i.drawn_target - i.distance) / 100.0 * i.mark * i.szi.abs() * (1.0 - i.maint_frac * side);
+    let room = i.max_rescue_usd.min(i.budget_left_usd).min(i.reserve_usd);
+    if room < MIN_RESCUE_USD {
         None
     } else {
-        Some(t)
+        Some(need.max(MIN_RESCUE_USD).min(room))
     }
 }
 

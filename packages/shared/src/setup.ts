@@ -13,7 +13,7 @@ import {
   ownerSalt,
   randomSalt,
 } from './commitment';
-import { presetRanges } from './guard';
+import { MIN_RESCUE_USD, presetRanges } from './guard';
 import type { SealContents } from './sealfile';
 import { seal } from './seal';
 import type { GuardSettings, Preset } from './types';
@@ -40,13 +40,13 @@ export interface PreparedGuard {
   fingerprint: string;
 }
 
-/** The checker's rule: a rescue of at least $5, within the budget. */
-export const MIN_RESERVE_USD = 5;
+/** A reserve must hold at least one rescue: the route's minimum (the checker refuses a smaller cap). */
+export const MIN_RESERVE_USD = MIN_RESCUE_USD;
 
 export function prepareGuard(d: GuardDraft, random: (n: number) => Uint8Array, nowMs: number): PreparedGuard {
   const ranges = presetRanges(d.preset, d.distance);
   if (!ranges) throw new Error('this position is too close to liquidation for this preset');
-  if (d.budget_usd < MIN_RESERVE_USD) throw new Error('the reserve must be at least $5');
+  if (d.budget_usd < MIN_RESERVE_USD) throw new Error(`the reserve must be at least $${MIN_RESERVE_USD}`);
   const ownerSecret = random(32);
   const receiptSecret = random(32);
   const owner = `ed25519:${base58(ed25519.getPublicKey(ownerSecret))}`;

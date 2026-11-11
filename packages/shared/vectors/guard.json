@@ -420,7 +420,7 @@
    "max_rescue_usd": 5000,
    "budget_left_usd": 5000,
    "reserve_usd": 5000,
-   "size_usd": null
+   "size_usd": 2
   },
   {
    "drawn_target": 11.0,
@@ -431,7 +431,29 @@
    "max_rescue_usd": 5000,
    "budget_left_usd": 5000,
    "reserve_usd": 4.0,
+   "size_usd": 4.0
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 2205.0,
+   "szi": 12.4,
+   "maint_frac": 0.02,
+   "max_rescue_usd": 5000,
+   "budget_left_usd": 1.5,
+   "reserve_usd": 5000,
    "size_usd": null
+  },
+  {
+   "drawn_target": 11.0,
+   "distance": 4.9,
+   "mark": 100000.0,
+   "szi": 0.0001,
+   "maint_frac": 0.0125,
+   "max_rescue_usd": 2.7,
+   "budget_left_usd": 2.7,
+   "reserve_usd": 2.7,
+   "size_usd": 2
   }
  ],
  "save_fee": [

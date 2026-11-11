@@ -51,7 +51,8 @@ describe('prepareGuard', () => {
 
   it('refuses what the checker would refuse', () => {
     expect(() => prepareGuard({ ...draft, distance: 0.5 }, random, NOW)).toThrow(/too close/);
-    expect(() => prepareGuard({ ...draft, budget_usd: 4 }, random, NOW)).toThrow(/at least \$5/);
+    expect(() => prepareGuard({ ...draft, budget_usd: 1.5 }, random, NOW)).toThrow(/at least \$2/);
+    expect(prepareGuard({ ...draft, budget_usd: 2.7 }, random, NOW).contents.settings.max_rescue_usd).toBe(2.7);
   });
 
   it('gives an isolated guard a random agent name, never one that announces it', () => {

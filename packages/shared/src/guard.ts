@@ -97,12 +97,19 @@ export interface SizeInput {
   reserve_usd: number;
 }
 
-/** USDC needed to lift the distance to the drawn target, clamped; null when under the $5 minimum. */
+/** The smallest rescue the private route to Hyperliquid carries ($2 lands $1.68 in about 20 s; $1 is refused). */
+export const MIN_RESCUE_USD = 2;
+
+/**
+ * USDC needed to lift the distance to the drawn target, at least the route's minimum (a small position gets the
+ * minimum rather than no rescue), within the cap, the budget left and the reserve; null when they allow less than
+ * the minimum.
+ */
 export function rescueSize(i: SizeInput): number | null {
   const side = i.szi > 0 ? 1 : -1;
-  let t = ((i.drawn_target - i.distance) / 100) * i.mark * Math.abs(i.szi) * (1 - i.maint_frac * side);
-  t = Math.min(t, i.max_rescue_usd, i.budget_left_usd, i.reserve_usd);
-  return t < 5 ? null : t;
+  const need = ((i.drawn_target - i.distance) / 100) * i.mark * Math.abs(i.szi) * (1 - i.maint_frac * side);
+  const room = Math.min(i.max_rescue_usd, i.budget_left_usd, i.reserve_usd);
+  return room < MIN_RESCUE_USD ? null : Math.min(Math.max(need, MIN_RESCUE_USD), room);
 }
 
 /** 3 % of a saved rescue, 0.5 % on any part above $50,000 (PRD §7). */
