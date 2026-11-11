@@ -14,6 +14,7 @@ import {
   type SealContents,
 } from '@ripcord/shared';
 import { CHECKER_PROJECT, NEAR_RPC, OUTLAYER, REGISTRY } from './near';
+import type { Stats } from './ledger';
 import type { OnChainArm, OnChainGuard } from './verify';
 
 export const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
@@ -153,11 +154,14 @@ async function view<T>(method: string, args: object, contract = REGISTRY): Promi
 export interface OnChainReceipt {
   public: { at_hour: number; credit_usd: number; latency_s: number; outcome: string };
   sealed: string;
+  /** The exact figures and Hyperliquid transaction, only when the owner published proof. */
+  proof?: { at: number; hl_credit_usd: number; hl_tx: string } | null;
 }
 
 export const readGuard = (id: string) => view<{ status: string }>('get_guard', { guard_id: id });
 export const readReceipts = (id: string) =>
   view<OnChainReceipt[]>('get_receipts', { guard_id: id, from: 0, limit: 50 });
+export const readStats = () => view<Stats>('stats', {});
 export const readGuardHashes = (id: string) => view<OnChainGuard>('get_guard', { guard_id: id });
 export const readArms = (id: string) => view<OnChainArm[]>('get_arms', { guard_id: id, from: 0, limit: 100 });
 /** The build OutLayer runs for the checker: its project's active version, the wasm's sha256. */

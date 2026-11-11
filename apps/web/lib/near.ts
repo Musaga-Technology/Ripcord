@@ -12,6 +12,8 @@ const NETS = {
     // The checker's OutLayer project, and the sha256 of the build it runs (`bash checker/build.sh mainnet`).
     checkerProject: 'ripcord-registry.near/checker',
     checkerHash: '',
+    // Guards whose owners publish every rescue in full on the ledger: Ripcord's own.
+    publishedGuards: [] as string[],
   },
   testnet: {
     registry: 'ripcord-registry-db06d339.testnet',
@@ -20,6 +22,7 @@ const NETS = {
     explorer: 'https://testnet.nearblocks.io',
     checkerProject: 'ripcord-ops-57834db8.testnet/checker',
     checkerHash: '7d179aa3bfbf4c67b3b8ae77b7ed91e5125efe5f2dafe7293921d74d5dac2bf6',
+    publishedGuards: [] as string[],
   },
 } as const;
 const NET = NETS[NETWORK];
@@ -30,6 +33,7 @@ export const OUTLAYER = NET.outlayer;
 export const EXPLORER = NET.explorer;
 export const CHECKER_PROJECT = NET.checkerProject;
 export const CHECKER_HASH = NET.checkerHash;
+export const PUBLISHED_GUARDS: readonly string[] = NET.publishedGuards;
 export const NETWORK_NAME = NETWORK === 'mainnet' ? 'NEAR' : 'NEAR testnet';
 
 export const accountUrl = (account: string) => `${EXPLORER}/address/${account}`;
