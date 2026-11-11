@@ -149,7 +149,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
       drop !== null && survive !== null && survive > 0 ? `enough to survive a ${drop}% drop` : null,
       i.preset ? `${i.preset[0]!.toUpperCase()}${i.preset.slice(1)}` : null,
     ].filter(Boolean);
-    return `${i.say ? `“${i.say}”: ` : ''}${parts.join(', ')}.`;
+    const said = i.say.replace(/[\s.!]+$/, '');
+    return `${said ? `“${said}”: ` : ''}${parts.join(', ')}.`;
   };
 
   const [phase, setPhase] = useState<Phase>('edit');
