@@ -75,7 +75,7 @@ export function AccountMenu({ session, onLeave }: { session: Session; onLeave():
               onLeave();
             }}
           >
-            {session.kind === 'demo' ? 'Leave the example account' : 'Disconnect'}
+            {session.kind === 'demo' ? 'Leave simulation' : 'Disconnect'}
           </button>
         </div>
       )}

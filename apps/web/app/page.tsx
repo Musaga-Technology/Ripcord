@@ -406,8 +406,8 @@ export default function Home() {
             <Link href="/guards" className="min-h-9 hover:text-text">
               Guard a position
             </Link>
-            <Link href="/guards?example" className="min-h-9 hover:text-text">
-              Example account
+            <Link href="/guards?simulation" className="min-h-9 hover:text-text">
+              Try a simulation
             </Link>
             <a href="#hunt" className="min-h-9 hover:text-text">
               Try to hunt it

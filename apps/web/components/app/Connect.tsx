@@ -45,9 +45,6 @@ export function Connect() {
           <button type="button" className={primaryBtn} onClick={wallet}>
             Connect wallet
           </button>
-          <button type="button" className={ghostBtn} onClick={() => enter(demoSession)}>
-            Try an example account
-          </button>
         </div>
         <form onSubmit={paste} className="flex flex-col gap-2 border-t border-line pt-5">
           <label htmlFor="address" className="text-[13px] text-muted">
@@ -74,6 +71,21 @@ export function Connect() {
         <p role="alert" className="min-h-6 text-[15px] text-red">
           {error}
         </p>
+        <section
+          aria-label="Simulation"
+          className="flex flex-col items-start gap-3 rounded-[20px] border border-line bg-panel p-5"
+        >
+          <div className="flex flex-col gap-1">
+            <h2 className="text-[17px] font-semibold">Not ready to connect? Try a simulation.</h2>
+            <p className="text-[15px] text-text-2">
+              An example account with simulated prices and money. Guard a position, then crash the market and watch the
+              rescue land.
+            </p>
+          </div>
+          <button type="button" className={ghostBtn} onClick={() => enter(demoSession)}>
+            Try a simulation
+          </button>
+        </section>
       </div>
       <div className="mx-auto w-full max-w-[460px]">
         <Card3D>

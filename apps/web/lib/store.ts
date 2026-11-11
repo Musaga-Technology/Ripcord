@@ -40,6 +40,11 @@ export function saveGuard(g: LocalGuard): void {
   save([g, ...loadGuards().filter((x) => x.id !== g.id)]);
 }
 
+/** Forgets the guards made in a simulation, so the next one starts from the example account as it was. */
+export function clearSimulation(): void {
+  save(loadGuards().filter((g) => !g.demo));
+}
+
 export function patchGuard(id: string, patch: Partial<LocalGuard>): void {
   save(loadGuards().map((g) => (g.id === id ? { ...g, ...patch } : g)));
 }

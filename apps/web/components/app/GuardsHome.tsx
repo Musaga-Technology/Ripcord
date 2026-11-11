@@ -38,7 +38,7 @@ function Home() {
           Open Hyperliquid
         </a>
         <button type="button" className={ghostBtn} onClick={() => enter(demoSession)}>
-          Try an example account
+          Try a simulation
         </button>
       </Notice>
     );
@@ -65,7 +65,7 @@ function Home() {
       <Dashboard holdings={account.holdings} guards={guards} activity={isDemo ? EXAMPLE_ACTIVITY : []} />
       <p className="text-[13px] text-muted">
         {session.kind === 'demo'
-          ? 'An example account and example guards. No wallet is connected and no funds move. '
+          ? 'A simulation: example positions and guards, simulated prices, no wallet and no money. '
           : 'Positions read from Hyperliquid just now, in this browser. '}
         Every guard runs on NEAR: checks in OutLayer&apos;s enclave, reserves in Confidential Intents, and a public
         registry of hashes at{' '}

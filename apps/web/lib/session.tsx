@@ -1,11 +1,12 @@
 'use client';
 
-// Who the app is looking at: an example account, an address someone pasted, or a connected wallet. Remembered for this
-// tab only, and never sent anywhere: positions are read straight from Hyperliquid.
+// Who the app is looking at: the simulation, an address someone pasted, or a connected wallet. Remembered for this tab
+// only and never sent anywhere; positions are read straight from Hyperliquid.
 import { DEMO_LEVERAGE, DEMO_POSITIONS, DEMO_TRADER } from '@ripcord/shared/mock';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { demo, live, type Backend } from './backend';
 import { readAccount, type Account, type Holding } from './hl';
+import { clearSimulation } from './store';
 
 export type SessionKind = 'demo' | 'address' | 'wallet';
 export interface Session {
@@ -29,8 +30,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
-      // `?example` opens the example account directly (the landing page links to it).
-      if (new URLSearchParams(location.search).has('example')) {
+      // `?simulation` (or the older `?example`) starts a fresh simulation, as the landing page's links do.
+      const q = new URLSearchParams(location.search);
+      if (q.has('simulation') || q.has('example')) {
+        clearSimulation();
         sessionStorage.setItem(KEY, JSON.stringify(demoSession));
       }
       const saved = sessionStorage.getItem(KEY);
@@ -41,6 +44,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
   const enter = useCallback((s: Session) => {
+    // Every simulation starts from the same example account.
+    if (s.kind === 'demo') clearSimulation();
     setSession(s);
     try {
       sessionStorage.setItem(KEY, JSON.stringify(s));

@@ -90,13 +90,13 @@ export function AppPreview() {
       </div>
       <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-4 lg:mt-10 lg:pr-[340px]">
         <p className="text-[13px] text-muted">
-          The app&apos;s own screens, on the example account. Example data until launch.
+          The app&apos;s own screens, in the simulation: example positions and simulated prices.
         </p>
         <Link
-          href="/guards?example"
+          href="/guards?simulation"
           className="inline-flex min-h-11 items-center rounded-full border border-line-3 px-6 text-[15px] font-medium transition-colors duration-[120ms] hover:border-muted"
         >
-          Open the example account
+          Try a simulation
         </Link>
       </div>
     </div>

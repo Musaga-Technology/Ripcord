@@ -21,7 +21,7 @@ export function OnNear({ guardId, example }: { guardId: string; example: boolean
     {
       what: 'Its record',
       how: example
-        ? 'A NEAR contract holds each guard as hashes, never an address. This example guard is not on chain.'
+        ? 'A NEAR contract holds each guard as hashes, never an address. This simulated guard is not on chain.'
         : `A NEAR contract holds this guard (${guardId}) as hashes, never an address, and its receipts.`,
       link: { label: 'The registry', href: accountUrl(REGISTRY) },
     },

@@ -241,7 +241,7 @@ function Coming({ panel }: { panel: Panel }) {
   };
   return (
     <p className="text-[15px] text-text-2">
-      {what[panel]} This arrives with the mainnet launch; it works on the example account today.
+      {what[panel]} This arrives with the mainnet launch; try it in the simulation today.
     </p>
   );
 }

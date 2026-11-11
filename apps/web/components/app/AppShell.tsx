@@ -62,14 +62,31 @@ export function AppShell({ children }: { children: ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {session?.kind === 'demo' && (
-              <span className="hidden text-[13px] text-muted sm:inline">Example account</span>
-            )}
-            {session && <AccountMenu session={session} onLeave={leave} />}
+            {session && session.kind !== 'demo' && <AccountMenu session={session} onLeave={leave} />}
             <ThemeToggle />
           </div>
         </div>
       </header>
+      {session?.kind === 'demo' && (
+        <div role="status" className="border-b border-amber/30 bg-amber/10">
+          <div className={`${appWrap} flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2`}>
+            <p className="flex items-center gap-2 text-[13px] text-text-2">
+              <span aria-hidden="true" className="h-[7px] w-[7px] shrink-0 rounded-full bg-amber" />
+              <span>
+                <span className="font-semibold text-text">Simulation.</span> Example positions, simulated prices, no
+                real money.
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={leave}
+              className="min-h-9 text-[13px] font-medium text-text underline decoration-line-3 underline-offset-4 hover:decoration-text"
+            >
+              Leave simulation
+            </button>
+          </div>
+        </div>
+      )}
       <main className={`${appWrap} flex flex-1 flex-col pb-24 pt-7 sm:pb-7`}>{children}</main>
       {/* Phone: the tab bar (DESIGN §3), above the home indicator. */}
       <nav

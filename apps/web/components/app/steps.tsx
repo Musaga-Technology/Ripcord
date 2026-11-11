@@ -26,7 +26,7 @@ export const assetOf = (reserve: string) => ASSETS.find((a) => a.reserve === res
 export function explain(e: unknown, doing: string): string {
   const m = e instanceof Refused ? e.message : '';
   if (m === 'not configured')
-    return "This copy of Ripcord isn't connected to a guard yet. The example account works without one.";
+    return "This copy of Ripcord isn't connected to a guard yet. The simulation works without one.";
   if (m === 'too many requests') return 'Too many requests from here. Wait a minute and try again.';
   if (m.includes('private route') || m.includes('HTTP 503')) {
     return `The private route is down, so ${doing} has to wait. Nothing has moved. Try again soon.`;
