@@ -85,9 +85,11 @@ export function Approve({
     <div className="step-in flex flex-col items-start gap-4">
       <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">One approval on Hyperliquid.</h2>
       <p className="max-w-[34rem] text-[15px] text-text-2">
-        Isolated margin, so this guard needs one approval on Hyperliquid. The key you approve belongs to this
-        guard&apos;s own wallet and never leaves OutLayer&apos;s keystore on NEAR; its code only adds margin. You can
-        revoke it on Hyperliquid at any time, and it ends with the guard.
+        A rescue reaches an isolated position through one key you approve. It can&apos;t withdraw or send your money,
+        and the guard only uses it to add margin. Revoke it on Hyperliquid any time; it ends with the guard.
+      </p>
+      <p className="max-w-[34rem] text-[13px] text-muted">
+        The key belongs to this guard&apos;s own wallet and never leaves OutLayer&apos;s keystore on NEAR.
       </p>
       <button type="button" className={primaryBtn} onClick={approve} disabled={busy}>
         {busy ? 'Waiting for your wallet…' : 'Approve on Hyperliquid'}
@@ -250,7 +252,8 @@ export function Fund({
         <div aria-busy="true" className="h-[208px] animate-pulse rounded-[20px] border border-line bg-panel" />
       ) : (
         <div className="flex flex-wrap items-center gap-5 rounded-[20px] border border-line bg-panel p-5">
-          <Qr text={deposit.address} />
+          {/* A QR is for a phone wallet; a send from Hyperliquid happens in Hyperliquid itself. */}
+          {!asset.how && <Qr text={deposit.address} />}
           <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
             <span className="text-[13px] text-muted">
               {isDemo ? 'Example address, no funds needed' : `Send to this address on ${asset.chain}`}

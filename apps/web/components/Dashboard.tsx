@@ -172,7 +172,7 @@ export function Dashboard({
                       <Link
                         href={`/guards/${r.guard.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-2 rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium hover:border-muted"
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-line-3 px-3 py-1 text-[13px] font-medium hover:border-muted"
                       >
                         <span
                           className={`h-[7px] w-[7px] rounded-full ${r.guard.state === 'guarded' ? 'bg-amber' : 'bg-muted'}`}

@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { guardOf, guardsFor } from '../../lib/guards';
-import { SessionProvider, useAccount, useSession } from '../../lib/session';
+import { demoSession, SessionProvider, useAccount, useSession } from '../../lib/session';
 import { loadGuards, type LocalGuard } from '../../lib/store';
 import { Dashboard, type Activity } from '../Dashboard';
 import { usd } from '../format';
-import { AppShell } from './AppShell';
+import { AppShell, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
 import { OpenSeal } from './OpenSeal';
 import { accountUrl, REGISTRY } from '../../lib/near';
 
 function Home() {
-  const { ready, session } = useSession();
+  const { ready, session, enter } = useSession();
   const { account, error } = useAccount(session);
   const [local, setLocal] = useState<LocalGuard[]>([]);
   useEffect(() => setLocal(loadGuards()), [session]);
@@ -31,9 +31,16 @@ function Home() {
   if (account.holdings.length === 0) {
     return (
       <Notice
-        title="No open positions on this account."
-        text="When this account holds a position, it shows here, ready to guard."
-      />
+        title="No open positions yet."
+        text={`Open one on Hyperliquid and it appears here, ready to guard. This page reads the account every 15 seconds${account.value > 0 ? `; it holds ${usd(account.value, 2)} now` : ''}.`}
+      >
+        <a href="https://app.hyperliquid.xyz/trade" target="_blank" rel="noreferrer" className={primaryBtn}>
+          Open Hyperliquid
+        </a>
+        <button type="button" className={ghostBtn} onClick={() => enter(demoSession)}>
+          Try an example account
+        </button>
+      </Notice>
     );
   }
 
@@ -80,11 +87,12 @@ const EXAMPLE_ACTIVITY: Activity[] = [
   { when: 'Oct 21', text: 'HYPE guard sealed and funded', tone: 'amber' },
 ];
 
-function Notice({ title, text }: { title: string; text: string }) {
+function Notice({ title, text, children }: { title: string; text: string; children?: ReactNode }) {
   return (
     <div className="my-auto flex flex-col items-center gap-2 py-16 text-center">
       <h1 className="text-[28px] font-semibold tracking-[-0.03em]">{title}</h1>
-      <p className="max-w-[28rem] text-text-2">{text}</p>
+      <p className="max-w-[30rem] text-text-2">{text}</p>
+      {children && <div className="mt-4 flex flex-wrap justify-center gap-3">{children}</div>}
     </div>
   );
 }
