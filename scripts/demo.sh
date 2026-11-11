@@ -51,6 +51,16 @@ else
   skip "cargo not found; the replay harness needs Rust"
 fi
 
+step "Predictions sealed on Nov 3, scored on October 2026 prices (crates/replay/holdout)"
+if command -v python3 >/dev/null; then
+  run python3 -I -c "import hashlib, sys; h = hashlib.sha256(open('crates/replay/holdout/predictions.md', 'rb').read()).hexdigest(); sys.exit(h != open('crates/replay/holdout/predictions.sha256').read().split()[0])" \
+    && ok "the revealed predictions match the sha256 committed on Nov 3 (a2562f5)"
+  run python3 -I scripts/replay/score.py crates/replay/holdout/2026-10.txt \
+    && ok "6 of 6 predictions pass: 211 of 992 positions liquidated unguarded, 20 with a hidden 1× reserve, the same 20 as posting it upfront"
+else
+  skip "python3 not found"
+fi
+
 step "Pokers decide when to wake the checker (docs/SPEC.md §4)"
 run $PNPM --filter @ripcord/poker test && ok "band, cadence, rate limit, settlement watch; an address is watched only with the owner's salt; encrypted at rest"
 

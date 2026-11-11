@@ -1,0 +1,169 @@
+asset    lev  reserve  mode              positions  liquidated  rescues  saved  early  failed
+BTC       10×    0.5×   unguarded             1092   14.38 %         0      0      0       0
+BTC       10×    0.5×   upfront               1092    5.59 %         0      0      0       0
+BTC       10×    0.5×   safer                 1092    5.59 %      1191     45   1139       7
+BTC       10×    0.5×   balanced              1092    5.59 %       843     80    757       6
+BTC       10×    0.5×   balanced +speed       1092    5.59 %       798     61    727      10
+BTC       10×    0.5×   lean                  1092    5.59 %       597    113    471      13
+BTC       10×    0.5×   lean +speed           1092    5.59 %       577     91    471      15
+BTC       10×    1.0×   unguarded             1092   14.38 %         0      0      0       0
+BTC       10×    1.0×   upfront               1092    1.83 %         0      0      0       0
+BTC       10×    1.0×   safer                 1092    1.83 %      1392     85   1307       0
+BTC       10×    1.0×   balanced              1092    2.11 %       976    124    849       3
+BTC       10×    1.0×   balanced +speed       1092    1.92 %       910     97    811       2
+BTC       10×    1.0×   lean                  1092    2.75 %       675    147    519       9
+BTC       10×    1.0×   lean +speed           1092    1.92 %       656    128    525       3
+BTC       10×    2.0×   unguarded             1092   14.38 %         0      0      0       0
+BTC       10×    2.0×   upfront               1092    0.00 %         0      0      0       0
+BTC       10×    2.0×   safer                 1092    0.00 %      1489    114   1375       0
+BTC       10×    2.0×   balanced              1092    0.27 %      1037    146    888       3
+BTC       10×    2.0×   balanced +speed       1092    0.09 %       962    114    847       1
+BTC       10×    2.0×   lean                  1092    0.92 %       716    168    540       8
+BTC       10×    2.0×   lean +speed           1092    0.09 %       695    144    550       1
+BTC       20×    0.5×   unguarded             1092   50.46 %         0      0      0       0
+BTC       20×    0.5×   upfront               1092   30.13 %         0      0      0       0
+BTC       20×    0.5×   safer                 1092   30.13 %      1842    480   1340      22
+BTC       20×    0.5×   balanced              1092   30.31 %      1518    565    932      21
+BTC       20×    0.5×   balanced +speed       1092   30.22 %      1261    405    825      31
+BTC       20×    0.5×   lean                  1092   30.68 %      1266    629    608      29
+BTC       20×    0.5×   lean +speed           1092   30.40 %      1054    469    553      32
+BTC       20×    1.0×   unguarded             1092   50.46 %         0      0      0       0
+BTC       20×    1.0×   upfront               1092   14.38 %         0      0      0       0
+BTC       20×    1.0×   safer                 1092   14.47 %      2654    744   1886      24
+BTC       20×    1.0×   balanced              1092   14.74 %      2132    840   1273      19
+BTC       20×    1.0×   balanced +speed       1092   14.65 %      1713    597   1097      19
+BTC       20×    1.0×   lean                  1092   15.48 %      1719    885    801      33
+BTC       20×    1.0×   lean +speed           1092   14.93 %      1443    672    750      21
+BTC       20×    2.0×   unguarded             1092   50.46 %         0      0      0       0
+BTC       20×    2.0×   upfront               1092    5.59 %         0      0      0       0
+BTC       20×    2.0×   safer                 1092    6.14 %      3311    953   2311      47
+BTC       20×    2.0×   balanced              1092    6.50 %      2613   1048   1528      37
+BTC       20×    2.0×   balanced +speed       1092    6.04 %      2059    749   1294      16
+BTC       20×    2.0×   lean                  1092    7.33 %      2066   1063    956      47
+BTC       20×    2.0×   lean +speed           1092    6.59 %      1712    812    872      28
+ETH       10×    0.5×   unguarded             1092   33.97 %         0      0      0       0
+ETH       10×    0.5×   upfront               1092   13.55 %         0      0      0       0
+ETH       10×    0.5×   safer                 1092   13.55 %      1517    201   1311       5
+ETH       10×    0.5×   balanced              1092   13.55 %      1189    260    919      10
+ETH       10×    0.5×   balanced +speed       1092   13.55 %      1042    201    835       6
+ETH       10×    0.5×   lean                  1092   13.83 %       944    329    604      11
+ETH       10×    0.5×   lean +speed           1092   13.55 %       832    244    578      10
+ETH       10×    1.0×   unguarded             1092   33.97 %         0      0      0       0
+ETH       10×    1.0×   upfront               1092    5.86 %         0      0      0       0
+ETH       10×    1.0×   safer                 1092    5.86 %      2001    298   1685      18
+ETH       10×    1.0×   balanced              1092    5.86 %      1504    362   1131      11
+ETH       10×    1.0×   balanced +speed       1092    5.86 %      1298    267   1022       9
+ETH       10×    1.0×   lean                  1092    6.23 %      1158    424    719      15
+ETH       10×    1.0×   lean +speed           1092    5.86 %      1052    324    719       9
+ETH       10×    2.0×   unguarded             1092   33.97 %         0      0      0       0
+ETH       10×    2.0×   upfront               1092    0.82 %         0      0      0       0
+ETH       10×    2.0×   safer                 1092    0.82 %      2278    436   1840       2
+ETH       10×    2.0×   balanced              1092    1.01 %      1709    474   1233       2
+ETH       10×    2.0×   balanced +speed       1092    0.92 %      1444    337   1107       0
+ETH       10×    2.0×   lean                  1092    2.47 %      1292    507    772      13
+ETH       10×    2.0×   lean +speed           1092    1.10 %      1161    392    767       2
+ETH       20×    0.5×   unguarded             1092   68.50 %         0      0      0       0
+ETH       20×    0.5×   upfront               1092   48.26 %         0      0      0       0
+ETH       20×    0.5×   safer                 1092   48.81 %      2279   1072   1123      84
+ETH       20×    0.5×   balanced              1092   49.18 %      1919   1107    742      70
+ETH       20×    0.5×   balanced +speed       1092   48.90 %      1465    740    674      51
+ETH       20×    0.5×   lean                  1092   49.63 %      1605   1092    450      63
+ETH       20×    0.5×   lean +speed           1092   49.08 %      1280    747    468      65
+ETH       20×    1.0×   unguarded             1092   68.50 %         0      0      0       0
+ETH       20×    1.0×   upfront               1092   33.97 %         0      0      0       0
+ETH       20×    1.0×   safer                 1092   35.44 %      3493   1743   1667      83
+ETH       20×    1.0×   balanced              1092   36.08 %      2923   1742   1095      86
+ETH       20×    1.0×   balanced +speed       1092   35.53 %      2038   1065    918      55
+ETH       20×    1.0×   lean                  1092   37.82 %      2436   1644    684     108
+ETH       20×    1.0×   lean +speed           1092   35.90 %      1791   1090    647      54
+ETH       20×    2.0×   unguarded             1092   68.50 %         0      0      0       0
+ETH       20×    2.0×   upfront               1092   13.55 %         0      0      0       0
+ETH       20×    2.0×   safer                 1092   18.22 %      4851   2560   2189     102
+ETH       20×    2.0×   balanced              1092   19.51 %      4018   2470   1451      97
+ETH       20×    2.0×   balanced +speed       1092   16.94 %      2674   1457   1158      59
+ETH       20×    2.0×   lean                  1092   23.63 %      3216   2219    873     124
+ETH       20×    2.0×   lean +speed           1092   17.86 %      2351   1476    807      68
+SOL        5×    0.5×   unguarded             1092    6.78 %         0      0      0       0
+SOL        5×    0.5×   upfront               1092    2.47 %         0      0      0       0
+SOL        5×    0.5×   safer                 1092    2.47 %       977     37    936       4
+SOL        5×    0.5×   balanced              1092    2.47 %       615     45    564       6
+SOL        5×    0.5×   balanced +speed       1092    2.47 %       592     36    551       5
+SOL        5×    0.5×   lean                  1092    2.47 %       388     64    316       8
+SOL        5×    0.5×   lean +speed           1092    2.47 %       386     43    338       5
+SOL        5×    1.0×   unguarded             1092    6.78 %         0      0      0       0
+SOL        5×    1.0×   upfront               1092    0.73 %         0      0      0       0
+SOL        5×    1.0×   safer                 1092    1.01 %      1084     67   1010       7
+SOL        5×    1.0×   balanced              1092    1.19 %       677     68    603       6
+SOL        5×    1.0×   balanced +speed       1092    0.73 %       642     52    590       0
+SOL        5×    1.0×   lean                  1092    1.47 %       426     82    334      10
+SOL        5×    1.0×   lean +speed           1092    0.73 %       421     62    358       1
+SOL        5×    2.0×   unguarded             1092    6.78 %         0      0      0       0
+SOL        5×    2.0×   upfront               1092    0.00 %         0      0      0       0
+SOL        5×    2.0×   safer                 1092    0.55 %      1104     71   1027       6
+SOL        5×    2.0×   balanced              1092    0.73 %       690     72    612       6
+SOL        5×    2.0×   balanced +speed       1092    0.00 %       660     52    608       0
+SOL        5×    2.0×   lean                  1092    1.19 %       431     85    337       9
+SOL        5×    2.0×   lean +speed           1092    0.09 %       435     63    371       1
+SOL       10×    0.5×   unguarded             1092   41.58 %         0      0      0       0
+SOL       10×    0.5×   upfront               1092   16.67 %         0      0      0       0
+SOL       10×    0.5×   safer                 1092   16.67 %      1726    269   1448       9
+SOL       10×    0.5×   balanced              1092   16.85 %      1362    317   1030      15
+SOL       10×    0.5×   balanced +speed       1092   16.76 %      1208    247    945      16
+SOL       10×    0.5×   lean                  1092   17.12 %      1114    404    688      22
+SOL       10×    0.5×   lean +speed           1092   16.85 %       995    302    672      21
+SOL       10×    1.0×   unguarded             1092   41.58 %         0      0      0       0
+SOL       10×    1.0×   upfront               1092    6.78 %         0      0      0       0
+SOL       10×    1.0×   safer                 1092    6.87 %      2325    392   1915      18
+SOL       10×    1.0×   balanced              1092    7.14 %      1773    434   1319      20
+SOL       10×    1.0×   balanced +speed       1092    6.96 %      1499    316   1171      12
+SOL       10×    1.0×   lean                  1092    8.42 %      1379    520    830      29
+SOL       10×    1.0×   lean +speed           1092    7.51 %      1221    385    817      19
+SOL       10×    2.0×   unguarded             1092   41.58 %         0      0      0       0
+SOL       10×    2.0×   upfront               1092    2.47 %         0      0      0       0
+SOL       10×    2.0×   safer                 1092    2.66 %      2647    523   2100      24
+SOL       10×    2.0×   balanced              1092    3.21 %      2004    551   1428      25
+SOL       10×    2.0×   balanced +speed       1092    2.56 %      1649    379   1261       9
+SOL       10×    2.0×   lean                  1092    4.85 %      1532    608    888      36
+SOL       10×    2.0×   lean +speed           1092    3.21 %      1340    455    871      14
+HYPE       3×    0.5×   unguarded             1092    6.50 %         0      0      0       0
+HYPE       3×    0.5×   upfront               1092    2.84 %         0      0      0       0
+HYPE       3×    0.5×   safer                 1092    2.84 %       839     35    796       8
+HYPE       3×    0.5×   balanced              1092    2.84 %       481     51    422       8
+HYPE       3×    0.5×   balanced +speed       1092    2.84 %       484     44    432       8
+HYPE       3×    0.5×   lean                  1092    2.84 %       297     54    226      17
+HYPE       3×    0.5×   lean +speed           1092    2.84 %       301     56    239       6
+HYPE       3×    1.0×   unguarded             1092    6.50 %         0      0      0       0
+HYPE       3×    1.0×   upfront               1092    0.46 %         0      0      0       0
+HYPE       3×    1.0×   safer                 1092    0.92 %       944     59    880       5
+HYPE       3×    1.0×   balanced              1092    1.28 %       539     70    463       6
+HYPE       3×    1.0×   balanced +speed       1092    0.82 %       540     61    476       3
+HYPE       3×    1.0×   lean                  1092    1.74 %       329     68    246      15
+HYPE       3×    1.0×   lean +speed           1092    0.46 %       341     72    268       1
+HYPE       3×    2.0×   unguarded             1092    6.50 %         0      0      0       0
+HYPE       3×    2.0×   upfront               1092    0.00 %         0      0      0       0
+HYPE       3×    2.0×   safer                 1092    0.46 %       987     64    919       4
+HYPE       3×    2.0×   balanced              1092    0.82 %       564     71    487       6
+HYPE       3×    2.0×   balanced +speed       1092    0.37 %       564     63    499       2
+HYPE       3×    2.0×   lean                  1092    1.28 %       341     72    255      14
+HYPE       3×    2.0×   lean +speed           1092    0.00 %       354     74    280       0
+HYPE       5×    0.5×   unguarded             1092   23.99 %         0      0      0       0
+HYPE       5×    0.5×   upfront               1092    8.88 %         0      0      0       0
+HYPE       5×    0.5×   safer                 1092    8.88 %      1465    107   1347      11
+HYPE       5×    0.5×   balanced              1092    8.88 %      1066    141    914      11
+HYPE       5×    0.5×   balanced +speed       1092    8.88 %      1006    126    872       8
+HYPE       5×    0.5×   lean                  1092    8.88 %       786    195    576      15
+HYPE       5×    0.5×   lean +speed           1092    8.88 %       761    158    592      11
+HYPE       5×    1.0×   unguarded             1092   23.99 %         0      0      0       0
+HYPE       5×    1.0×   upfront               1092    4.40 %         0      0      0       0
+HYPE       5×    1.0×   safer                 1092    4.40 %      1766    166   1577      23
+HYPE       5×    1.0×   balanced              1092    4.40 %      1268    199   1054      15
+HYPE       5×    1.0×   balanced +speed       1092    4.40 %      1166    179    978       9
+HYPE       5×    1.0×   lean                  1092    4.40 %       912    241    656      15
+HYPE       5×    1.0×   lean +speed           1092    4.40 %       872    208    655       9
+HYPE       5×    2.0×   unguarded             1092   23.99 %         0      0      0       0
+HYPE       5×    2.0×   upfront               1092    0.92 %         0      0      0       0
+HYPE       5×    2.0×   safer                 1092    2.20 %      1923    228   1674      21
+HYPE       5×    2.0×   balanced              1092    2.20 %      1384    247   1122      15
+HYPE       5×    2.0×   balanced +speed       1092    2.20 %      1265    222   1028      15
+HYPE       5×    2.0×   lean                  1092    2.20 %       990    287    688      15
+HYPE       5×    2.0×   lean +speed           1092    2.20 %       936    249    681       6
