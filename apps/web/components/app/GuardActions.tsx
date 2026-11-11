@@ -1,8 +1,8 @@
 'use client';
 
 // What the owner can do with a guard (DESIGN §4.3): top up the reserve, change the rescue range, freeze the reserve,
-// close the guard. On the example account each one works; on a real guard they arrive with the mainnet launch, and
-// the panel says what each will do. One panel at a time, inline under the row; Escape closes it.
+// close the guard. In the simulation each one works. On a real guard, freeze and close are signed with the owner key
+// from the opened seal file; top up and change range say what they will do. One panel at a time; Escape closes it.
 import { presetRanges, type Preset } from '@ripcord/shared';
 import { useEffect, useState } from 'react';
 import { radioKeys } from '../../lib/radio';
@@ -18,6 +18,12 @@ export interface Control {
 }
 
 export const NO_CONTROL: Control = { frozen: false, closed: false, added: [], preset: null };
+
+/** A real guard's own actions, signed with the owner key; null until the seal file is open. */
+export interface OwnerActions {
+  freeze(frozen: boolean): Promise<void>;
+  close(): Promise<void>;
+}
 
 type Panel = 'topup' | 'range' | 'freeze' | 'close';
 
@@ -39,8 +45,10 @@ export function GuardActions({
   current = null,
   priceAt,
   busy = null,
+  owner = null,
 }: {
   example: boolean;
+  owner?: OwnerActions | null;
   control: Control;
   onChange(c: Control): void;
   /** The reserve in words, e.g. "0.057 BTC". */
@@ -59,6 +67,8 @@ export function GuardActions({
   const [amount, setAmount] = useState('');
   const [preset, setPreset] = useState<Preset>(control.preset ?? current ?? 'balanced');
   const [done, setDone] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
     if (!panel) return;
@@ -76,8 +86,31 @@ export function GuardActions({
     setDone(message || null);
     setPanel(null);
   };
+  /** A real guard's signed action: the panel stays open with the reason if it doesn't go through. */
+  const act = async (run: () => Promise<void>, next: Control, message: string) => {
+    setWorking(true);
+    setFailed(null);
+    try {
+      await run();
+      finish(next, message);
+    } catch (e) {
+      setFailed(
+        e instanceof Error && e.message
+          ? `${e.message[0]!.toUpperCase()}${e.message.slice(1)}.`
+          : 'That didn’t go through. Try again.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  };
 
-  if (control.closed) return null;
+  if (control.closed)
+    return done ? (
+      <p aria-live="polite" className="flex items-center gap-2 text-[15px] text-text-2">
+        <span className="h-[7px] w-[7px] rounded-full bg-green" />
+        {done}
+      </p>
+    ) : null;
 
   const buttons: { id: Panel; label: string }[] = [
     { id: 'topup', label: 'Top up reserve' },
@@ -115,8 +148,13 @@ export function GuardActions({
       )}
       {panel && (
         <div className="step-in flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-5">
-          {!example ? (
+          {!example && (panel === 'topup' || panel === 'range') ? (
             <Coming panel={panel} />
+          ) : !example && !owner ? (
+            <p className="text-[15px] text-text-2">
+              Open your seal file above: {panel === 'freeze' ? 'freezing' : 'closing'} is signed with the owner key it
+              holds.
+            </p>
           ) : panel === 'topup' ? (
             <form
               className="flex flex-col gap-3"
@@ -202,15 +240,25 @@ export function GuardActions({
               <button
                 type="button"
                 className={`${primaryBtn} w-fit`}
-                onClick={() =>
-                  finish(
-                    { ...control, frozen: !control.frozen },
-                    control.frozen ? 'Unfrozen. Rescues can reach your margin again.' : '',
-                  )
-                }
+                disabled={working}
+                onClick={() => {
+                  const next = { ...control, frozen: !control.frozen };
+                  const said = control.frozen
+                    ? 'Unfrozen. Rescues can reach your margin again.'
+                    : example
+                      ? ''
+                      : 'Frozen. Nothing can leave the reserve until you unfreeze it.';
+                  if (example || !owner) finish(next, said);
+                  else void act(() => owner.freeze(!control.frozen), next, said);
+                }}
               >
-                {control.frozen ? 'Unfreeze reserve' : 'Freeze reserve'}
+                {working ? 'Signing…' : control.frozen ? 'Unfreeze reserve' : 'Freeze reserve'}
               </button>
+              {failed && (
+                <p role="alert" className="text-[15px] text-red">
+                  {failed}
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -220,10 +268,25 @@ export function GuardActions({
               <button
                 type="button"
                 className={`${primaryBtn} w-fit`}
-                onClick={() => finish({ ...control, closed: true }, '')}
+                disabled={working}
+                onClick={() => {
+                  const next = { ...control, closed: true };
+                  if (example || !owner) finish(next, '');
+                  else
+                    void act(
+                      () => owner.close(),
+                      next,
+                      'Closed. What was left of the reserve is on its way to your Hyperliquid account.',
+                    );
+                }}
               >
-                Close and return {reserve}
+                {working ? 'Closing…' : `Close and return ${reserve}`}
               </button>
+              {failed && (
+                <p role="alert" className="text-[15px] text-red">
+                  {failed}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -14,7 +14,8 @@ import {
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { lastCheck, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
+import { lastCheck, readFrozen, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
+import { signClose, signFreeze } from '../../lib/ownerActions';
 import { CrashRun, marginFor } from '../../lib/crash';
 import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
 import { ASSETS } from '../../lib/assets';
@@ -29,7 +30,7 @@ import { Ticker } from '../Ticker';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
-import { GuardActions, NO_CONTROL, type Control } from './GuardActions';
+import { GuardActions, NO_CONTROL, type Control, type OwnerActions } from './GuardActions';
 import { OnNear } from './OnNear';
 import { Approve, assetOf, Fund } from './steps';
 
@@ -673,6 +674,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const [onChain, setOnChain] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<OnChainReceipt[]>([]);
   const [now, setNow] = useState(() => Date.now());
+  const [control, setControl] = useState<Control>(NO_CONTROL);
 
   useEffect(() => {
     const read = () => {
@@ -685,12 +687,30 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
       readReceipts(g.id)
         .then((r) => setReceipts(r ?? []))
         .catch(() => {});
+      readFrozen(g.id)
+        .then((f) => f !== null && setControl((c) => ({ ...c, frozen: f })))
+        .catch(() => {});
       setNow(Date.now());
     };
     read();
     const t = setInterval(read, 30_000);
     return () => clearInterval(t);
   }, [g.id]);
+
+  // Freeze and close are signed here with the owner key from the opened seal file.
+  const owner: OwnerActions | null = opened
+    ? {
+        freeze: (frozen) => backend.freeze(signFreeze(opened, frozen)),
+        async close() {
+          // Each step is its own signed request: the payout first, then the guard leaves the chain.
+          for (let i = 0; i < 24; i++) {
+            if ((await backend.close(signClose(opened))) === 'closed') return;
+            await new Promise((r) => setTimeout(r, 8_000));
+          }
+          throw new Error('still closing: the payout is taking longer than usual. Check again in a minute');
+        },
+      }
+    : null;
 
   const stale = checkedAt !== null && now - checkedAt > PAUSED_AFTER_MS;
   const paused =
@@ -735,8 +755,9 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
       {state === 'guarded' && h && (
         <GuardActions
           example={false}
-          control={NO_CONTROL}
-          onChange={() => {}}
+          owner={owner}
+          control={control}
+          onChange={setControl}
           reserve={opened ? reserveWords(opened.settings) : 'your reserve'}
           asset={opened ? assetOf(opened.settings.reserve_asset).symbol : ''}
           distance={h.distance ?? 10}

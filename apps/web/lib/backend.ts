@@ -15,6 +15,7 @@ import {
 } from '@ripcord/shared';
 import { CHECKER_PROJECT, NEAR_RPC, OUTLAYER, REGISTRY } from './near';
 import type { Stats } from './ledger';
+import type { CloseInput, FreezeInput } from './ownerActions';
 import type { OnChainArm, OnChainGuard } from './verify';
 
 export const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
@@ -35,6 +36,10 @@ export interface Backend {
   fund(c: SealContents, source: string): Promise<Deposit>;
   /** The reserve's balances by token. */
   reserve(c: SealContents): Promise<Record<string, string>>;
+  /** The owner's signed freeze or unfreeze, submitted for the registry to check. */
+  freeze(input: FreezeInput): Promise<void>;
+  /** One step of the owner's signed close: `closed` once the rest of the reserve is on its way and it's off chain. */
+  close(input: CloseInput): Promise<'pending' | 'closed'>;
 }
 
 const opened = <T>(sealed: string, receiptSecret: string, guardId: string): T =>
@@ -85,6 +90,12 @@ export const live: Backend = {
     const a = await call({ action: 'reserve', guard_id: c.guard_id });
     return toBalances(opened(a.sealed ?? '', c.receipt_secret, c.guard_id));
   },
+  async freeze(input) {
+    await call(input);
+  },
+  async close(input) {
+    return (await call(input)).status === 'closed' ? 'closed' : 'pending';
+  },
 };
 
 /** Demo only. Money arrives this long after an address is made. */
@@ -120,6 +131,13 @@ function demoBackend(): Backend {
     async reserve(c) {
       const since = funded.get(c.guard_id);
       return since !== undefined && Date.now() - since >= DEMO_ARRIVES_MS ? { [c.settings.reserve_asset]: '1' } : {};
+    },
+    async freeze() {
+      await new Promise((r) => setTimeout(r, 700));
+    },
+    async close() {
+      await new Promise((r) => setTimeout(r, 900));
+      return 'closed';
     },
   };
 }
@@ -162,6 +180,13 @@ export const readGuard = (id: string) => view<{ status: string }>('get_guard', {
 export const readReceipts = (id: string) =>
   view<OnChainReceipt[]>('get_receipts', { guard_id: id, from: 0, limit: 50 });
 export const readStats = () => view<Stats>('stats', {});
+/** Whether the guard's wallet is frozen: OutLayer keeps it with the wallet's policy. Null when it can't be read. */
+export async function readFrozen(id: string): Promise<boolean | null> {
+  const g = await view<{ wallet_pubkey: string }>('get_guard', { guard_id: id });
+  if (!g) return null;
+  const p = await view<{ frozen: boolean }>('get_wallet_policy', { wallet_pubkey: g.wallet_pubkey }, OUTLAYER);
+  return p ? p.frozen : null;
+}
 export const readGuardHashes = (id: string) => view<OnChainGuard>('get_guard', { guard_id: id });
 export const readArms = (id: string) => view<OnChainArm[]>('get_arms', { guard_id: id, from: 0, limit: 100 });
 /** The build OutLayer runs for the checker: its project's active version, the wasm's sha256. */
