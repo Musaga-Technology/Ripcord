@@ -14,6 +14,12 @@ export interface ReserveAsset {
   wait: string;
   /** An example price, for demo mode only. */
   demoPrice: number;
+  /** Sent on top of the amount: a send from Hyperliquid carries $1 for the transfer (1Click, measured Oct 21). */
+  extra?: number;
+  /** How to send it, when the wallet isn't an ordinary one. */
+  how?: string;
+  /** Said under the address when the send itself is public. */
+  note?: string;
 }
 
 export const USDC_NEAR = 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
@@ -70,6 +76,29 @@ export const ASSETS: ReserveAsset[] = [
     demoPrice: 1,
   },
 ];
+
+/**
+ * A USDC reserve funded from the trader's own Hyperliquid account: the easiest way in, since the money is already
+ * there. Hyperliquid's Send moves it to a one-time address and NEAR Intents credits the guard's private balance in
+ * about a minute (Oct 21 on mainnet: 5.00 in, 4.80 credited). The send itself shows on Hyperliquid, so funding from
+ * another chain stays the private way.
+ */
+export const FROM_HYPERLIQUID: ReserveAsset = {
+  symbol: 'USDC',
+  name: 'USDC on Hyperliquid',
+  chain: 'Hyperliquid',
+  source: '1cs_v1:hypercore:hip1:0x6d1e7cde53ba9467b783cb7c530ce054',
+  reserve: USDC_NEAR,
+  digits: 2,
+  wait: 'From Hyperliquid, a reserve usually arrives in about a minute.',
+  demoPrice: 1,
+  extra: 1,
+  how: 'In Hyperliquid, open Portfolio, choose Send, and paste this address.',
+  note: 'This send shows on Hyperliquid, so anyone can see its size. To keep the reserve unsized, fund from Arbitrum.',
+};
+
+/** Where a reserve can be sent from: USDC also from Hyperliquid itself, offered first. */
+export const sourcesFor = (a: ReserveAsset): ReserveAsset[] => (a.reserve === USDC_NEAR ? [FROM_HYPERLIQUID, a] : [a]);
 
 export type Prices = Record<string, number>;
 

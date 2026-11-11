@@ -17,7 +17,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { ASSETS, demoPrices, suggestAmount, type Prices } from '../../lib/assets';
+import { ASSETS, demoPrices, suggestAmount, USDC_NEAR, type Prices } from '../../lib/assets';
 import { random, watch } from '../../lib/backend';
 import { guardOf, guardsFor, labelOf, watchedDistance } from '../../lib/guards';
 import type { Holding } from '../../lib/hl';
@@ -105,7 +105,13 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           .sort((a, b) => (a.distance as number) - (b.distance as number))[0] ?? holding)
       : holding;
 
-  const [assetIx, setAssetIx] = useState(0);
+  // USDC first: a Hyperliquid trader already holds it, and a USDC rescue needs no swap, so it lands fastest and cheapest.
+  const [assetIx, setAssetIx] = useState(() =>
+    Math.max(
+      0,
+      ASSETS.findIndex((a) => a.reserve === USDC_NEAR),
+    ),
+  );
   const asset = ASSETS[assetIx]!;
   const assetPrice = prices?.[asset.source] ?? null;
   const [amount, setAmount] = useState<string | null>(null);

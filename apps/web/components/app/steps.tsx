@@ -14,7 +14,7 @@ import {
 } from '@ripcord/shared';
 import { encode } from 'uqr';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ASSETS } from '../../lib/assets';
+import { ASSETS, sourcesFor } from '../../lib/assets';
 import { DEMO_ARRIVES_MS, random, Refused, type Backend, type Deposit } from '../../lib/backend';
 import { readAgents } from '../../lib/hl';
 import { approveAgent } from '../../lib/wallet';
@@ -142,7 +142,9 @@ export function Fund({
   fallback: string;
   onFunded(): void;
 }) {
-  const asset = assetOf(contents.settings.reserve_asset);
+  const sources = sourcesFor(assetOf(contents.settings.reserve_asset));
+  const [srcIx, setSrcIx] = useState(0);
+  const asset = sources[srcIx] ?? sources[0]!;
   const [deposit, setDeposit] = useState<Deposit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'address' | 'amount' | null>(null);
@@ -187,11 +189,14 @@ export function Fund({
     };
   }, [backend, contents, deposit, isDemo]);
 
-  const exact =
+  const forReserve =
     deposit && deposit.decimals > 0
-      ? String(Number(deposit.amount) / 10 ** deposit.decimals)
-      : fallback.replace(/,/g, '');
+      ? Number(deposit.amount) / 10 ** deposit.decimals
+      : Number(fallback.replace(/,/g, ''));
+  // What to send: the reserve, plus what the send itself carries (Hyperliquid: $1 for the transfer).
+  const exact = String(Math.round((forReserve + (asset.extra ?? 0)) * 1e8) / 1e8);
   const amount = Number(exact).toLocaleString('en-US', { maximumFractionDigits: 8 });
+  const reserveAmount = forReserve.toLocaleString('en-US', { maximumFractionDigits: 8 });
 
   const copy = async (what: 'address' | 'amount') => {
     if (!deposit) return;
@@ -209,11 +214,29 @@ export function Fund({
       <div className="flex flex-col gap-2">
         <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">Fund the reserve.</h2>
         <p className="max-w-[34rem] text-[15px] text-text-2">
-          Send {amount} {asset.symbol} from {asset.chain}. NEAR Intents carries it into a NEAR Confidential Intents
-          balance held by this guard&apos;s own wallet, so its size stays private and it can pay only your Hyperliquid
-          account.
+          {asset.extra
+            ? `Send ${amount} ${asset.symbol} from ${asset.chain}: ${reserveAmount} for the reserve and $${asset.extra} for the transfer.`
+            : `Send ${amount} ${asset.symbol} from ${asset.chain}.`}{' '}
+          NEAR Intents carries it into a private balance held by this guard&apos;s own wallet, which can pay only your
+          Hyperliquid account.
         </p>
       </div>
+      {sources.length > 1 && (
+        <div role="radiogroup" aria-label="Send from" className="flex w-fit gap-1 rounded-full border border-line p-1">
+          {sources.map((s, i) => (
+            <button
+              key={s.source}
+              type="button"
+              role="radio"
+              aria-checked={i === srcIx}
+              onClick={() => setSrcIx(i)}
+              className={`min-h-10 rounded-full px-4 text-[15px] transition-colors duration-[120ms] ${i === srcIx ? 'bg-text font-medium text-ground' : 'text-text-2 hover:text-text'}`}
+            >
+              From {s.chain}
+            </button>
+          ))}
+        </div>
+      )}
       {error ? (
         <div className="flex flex-col items-start gap-3 rounded-[20px] border border-line bg-panel p-5">
           <p role="alert" className="text-[15px] text-red">
@@ -230,7 +253,7 @@ export function Fund({
           <Qr text={deposit.address} />
           <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
             <span className="text-[13px] text-muted">
-              {isDemo ? 'Example address, no funds needed' : `Your ${asset.chain} deposit address`}
+              {isDemo ? 'Example address, no funds needed' : `Send to this address on ${asset.chain}`}
             </span>
             <code className="break-all font-mono text-[15px] leading-relaxed text-text">{deposit.address}</code>
             <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] tabular-nums">
@@ -248,8 +271,9 @@ export function Fund({
               </button>
             </span>
             <span className="text-[13px] text-muted">
-              Send only {asset.symbol} on {asset.chain} to this address.
+              {asset.how ? `${asset.how} ` : ''}Send only {asset.symbol} on {asset.chain} to this address.
             </span>
+            {asset.note && <span className="text-[13px] text-muted">{asset.note}</span>}
           </div>
         </div>
       )}
@@ -258,7 +282,7 @@ export function Fund({
           {arrived ? (
             <>
               <span className="h-[7px] w-[7px] rounded-full bg-green" />
-              Reserve received: {amount} {asset.symbol}.
+              Reserve received: {reserveAmount} {asset.symbol}.
             </>
           ) : (
             <>
