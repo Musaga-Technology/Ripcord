@@ -214,6 +214,33 @@ fn never_spends_past_the_budget() {
 }
 
 #[test]
+fn asks_only_for_what_the_reserve_holds() {
+    let (host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    // The deposit route's fee left less than the budget: the rescue pays what is there instead of a request that
+    // would be refused on every check.
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "800000000" }]));
+    assert_eq!(check(&host)["status"], "rescued");
+    assert_eq!(net.borrow().withdraws[0]["amount"], "800000000");
+    assert_eq!(track(&host).budget_used_usd, 800.0);
+}
+
+#[test]
+fn under_two_dollars_left_it_guards_without_firing() {
+    let (host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(76_000.0);
+    create(&host, &settings());
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "1990000" }]));
+    assert_eq!(
+        check(&host)["status"],
+        "guarding",
+        "the route to Hyperliquid starts at $2"
+    );
+    assert!(net.borrow().withdraws.is_empty());
+}
+
+#[test]
 fn an_outage_pauses_and_never_falls_back() {
     let (host, net) = common::host(2);
     net.borrow_mut().hl_state = btc(76_000.0);
@@ -420,6 +447,8 @@ fn a_wnear_reserve_swaps_to_usdc_inside_the_confidential_balance_first() {
     let mut s = settings();
     s.reserve_asset = "nep141:wrap.near".into();
     create(&host, &s);
+    net.borrow_mut().balances =
+        Some(json!([{ "token": "nep141:wrap.near", "balance": "1000000000000000000000000000" }]));
     assert_eq!(check(&host)["status"], "rescued");
     let swap = net.borrow().swaps[0].clone();
     assert_eq!(

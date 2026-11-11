@@ -148,6 +148,20 @@ pub fn month_of(ms: u64) -> String {
     format!("{y:04}-{m:02}")
 }
 
+/// What the reserve can pay right now, in USD. A rescue sized past it would be refused, given back and fired again
+/// on every check, so it never would land. A non-USDC reserve sells 3 % more than the rescue, so it counts for less.
+fn payable_usd(balances: &[(String, String)], asset: &str, tok: Option<&oneclick::Token>) -> f64 {
+    let units = balances
+        .iter()
+        .find(|(t, _)| t == asset)
+        .and_then(|(_, b)| b.parse::<u128>().ok())
+        .unwrap_or(0) as f64;
+    match tok {
+        None => units / 1e6,
+        Some(t) => units / t.per_usd() / 1.03,
+    }
+}
+
 /// Sends the rescue's current leg under its current key.
 fn send(custody: &Custody, guard_id: &str, g: &StoredGuard, r: &Rescue) -> Result<Op, String> {
     match r.stage {
@@ -515,6 +529,15 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         return Ok(CheckStatus::Guarding);
     }
     let budget_left = (s.budget_usd - t.budget_used_usd).max(0.0);
+    let Some(balances) = custody.balances(guard_id)? else {
+        vault::put(host, &key, &t)?;
+        return Ok(CheckStatus::Skipped);
+    };
+    let tok = if s.reserve_asset == policy::USDC {
+        None
+    } else {
+        Some(oneclick::token(host, NET.oneclick, &s.reserve_asset)?)
+    };
     let size = rescue_size(&SizeInput {
         // Fast falls get a bigger top-up: past the target by the fall expected while the credit lands.
         drawn_target: speed_target(t.target, s.speed_aware, v, HORIZON_S),
@@ -524,9 +547,7 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         maint_frac: p.maint_frac(),
         max_rescue_usd: s.max_rescue_usd,
         budget_left_usd: budget_left,
-        // The confidential balance itself is not read before firing: the budget bounds the rescue, and a short
-        // balance comes back as a failed request, which gives the budget back.
-        reserve_usd: budget_left,
+        reserve_usd: payable_usd(&balances, &s.reserve_asset, tok.as_ref()),
     });
     let Some(amount) = size else {
         vault::put(host, &key, &t)?;
@@ -542,14 +563,14 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
     }
 
     let usdc_units = ((amount * 1e6).floor() as u128).to_string();
-    let (stage, swap_in, swap_min_out) = if s.reserve_asset == policy::USDC {
-        (Stage::Withdrawing, None, None)
-    } else {
+    let (stage, swap_in, swap_min_out) = match &tok {
+        None => (Stage::Withdrawing, None, None),
         // Sell a little more than needed (3 %) and refuse a fill under 98 % of the rescue.
-        let tok = oneclick::token(host, NET.oneclick, &s.reserve_asset)?;
-        let amount_in = ((amount * 1.03 * tok.per_usd()).ceil() as u128).to_string();
-        let min_out = ((amount * 0.98 * 1e6).floor() as u128).to_string();
-        (Stage::Swapping, Some(amount_in), Some(min_out))
+        Some(tok) => {
+            let amount_in = ((amount * 1.03 * tok.per_usd()).ceil() as u128).to_string();
+            let min_out = ((amount * 0.98 * 1e6).floor() as u128).to_string();
+            (Stage::Swapping, Some(amount_in), Some(min_out))
+        }
     };
     let mut r = Rescue {
         epoch: t.epoch,
