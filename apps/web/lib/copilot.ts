@@ -12,6 +12,15 @@ import type { Holding } from './hl';
 const INFO = utf8ToBytes('ed25519_encryption');
 const rand = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
+/** A one-time key for one request: its secret opens the answer, its public half goes in `X-Client-Pub-Key`. */
+export function clientKey() {
+  const secret = ed25519.utils.randomSecretKey();
+  return { secret, pub: bytesToHex(ed25519.getPublicKey(secret)) };
+}
+
+/** A fresh attestation nonce, so an old or borrowed report can't be replayed. */
+export const freshNonce = () => bytesToHex(rand(32));
+
 /** Encrypts `text` to an Ed25519 public key: [ephemeral X25519 key 32][nonce 24][ciphertext + tag], hex. */
 export function sealTo(edPubHex: string, text: string): string {
   const eph = x25519.utils.randomSecretKey();
@@ -81,7 +90,7 @@ export function reserveToSurvive(h: Holding, dropPct: number): number | null {
   return Math.max(0, move * h.size * (long ? 1 - mm : 1 + mm));
 }
 
-function instructions(h: Holding): string {
+export function instructions(h: Holding): string {
   const liq = h.liquidation === null ? 'none' : String(h.liquidation);
   return [
     `You set up a guard for one Hyperliquid position: ${h.coin} ${h.side.toLowerCase()}, ${h.leverage}x ${h.margin},`,
@@ -98,19 +107,19 @@ export class CopilotError extends Error {}
 
 /** Asks the model, end to end encrypted through Ripcord's relay (`/api/copilot`). */
 export async function askCopilot(h: Holding, words: string): Promise<{ intent: Intent; modelKey: string }> {
-  const nonce = bytesToHex(rand(32));
+  const nonce = freshNonce();
   const att = await fetch(`/api/copilot?nonce=${nonce}`).then((r) => (r.ok ? r.json() : null));
   const modelKey: unknown = att?.signing_public_key;
   // The enclave's report must answer this request's own nonce, so an old or borrowed report can't be replayed.
   if (typeof modelKey !== 'string' || !/^[0-9a-f]{64}$/.test(modelKey) || att.request_nonce !== nonce)
     throw new CopilotError("NEAR AI's enclave didn't prove itself.");
-  const secret = ed25519.utils.randomSecretKey();
+  const { secret, pub } = clientKey();
   const r = await fetch('/api/copilot', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model_pub: modelKey,
-      client_pub: bytesToHex(ed25519.getPublicKey(secret)),
+      client_pub: pub,
       messages: [
         { role: 'system', content: sealTo(modelKey, instructions(h)) },
         { role: 'user', content: sealTo(modelKey, words.slice(0, 500)) },

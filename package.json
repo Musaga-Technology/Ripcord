@@ -18,7 +18,8 @@
     "demo": "bash scripts/demo.sh",
     "testnet:registry": "tsx scripts/testnet/registry.ts",
     "testnet:checker": "tsx scripts/testnet/checker.ts",
-    "mainnet:deploy": "tsx scripts/mainnet/deploy.ts"
+    "mainnet:deploy": "tsx scripts/mainnet/deploy.ts",
+    "copilot:eval": "tsx scripts/copilot-eval.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
