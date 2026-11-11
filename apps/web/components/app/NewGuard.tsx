@@ -120,6 +120,9 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   const [chosen, setChosen] = useState<Preset | null>(null);
   const [pass, setPass] = useState('');
   const [pass2, setPass2] = useState('');
+  // A pasted address isn't proven to be the visitor's own, and a guard pays only that account.
+  const pasted = session?.kind === 'address';
+  const [mine, setMine] = useState(false);
 
   const suggestion = assetPrice ? suggestAmount(asset, margin * 2, assetPrice) : '';
   const amountStr = amount ?? suggestion;
@@ -185,7 +188,9 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           ? 'Your passphrase needs 8 or more characters.'
           : pass !== pass2
             ? "The two passphrases don't match yet."
-            : '';
+            : pasted && !mine
+              ? 'Confirm the account is yours.'
+              : '';
   const canSeal = phase === 'edit' && blocker === '';
 
   /** The seal (DESIGN §8.1): the rosette prints, each sealed value collapses, the fingerprint types in. */
@@ -481,6 +486,24 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                     />
                   </label>
                 </div>
+                {pasted && session && (
+                  <label className="flex items-start gap-3 text-[15px] text-text-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-[var(--text)]"
+                      checked={mine}
+                      disabled={phase !== 'edit'}
+                      onChange={(e) => setMine(e.target.checked)}
+                    />
+                    <span>
+                      This is my Hyperliquid account. The guard only ever pays{' '}
+                      <span className="font-mono text-[13px] text-text">
+                        {session.address.slice(0, 6)}…{session.address.slice(-4)}
+                      </span>
+                      .
+                    </span>
+                  </label>
+                )}
                 <div className="flex flex-col gap-1 pt-2 text-[13px] text-muted">
                   <p>A rescue takes under a minute. A move faster than that can still liquidate you.</p>
                   <p>

@@ -85,6 +85,8 @@ See `docs/ARCHITECTURE.md` §2. In short:
 - **Speed:** a rescue takes about 45 s end to end, so a move that crosses your buffer faster than that can still liquidate you. MVP protects cross-margin positions.
 - **Third parties:** OutLayer (keys, one custody wallet per guard, liveness), Confidential Intents validators and TEE bridge, and 1Click solvers for price.
 - **Isolated positions:** need one approval of a Hyperliquid agent held in your guard's wallet. It can't transfer or withdraw your money; on Hyperliquid an agent could trade or deposit into vaults, so Ripcord's code only ever signs "add margin". Revoke it any time.
+- **Pasted addresses:** a guard pays only the account it was set up for, so pasting someone else's address can only add margin to their account, at your cost; the app asks you to confirm the account is yours. An isolated guard also needs the account owner's own approval on Hyperliquid.
+- **Unfunded guards:** registering a guard costs Ripcord about 0.015 NEAR of storage before its reserve arrives. Requests are rate-limited per visitor; registering a guard only once its reserve lands is the planned fix.
 - **Our promise:** if a guard fails because of us, we pay back what the liquidation took (up to the reserve at the time or $10,000) from a public make-good fund fed by 10 % of every save fee: a Trezu multisig treasury where every payout needs 2 of 3 keys. For the hackathon all three keys belong to the founder, on three separate devices: a stolen or lost key can't pay out, but this doesn't yet protect the fund from us. Independent key-holders come next that earns on Rhea Lending between claims. Eligibility is checked from your seal file and public prices; see `docs/ARCHITECTURE.md` §9.
 
 | Who | Can see | Can't see |
