@@ -128,17 +128,27 @@ export function verify(o: {
     };
   } else {
     const within = (x: number, [lo, hi]: [number, number]) => x >= lo - 1e-9 && x <= hi + 1e-9;
-    const out = o.draws.find((d) => !within(d.line, s.line_range_pct) || !within(d.target, s.target_range_pct));
+    // A line is checked against the range in force when it was drawn: an earlier one, if the owner changed it since.
+    const earlier = [...(o.contents.earlier ?? [])].sort((a, b) => a.until_epoch - b.until_epoch);
+    const rangeAt = (epoch: number) => earlier.find((e) => epoch < e.until_epoch) ?? s;
+    const out = o.draws.find((d) => {
+      const r = rangeAt(d.epoch);
+      return !within(d.line, r.line_range_pct) || !within(d.target, r.target_range_pct);
+    });
+    const before = o.draws.filter((d) => rangeAt(d.epoch) !== s).length;
+    const r = out ? rangeAt(out.epoch) : s;
     draws = out
       ? {
           ok: false,
           title: 'A line fell outside your range',
-          detail: `Line ${o.draws.indexOf(out) + 1} was drawn at ${pc(out.line, 2)} with a target of ${pc(out.target, 2)}; your lines are ${lines}, targets ${targets}.`,
+          detail: `Line ${o.draws.indexOf(out) + 1} was drawn at ${pc(out.line, 2)} with a target of ${pc(out.target, 2)}; its lines were ${between(r.line_range_pct)}, targets ${between(r.target_range_pct)}.`,
         }
       : {
           ok: true,
           title: 'Every line it drew sat inside your range',
-          detail: `${o.draws.length} ${o.draws.length === 1 ? 'line' : 'lines'} drawn, each ${lines} from liquidation, with top-up targets ${targets}. ${rescueLine(rescues)}`,
+          detail: before
+            ? `${o.draws.length} lines drawn: ${before} inside the range you had before, and ${o.draws.length - before} inside today's, ${lines} from liquidation with top-up targets ${targets}. ${rescueLine(rescues)}`
+            : `${o.draws.length} ${o.draws.length === 1 ? 'line' : 'lines'} drawn, each ${lines} from liquidation, with top-up targets ${targets}. ${rescueLine(rescues)}`,
         };
   }
 

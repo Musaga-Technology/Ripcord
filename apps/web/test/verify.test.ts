@@ -57,6 +57,34 @@ describe('Verify', () => {
     expect(v.draws.detail).toContain('Line 4');
   });
 
+  it('checks each line against the range in force when it was drawn', () => {
+    const e = exampleCase(random);
+    const old = e.contents.settings;
+    const up = ([lo, hi]: [number, number]): [number, number] => [lo + 5, hi + 5];
+    const contents = {
+      ...e.contents,
+      settings: { ...old, line_range_pct: up(old.line_range_pct), target_range_pct: up(old.target_range_pct) },
+      earlier: [{ until_epoch: 3, line_range_pct: old.line_range_pct, target_range_pct: old.target_range_pct }],
+    };
+    const before = openDraws(e.contents, e.arms) ?? [];
+    expect(before.map((d) => d.epoch)).toEqual([0, 1, 2]);
+    const mid = ([lo, hi]: [number, number]) => (lo + hi) / 2;
+    const after = {
+      epoch: 3,
+      line: mid(contents.settings.line_range_pct),
+      target: mid(contents.settings.target_range_pct),
+    };
+    const check = (draws: typeof before) =>
+      verify({ guard: e.guard, contents, draws, receipts: [], running: BUILD, published: BUILD }).draws;
+
+    const ok = check([...before, after]);
+    expect(ok.ok).toBe(true);
+    expect(ok.detail).toMatch(/^4 lines drawn: 3 inside the range you had before, and 1 inside today's/);
+    // A line from the old range after the change, or from the new range before it, is outside.
+    expect(check([...before, { ...before[0]!, epoch: 3 }]).ok).toBe(false);
+    expect(check([{ ...after, epoch: 1 }, ...before.slice(1)]).ok).toBe(false);
+  });
+
   it("fails lines that weren't sealed to this owner", () => {
     const e = exampleCase(random);
     const stranger = exampleCase(random);
