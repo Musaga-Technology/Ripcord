@@ -85,7 +85,7 @@ export function OpenSeal({ isDemo, onOpened }: { isDemo: boolean; onOpened(): vo
           className="inline-flex min-h-11 items-center underline decoration-line-3 underline-offset-4 hover:text-text"
           onClick={() => input.current?.click()}
         >
-          Open a seal file
+          Guarded this account on another device? Open its seal file
         </button>
       )}
       {error && (
