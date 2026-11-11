@@ -56,6 +56,14 @@ pub struct StoredGuard {
     pub settings: GuardSettings,
     pub salt: String,
     pub commitment: String,
+    /// The other two public hashes, for registering the guard once its reserve arrives.
+    #[serde(default)]
+    pub owner_commitment: String,
+    #[serde(default)]
+    pub account_commitment: String,
+    /// The guard's custody wallet is open (off chain).
+    #[serde(default)]
+    pub wallet_open: bool,
     /// The `register_guard` transaction, once the guard's wallet policy is on chain.
     #[serde(default)]
     pub registered: Option<String>,
@@ -85,9 +93,9 @@ pub fn pubkey(host: &dyn Host) -> Result<Value, String> {
     Ok(json!({ "enc_pk": hex::encode(enc_pk), "account": account }))
 }
 
-/// Opens the owner's sealed settings, checks them against the three public hashes, seals them in the vault, then
-/// opens the guard's custody wallet and registers the guard with the wallet's policy. Safe to retry with the same
-/// input: each step is idempotent, and a guard already on chain is not registered twice.
+/// Opens the owner's sealed settings, checks them against the three public hashes, seals them in the vault and opens
+/// the guard's custody wallet. Nothing goes on chain yet: a guard is registered, with its wallet's policy, once its
+/// reserve arrives (`activate`), so a guard nobody funds costs nothing on NEAR. Safe to retry with the same input.
 pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
     if !is_guard_id(&c.guard_id) {
         return Err("invalid guard_id".into());
@@ -118,14 +126,18 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
                 settings: p.settings,
                 salt: p.salt,
                 commitment: c.commitment.clone(),
+                owner_commitment: c.owner_commitment.clone(),
+                account_commitment: c.account_commitment.clone(),
+                wallet_open: false,
                 registered: None,
             };
             vault::put(host, &key, &g)?;
             g
         }
     };
-    if g.registered.is_none() {
-        g.registered = Some(register(host, c, &g.settings)?);
+    if !g.wallet_open {
+        Custody::new(host, NET.outlayer_api)?.register(&c.guard_id)?;
+        g.wallet_open = true;
         vault::put(host, &key, &g)?;
     }
     // An isolated guard's owner approves this wallet's EVM address on Hyperliquid. Sealed: an approved agent's
@@ -138,15 +150,30 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
     Ok(json!({ "status": "pending" }))
 }
 
-/// The guard's wallet (seed = guard id), its policy encrypted by OutLayer and signed by the wallet for the
-/// registry, and `register_guard` signed by the checker's own key. Returns the transaction hash.
-fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<String, String> {
-    let on_chain = registry::view(host, "get_guard", &json!({ "guard_id": c.guard_id }))?;
+/// Puts a funded guard on chain: its wallet's policy encrypted by OutLayer and signed by the wallet for the registry,
+/// and `register_guard` signed by the checker's own key. Until then only this code can move the wallet's money, and it
+/// pays only the owner's account. Idempotent: a guard already on chain is only marked.
+pub fn activate(host: &dyn Host, guard_id: &str, mut g: StoredGuard) -> Result<StoredGuard, String> {
+    if g.registered.is_none() {
+        g.registered = Some(register(host, guard_id, &g)?);
+        vault::put(host, &format!("s/{guard_id}"), &g)?;
+    }
+    Ok(g)
+}
+
+/// True when any balance in the guard's wallet is above zero.
+pub fn funded(balances: &[(String, String)]) -> bool {
+    balances.iter().any(|(_, b)| b.parse::<u128>().is_ok_and(|x| x > 0))
+}
+
+fn register(host: &dyn Host, guard_id: &str, g: &StoredGuard) -> Result<String, String> {
+    let on_chain = registry::view(host, "get_guard", &json!({ "guard_id": guard_id }))?;
     if !on_chain.is_null() {
         return Ok("already registered".into());
     }
+    let s = &g.settings;
     let custody = Custody::new(host, NET.outlayer_api)?;
-    let wallet_id = custody.register(&c.guard_id)?;
+    let wallet_id = custody.register(guard_id)?;
     let reserve = if s.reserve_asset == policy::USDC {
         None
     } else {
@@ -154,14 +181,14 @@ fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<Strin
         Some(policy::ReserveUnits { per_usd: t.per_usd() })
     };
     let p = policy::build(s, NET.fee_wallet, reserve)?;
-    let encrypted = custody.encrypt_policy(&c.guard_id, &wallet_id, &p)?;
-    let signed = custody.sign_policy(&c.guard_id, &encrypted, NET.registry)?;
+    let encrypted = custody.encrypt_policy(guard_id, &wallet_id, &p)?;
+    let signed = custody.sign_policy(guard_id, &encrypted, NET.registry)?;
     let args = json!({
-        "guard_id": c.guard_id,
-        "commitment": c.commitment,
-        "owner_commitment": c.owner_commitment,
-        "account_commitment": c.account_commitment,
-        "expires_at": c.expires_at,
+        "guard_id": guard_id,
+        "commitment": g.commitment,
+        "owner_commitment": g.owner_commitment,
+        "account_commitment": g.account_commitment,
+        "expires_at": s.expires_at,
         "wallet_pubkey": format!("ed25519:{}", signed.public_key),
         "encrypted_policy": encrypted,
         "wallet_signature": signed.signature,
@@ -171,14 +198,13 @@ fn register(host: &dyn Host, c: &CreateInput, s: &GuardSettings) -> Result<Strin
     registry::call(host, "register_guard", &args, REGISTER_GAS, REGISTER_DEPOSIT)
 }
 
-/// A one-time address on the owner's chain that funds the guard's confidential reserve with its budget. Only for
-/// a registered guard, so no money reaches a wallet before its policy does. The amount comes from the sealed
-/// settings, never from input. The address and amount are sealed to the owner: guard ids are public, and whoever
-/// holds the address can read the reserve's size on its chain.
+/// A one-time address on the owner's chain that funds the guard's confidential reserve with its budget. The amount
+/// comes from the sealed settings, never from input. The address and amount are sealed to the owner: guard ids are
+/// public, and whoever holds the address can read the reserve's size on its chain.
 pub fn fund(host: &dyn Host, f: &FundInput) -> Result<Value, String> {
     let g: StoredGuard = vault::get(host, &format!("s/{}", f.guard_id))?.ok_or("no such guard")?;
-    if g.registered.is_none() {
-        return Err("guard is not registered yet".into());
+    if !g.wallet_open {
+        return Err("guard's wallet is not open yet".into());
     }
     let t = oneclick::token(host, NET.oneclick, &f.source_asset)?;
     let amount = ((g.settings.budget_usd * t.per_usd()).ceil() as u128).to_string();
@@ -200,6 +226,7 @@ pub fn reserve(host: &dyn Host, guard_id: &str) -> Result<Value, String> {
     let Some(list) = custody.balances(guard_id)? else {
         return Err("the private route is unavailable".into());
     };
+    let g = if funded(&list) { activate(host, guard_id, g)? } else { g };
     let balances: Vec<Value> = list.iter().map(|(t, b)| json!({ "token": t, "balance": b })).collect();
     let sealed = seal_to_owner(host, guard_id, &g, &json!({ "balances": balances }))?;
     Ok(json!({ "status": "guarding", "sealed": sealed }))

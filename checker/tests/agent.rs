@@ -72,6 +72,7 @@ fn track(host: &MockHost) -> Track {
 fn near_liquidation(seed: u8) -> (MockHost, std::rc::Rc<std::cell::RefCell<common::Net>>) {
     let (host, net) = common::host(seed);
     create(&host);
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
     net.borrow_mut().hl_state = state(vec![position("HYPE", 100.0, 50.0, Some(48.0), 10, "isolated")]);
     net.borrow_mut().agents = json!([{ "name": "x", "address": AGENT, "validUntil": 9_999_999_999_999u64 }]);
     (host, net)
@@ -188,6 +189,7 @@ fn a_cross_guard_never_signs() {
         "expires_at": s.expires_at, "enc_settings": hex::encode(env),
     });
     run(&host, &input.to_string());
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
     net.borrow_mut().hl_state = state(vec![position("BTC", 1.0, 80_000.0, Some(77_000.0), 40, "cross")]);
     assert_eq!(check(&host), "rescued");
     check(&host);

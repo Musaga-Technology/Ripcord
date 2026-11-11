@@ -109,11 +109,27 @@ fn tx_args(txs: &[Vec<u8>], method: &str, n: usize) -> Value {
 }
 
 #[test]
-fn waits_until_the_guard_is_registered() {
+fn goes_on_chain_only_once_its_reserve_arrives() {
     let (host, net) = common::host(1);
-    net.borrow_mut().fail_tx = true;
+    net.borrow_mut().balances = Some(json!([]));
+    net.borrow_mut().hl_state = btc(74_000.0);
     create(&host, &settings());
     assert_eq!(check(&host), json!({ "status": "pending" }));
+    assert!(
+        net.borrow().methods.is_empty(),
+        "an unfunded guard costs nothing on NEAR"
+    );
+
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
+    net.borrow_mut().fail_tx = true;
+    assert_eq!(
+        check(&host),
+        json!({ "status": "skipped" }),
+        "a failed registration waits for the next check"
+    );
+    net.borrow_mut().fail_tx = false;
+    assert_eq!(check(&host), json!({ "status": "guarding" }));
+    assert_eq!(net.borrow().methods[0], "register_guard");
 }
 
 #[test]
@@ -219,8 +235,8 @@ fn an_outage_pauses_and_never_falls_back() {
         .filter(|u| u.contains("/wallet/v1/") && !u.contains("policy"))
         .collect();
     assert!(
-        paths.iter().all(|u| u.ends_with("/confidential/withdraw")),
-        "only the confidential route, never a public one: {paths:?}"
+        paths.iter().all(|u| u.contains("/wallet/v1/confidential/")),
+        "only confidential routes, never a public one: {paths:?}"
     );
 }
 

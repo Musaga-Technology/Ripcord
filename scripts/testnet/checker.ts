@@ -292,22 +292,10 @@ async function create(): Promise<void> {
     'the output carries no setting',
     ![settings.hl_address.slice(2), salt, ownerSalt, '1500', '4000'].some((x) => text.includes(x)),
   );
-  const guard = await view<{ status: string; wallet_pubkey: string } | null>(s.registry, 'get_guard', {
-    guard_id: guardId,
-  });
-  check(
-    'the registry holds the guard, registered by the enclave account',
-    guard?.status === 'Pending',
-    JSON.stringify(guard),
-  );
-  const policy = guard
-    ? await view<{ owner: string } | null>(OUTLAYER, 'get_wallet_policy', { wallet_pubkey: guard.wallet_pubkey })
-    : null;
-  check(
-    "the guard's own wallet has the registry as its policy controller",
-    policy?.owner === s.registry,
-    policy?.owner,
-  );
+  // A guard goes on chain once its reserve arrives, and testnet has no private route to fund one, so a testnet guard
+  // stays off chain: registering it is covered by the checker's tests and by mainnet.
+  const guard = await view<{ status: string } | null>(s.registry, 'get_guard', { guard_id: guardId });
+  check('nothing is on chain before the reserve arrives', guard === null, JSON.stringify(guard));
   const again = await callChecker(input);
   check('a retry is harmless', again.status === 'pending', JSON.stringify(again));
   const stranger = await callChecker({ ...input, guard_id: newGuardId(random) });
@@ -357,23 +345,19 @@ async function mainnetHost(): Promise<void> {
 }
 
 /** The enclave reads Hyperliquid itself; this guard's account holds nothing, so it arms and guards. */
+/** An unfunded guard is checked inside the enclave and answers pending: it can't be guarded before its reserve. */
 async function checkStage(): Promise<void> {
   const s = readState();
   if (!s.last_guard || !s.registry) throw new Error('run `create` first');
   const out = await callChecker({ action: 'check', guard_id: s.last_guard });
-  check(`checked ${s.last_guard} inside the enclave`, out.status === 'guarding', JSON.stringify(out));
-  check('the output is a bare status', Object.keys(out).join() === 'status');
-  const g = await view<{ status: string; arm_count: number } | null>(s.registry, 'get_guard', {
-    guard_id: s.last_guard,
-  });
   check(
-    'the enclave armed it and set it guarding on the registry',
-    g?.status === 'Guarding' && g.arm_count >= 1,
-    JSON.stringify({ status: g?.status, arm_count: g?.arm_count }),
+    `checked ${s.last_guard} inside the enclave: pending until funded`,
+    out.status === 'pending',
+    JSON.stringify(out),
   );
-  const again = await callChecker({ action: 'check', guard_id: s.last_guard });
-  const g2 = await view<{ arm_count: number } | null>(s.registry, 'get_guard', { guard_id: s.last_guard });
-  check('a second check keeps the same draw', again.status === 'guarding' && g2?.arm_count === g?.arm_count);
+  check('the output is a bare status', Object.keys(out).join() === 'status');
+  const g = await view<{ status: string } | null>(s.registry, 'get_guard', { guard_id: s.last_guard });
+  check('and still nothing on chain', g === null, JSON.stringify(g));
 }
 
 /**
@@ -428,7 +412,8 @@ async function pokerStage(): Promise<void> {
       calls.length === 1,
       JSON.stringify(calls.map((c) => [c.reason, c.status, c.ms])),
     );
-    check('which read Hyperliquid and answered guarding', statuses[0] === 'guarding', statuses[0]);
+    // Unfunded (testnet can't fund a reserve), so the enclave answers pending instead of reading Hyperliquid.
+    check('which answered pending: the guard has no reserve yet', statuses[0] === 'pending', statuses[0]);
     const h = (await (await fetch(`${base}/v1/health/${g.guardId}`)).json()) as Record<string, unknown>;
     check(
       'health shows the check, and no address',

@@ -6,7 +6,7 @@
 //! The rescue executor follows ARCHITECTURE §8 across checks rather than waiting inside one: 502 and `wallet_busy`
 //! send the same key again next time, `processing` is read, never resubmitted, a refund fires again under a fresh
 //! key, and 503 pauses with no public fallback.
-use crate::actions::StoredGuard;
+use crate::actions::{self, StoredGuard};
 use crate::agent::{self, Moved};
 use crate::config::{canary_on, fees_on, HISTORY_S, HORIZON_S, MAX_MARGIN_TRIES, MAX_REFIRES, MONTHLY_FEE_UNITS, NET};
 use crate::custody::{Custody, Op, Request};
@@ -381,9 +381,16 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
     if !is_guard_id(guard_id) {
         return Err("invalid guard_id".into());
     }
-    let g: StoredGuard = vault::get(host, &format!("s/{guard_id}"))?.ok_or("no such guard")?;
+    let mut g: StoredGuard = vault::get(host, &format!("s/{guard_id}"))?.ok_or("no such guard")?;
     if g.registered.is_none() {
-        return Ok(CheckStatus::Pending);
+        // A guard goes on chain once its reserve arrives; until then there is nothing to guard.
+        let balances = Custody::new(host, NET.outlayer_api)?
+            .balances(guard_id)?
+            .unwrap_or_default();
+        if !actions::funded(&balances) {
+            return Ok(CheckStatus::Pending);
+        }
+        g = actions::activate(host, guard_id, g)?;
     }
     let s = &g.settings;
     let now = host.now_ms();

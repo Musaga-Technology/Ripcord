@@ -62,8 +62,13 @@ pub fn state(positions: Vec<Value>) -> Value {
     json!({ "assetPositions": positions, "marginSummary": {}, "crossMarginSummary": {}, "withdrawable": "0", "time": 0 })
 }
 
+/// A fake network whose guard wallet already holds a funded reserve (4,000 USDC): a guard registers on chain once
+/// its reserve arrives, so most tests start there. Tests about unfunded guards empty it.
 pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
-    let net = Rc::new(RefCell::new(Net::default()));
+    let net = Rc::new(RefCell::new(Net {
+        balances: Some(json!([{ "token": ripcord_checker::policy::USDC, "balance": "4000000000" }])),
+        ..Net::default()
+    }));
     let mut host = MockHost::new(seed);
     let n = net.clone();
     host.responder = Box::new(move |_, url, body| {

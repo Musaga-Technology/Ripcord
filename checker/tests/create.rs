@@ -222,22 +222,59 @@ fn an_isolated_btc_guard_caps_the_reserve_token_too() {
     assert_eq!(p["capabilities"]["evm_sign"]["raw_tx"], false);
 }
 
+/// The reserve look the owner's page polls; the first one that sees money registers the guard.
+fn reserve(host: &MockHost) -> Value {
+    run(host, &json!({ "action": "reserve", "guard_id": GID }).to_string())
+}
+
 #[test]
-fn registers_the_guard_with_its_wallet_policy_once() {
+fn create_opens_the_wallet_and_puts_nothing_on_chain() {
     let (host, net) = common::host(1);
     let input = create_input(&host, &settings(), GID, GID);
     assert_eq!(run(&host, &input), json!({ "status": "pending" }));
     {
         let n = net.borrow();
-        assert_eq!(n.registered, vec![GID.to_string()]);
+        assert!(
+            n.registered.is_empty() && n.txs.is_empty(),
+            "an unfunded guard costs nothing on NEAR"
+        );
         let paths: Vec<&str> = n
             .requests
+            .iter()
+            .map(|(u, _)| u.rsplit_once(".ai").map_or("rpc", |x| x.1))
+            .collect();
+        assert_eq!(paths, ["/register"], "only the wallet opens, off chain");
+    }
+    let stored: StoredGuard = vault::get(&host, &format!("s/{GID}")).unwrap().unwrap();
+    assert!(stored.wallet_open && stored.registered.is_none());
+
+    let before = net.borrow().requests.len();
+    assert_eq!(run(&host, &input), json!({ "status": "pending" }));
+    assert_eq!(net.borrow().requests.len(), before, "a retry touches nothing");
+}
+
+#[test]
+fn registers_the_guard_with_its_wallet_policy_once_its_reserve_arrives() {
+    let (host, net) = common::host(1);
+    run(&host, &create_input(&host, &settings(), GID, GID));
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "0" }]));
+    assert_eq!(reserve(&host)["status"], "guarding");
+    assert!(net.borrow().registered.is_empty(), "an empty reserve registers nothing");
+
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
+    let before = net.borrow().requests.len();
+    assert_eq!(reserve(&host)["status"], "guarding");
+    {
+        let n = net.borrow();
+        assert_eq!(n.registered, vec![GID.to_string()]);
+        let paths: Vec<&str> = n.requests[before..]
             .iter()
             .map(|(u, _)| u.rsplit_once(".ai").map_or("rpc", |x| x.1))
             .collect();
         assert_eq!(
             paths,
             [
+                "/wallet/v1/confidential/balance",
                 "rpc",
                 "/register",
                 "/wallet/v1/encrypt-policy",
@@ -245,9 +282,9 @@ fn registers_the_guard_with_its_wallet_policy_once() {
                 "rpc",
                 "rpc"
             ],
-            "view, open the wallet, policy, access key, send"
+            "balance, view, the wallet, its policy, access key, send"
         );
-        let (_, sign) = &n.requests[3];
+        let (_, sign) = n.requests.iter().find(|(u, _)| u.ends_with("/sign-policy")).unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(sign).unwrap()["caller"],
             ripcord_checker::config::NET.registry,
@@ -257,13 +294,8 @@ fn registers_the_guard_with_its_wallet_policy_once() {
     let stored: StoredGuard = vault::get(&host, &format!("s/{GID}")).unwrap().unwrap();
     assert!(stored.registered.is_some());
 
-    let before = net.borrow().requests.len();
-    assert_eq!(run(&host, &input), json!({ "status": "pending" }));
-    assert_eq!(
-        net.borrow().requests.len(),
-        before,
-        "a retry after success touches nothing"
-    );
+    reserve(&host);
+    assert_eq!(net.borrow().txs.len(), 1, "registered once");
 }
 
 #[test]
@@ -271,6 +303,7 @@ fn the_registry_transaction_carries_hashes_only() {
     // No public link between a guard and its account: the transaction is public, so it holds no setting.
     let (host, net) = common::host(1);
     run(&host, &create_input(&host, &settings(), GID, GID));
+    reserve(&host);
     let n = net.borrow();
     let tx = String::from_utf8_lossy(&n.txs[0]).into_owned();
     // borsh: the method name, then the args' u32 length and bytes.
@@ -312,26 +345,26 @@ fn the_registry_transaction_carries_hashes_only() {
 fn a_guard_already_on_chain_is_not_registered_twice() {
     let (host, net) = common::host(1);
     net.borrow_mut().registered.push(GID.into());
-    assert_eq!(
-        run(&host, &create_input(&host, &settings(), GID, GID)),
-        json!({ "status": "pending" })
-    );
+    run(&host, &create_input(&host, &settings(), GID, GID));
+    assert_eq!(reserve(&host)["status"], "guarding");
     assert!(net.borrow().txs.is_empty());
+    let stored: StoredGuard = vault::get(&host, &format!("s/{GID}")).unwrap().unwrap();
+    assert_eq!(stored.registered.as_deref(), Some("already registered"));
 }
 
 #[test]
 fn a_failed_registration_is_refused_and_retried_next_time() {
     let (host, net) = common::host(1);
+    run(&host, &create_input(&host, &settings(), GID, GID));
     net.borrow_mut().fail_tx = true;
-    let input = create_input(&host, &settings(), GID, GID);
-    let out = run(&host, &input);
+    let out = reserve(&host);
     assert_eq!(out["status"], "skipped");
     assert!(out["refused"].as_str().unwrap().starts_with("transaction failed"));
     let stored: StoredGuard = vault::get(&host, &format!("s/{GID}")).unwrap().unwrap();
     assert!(stored.registered.is_none(), "kept sealed, not marked registered");
 
     net.borrow_mut().fail_tx = false;
-    assert_eq!(run(&host, &input), json!({ "status": "pending" }));
+    assert_eq!(reserve(&host)["status"], "guarding");
     assert_eq!(net.borrow().registered, vec![GID.to_string()]);
 }
 
@@ -341,6 +374,7 @@ fn a_wnear_reserve_is_capped_in_wnear_at_the_listed_price() {
     let mut s = settings();
     s.reserve_asset = "nep141:wrap.near".into();
     run(&host, &create_input(&host, &s, GID, GID));
+    reserve(&host);
     let n = net.borrow();
     let (_, enc) = n.requests.iter().find(|(u, _)| u.ends_with("/encrypt-policy")).unwrap();
     let p: Value = serde_json::from_str(enc).unwrap();
@@ -376,6 +410,7 @@ fn the_reserve_balance_is_sealed_to_the_owner() {
     assert_eq!(run(&host, &ask)["refused"], "no such guard");
     run(&host, &create_input(&host, &owned(), GID, GID));
 
+    net.borrow_mut().balances = None;
     assert_eq!(run(&host, &ask)["refused"], "the private route is unavailable");
     net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "4000000000" }]));
     let out = run(&host, &ask);
@@ -404,22 +439,17 @@ fn an_isolated_guard_hands_its_agent_only_to_the_owner() {
 }
 
 #[test]
-fn funds_a_registered_guard_with_its_sealed_budget() {
+fn funds_a_guard_before_it_goes_on_chain() {
     let (host, net) = common::host(1);
     let fund = json!({ "action": "fund", "guard_id": GID, "source_asset": ARB_USDC }).to_string();
     assert_eq!(run(&host, &fund)["refused"], "no such guard");
 
-    net.borrow_mut().fail_tx = true;
-    run(&host, &create_input(&host, &owned(), GID, GID));
-    assert_eq!(
-        run(&host, &fund)["refused"],
-        "guard is not registered yet",
-        "no money before the policy"
-    );
-
-    net.borrow_mut().fail_tx = false;
     run(&host, &create_input(&host, &owned(), GID, GID));
     let out = run(&host, &fund);
+    assert!(
+        net.borrow().txs.is_empty(),
+        "the deposit address needs nothing on chain"
+    );
     assert_eq!(out["status"], "pending");
     assert!(
         !out.to_string().contains("0xDEP0517"),
