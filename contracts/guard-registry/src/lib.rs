@@ -487,6 +487,7 @@ impl Registry {
         let g = self.authorize(&guard_id, &owner, &owner_salt, &sig, &nonce, &message);
         require!(g.status != GuardStatus::Closed, "already closed");
         emit("policy_updated", json!({ "guard_id": guard_id }));
+        // OutLayer refunds an update's unused deposit to whoever registration named (the checker).
         Promise::new(self.outlayer.clone()).function_call(
             "store_wallet_policy",
             store_policy_args(
@@ -495,7 +496,7 @@ impl Registry {
                 &wallet_signature,
                 policy_version,
                 policy_valid_until,
-                Some(env::predecessor_account_id()),
+                None,
             ),
             env::attached_deposit(),
             GAS_POLICY,
