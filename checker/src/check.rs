@@ -115,7 +115,7 @@ pub fn seal_to_owner(host: &dyn Host, guard_id: &str, g: &StoredGuard, plain: &V
 
 /// Draws this epoch's line and target and records the arm on the registry, sealed to the owner so only the owner
 /// can later show which line was in force (compensation evidence).
-fn arm(host: &dyn Host, guard_id: &str, g: &StoredGuard, epoch: u64) -> Result<(f64, f64), String> {
+pub fn arm(host: &dyn Host, guard_id: &str, g: &StoredGuard, epoch: u64) -> Result<(f64, f64), String> {
     let s = &g.settings;
     let line = draw(s.line_range_pct[0], s.line_range_pct[1], uniform(host));
     let target = draw(s.target_range_pct[0], s.target_range_pct[1], uniform(host));
@@ -528,7 +528,7 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         vault::put(host, &key, &t)?;
         return Ok(CheckStatus::Guarding);
     }
-    let budget_left = (s.budget_usd - t.budget_used_usd).max(0.0);
+    let budget_left = (s.budget_usd + g.added_usd - t.budget_used_usd).max(0.0);
     let Some(balances) = custody.balances(guard_id)? else {
         vault::put(host, &key, &t)?;
         return Ok(CheckStatus::Skipped);

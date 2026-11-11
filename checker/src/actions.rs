@@ -1,5 +1,6 @@
 //! The checker's actions (docs/SPEC.md §3). Input is JSON on stdin, output is JSON on stdout (≤ 900 bytes) and
 //! carries a status, never a setting. Refusal reasons name the rule that failed, never the value.
+use crate::change::{self, ResealInput, TopupInput};
 use crate::check::{self, seal_to_owner};
 use crate::close::{self, CloseInput};
 use crate::config::{NET, OWNER_GAS, REGISTER_DEPOSIT, REGISTER_GAS};
@@ -25,6 +26,8 @@ pub enum Input {
     Check { guard_id: String },
     Freeze(FreezeInput),
     Close(CloseInput),
+    Topup(TopupInput),
+    Reseal(ResealInput),
 }
 
 /// An owner's freeze or unfreeze, signed with the owner key; the enclave only submits it and pays the gas, and the
@@ -82,6 +85,11 @@ pub struct StoredGuard {
     /// The `register_guard` transaction, once the guard's wallet policy is on chain.
     #[serde(default)]
     pub registered: Option<String>,
+    /// What the owner's top-ups added to the sealed budget, and the nonces they were signed with.
+    #[serde(default)]
+    pub added_usd: f64,
+    #[serde(default)]
+    pub topups: Vec<String>,
 }
 
 pub fn refuse(reason: &str) -> Value {
@@ -97,6 +105,8 @@ pub fn run(host: &dyn Host, input: &str) -> Value {
         Ok(Input::Reserve { guard_id }) => reserve(host, &guard_id).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Freeze(f)) => freeze(host, &f).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Close(c)) => close::close(host, &c).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Topup(t)) => change::topup(host, &t).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Reseal(r)) => change::reseal(host, &r).unwrap_or_else(|e| refuse(&e)),
         // A check answers with its status alone, even when it fails (rule 4).
         Ok(Input::Check { guard_id }) => {
             json!({ "status": check::check(host, &guard_id).unwrap_or(CheckStatus::Skipped) })
@@ -160,6 +170,8 @@ pub fn create(host: &dyn Host, c: &CreateInput) -> Result<Value, String> {
                 account_commitment: c.account_commitment.clone(),
                 wallet_open: false,
                 registered: None,
+                added_usd: 0.0,
+                topups: vec![],
             };
             vault::put(host, &key, &g)?;
             g
@@ -191,6 +203,15 @@ pub fn activate(host: &dyn Host, guard_id: &str, mut g: StoredGuard) -> Result<S
     Ok(g)
 }
 
+/// A non-USDC reserve's price, for its per-transaction cap in the wallet's policy.
+pub fn reserve_units(host: &dyn Host, s: &GuardSettings) -> Result<Option<policy::ReserveUnits>, String> {
+    if s.reserve_asset == policy::USDC {
+        return Ok(None);
+    }
+    let t = oneclick::token(host, NET.oneclick, &s.reserve_asset)?;
+    Ok(Some(policy::ReserveUnits { per_usd: t.per_usd() }))
+}
+
 /// True when any balance in the guard's wallet is above zero.
 pub fn funded(balances: &[(String, String)]) -> bool {
     balances.iter().any(|(_, b)| b.parse::<u128>().is_ok_and(|x| x > 0))
@@ -204,13 +225,7 @@ fn register(host: &dyn Host, guard_id: &str, g: &StoredGuard) -> Result<String, 
     let s = &g.settings;
     let custody = Custody::new(host, NET.outlayer_api)?;
     let wallet_id = custody.register(guard_id)?;
-    let reserve = if s.reserve_asset == policy::USDC {
-        None
-    } else {
-        let t = oneclick::token(host, NET.oneclick, &s.reserve_asset)?;
-        Some(policy::ReserveUnits { per_usd: t.per_usd() })
-    };
-    let p = policy::build(s, NET.fee_wallet, reserve)?;
+    let p = policy::build(s, NET.fee_wallet, reserve_units(host, s)?)?;
     let encrypted = custody.encrypt_policy(guard_id, &wallet_id, &p)?;
     let signed = custody.sign_policy(guard_id, &encrypted, NET.registry)?;
     let args = json!({
@@ -239,7 +254,7 @@ pub fn fund(host: &dyn Host, f: &FundInput) -> Result<Value, String> {
     let t = oneclick::token(host, NET.oneclick, &f.source_asset)?;
     let amount = ((g.settings.budget_usd * t.per_usd()).ceil() as u128).to_string();
     let custody = Custody::new(host, NET.outlayer_api)?;
-    let address = custody.deposit_address(&f.guard_id, &f.source_asset, &amount)?;
+    let address = custody.deposit_address(&f.guard_id, &f.source_asset, &amount, "fund")?;
     let sealed = seal_to_owner(
         host,
         &f.guard_id,

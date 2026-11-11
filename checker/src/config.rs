@@ -41,8 +41,12 @@ pub const REGISTER_DEPOSIT: u128 = 30_000_000_000_000_000_000_000;
 /// NEAR holds a call's attached gas up front at about 10× the gas price, so it is kept near need: the registry sets
 /// 55 Tgas aside for OutLayer and its reply, and a registration burns about 11 Tgas in all.
 pub const REGISTER_GAS: u64 = 70_000_000_000_000;
-/// An owner's freeze, unfreeze or close: the registry sets 30 Tgas aside for OutLayer.
+/// An owner's freeze, unfreeze, close or new range: the registry sets 30 Tgas aside for OutLayer.
 pub const OWNER_GAS: u64 = 45_000_000_000_000;
+/// A top-up's new wallet policy: the registry sets 40 Tgas aside for OutLayer, which keeps what the policy's storage
+/// costs from the deposit and refunds the rest to the checker.
+pub const TOPUP_GAS: u64 = 60_000_000_000_000;
+pub const TOPUP_DEPOSIT: u128 = 20_000_000_000_000_000_000_000;
 
 /// Seconds of distance history kept for the fall rate, and the rescue time a speed-aware trigger looks ahead
 /// (docs/SPEC.md §3: 60 s until the measured p95 replaces it).

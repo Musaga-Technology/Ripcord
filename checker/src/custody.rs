@@ -143,11 +143,12 @@ impl<'a> Custody<'a> {
         }
     }
 
-    /// A one-time address that credits the guard's confidential balance from another chain.
-    pub fn deposit_address(&self, seed: &str, source_asset: &str, amount: &str) -> Result<String, String> {
+    /// A one-time address that credits the guard's confidential balance from another chain. `tag` keeps each funding
+    /// (the first, or a top-up) on its own address.
+    pub fn deposit_address(&self, seed: &str, source_asset: &str, amount: &str, tag: &str) -> Result<String, String> {
         let t = self.token(seed)?;
         let body = json!({ "source_asset": source_asset, "amount": amount });
-        let idem = format!("{seed}-fund-{source_asset}-{amount}");
+        let idem = format!("{seed}-{tag}-{source_asset}-{amount}");
         let path = "/wallet/v1/confidential/deposit/cross-chain";
         let v = self.ok(
             "deposit",

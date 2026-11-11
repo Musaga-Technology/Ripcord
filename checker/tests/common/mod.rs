@@ -111,6 +111,8 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                     let mut net = n.borrow_mut();
                     net.txs.push(tx);
                     let method = [
+                        "top_up",
+                        "reseal",
                         "register_guard",
                         "record_arm",
                         "record_rescue",

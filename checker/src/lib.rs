@@ -2,6 +2,7 @@
 //! mock host; `src/main.rs` (feature `outlayer`) wires it to OutLayer's interfaces for the wasm32-wasip2 build.
 pub mod actions;
 pub mod agent;
+pub mod change;
 pub mod check;
 pub mod close;
 pub mod config;

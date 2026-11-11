@@ -1,5 +1,6 @@
-//! What an owner signs (docs/SPEC.md §2), checked here for the one owner action the enclave carries out itself:
-//! closing a guard. Same bytes as packages/shared/src/owner.ts and the registry's `sig.rs`.
+//! What an owner signs (docs/SPEC.md §2), checked here for the owner actions the enclave carries out itself:
+//! closing a guard, topping up its reserve and changing its range. Same bytes as packages/shared/src/owner.ts and the
+//! registry's `sig.rs`.
 use ed25519_dalek::{Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 
@@ -8,6 +9,22 @@ const NEP413_TAG: u32 = 2_147_484_061;
 
 pub fn close_message(guard_id: &str, chain: &str, address: &str, nonce: &str) -> String {
     format!("ripcord:close:{guard_id}:{chain}:{address}:{nonce}")
+}
+
+/// Hides a top-up's amount: the owner signs this, the registry sees only this, and the enclave opens the amount.
+pub fn topup_digest(guard_id: &str, cents: u64, salt: &str) -> String {
+    hex::encode(Sha256::digest(format!(
+        "ripcord:topup-amount:{guard_id}:{cents}:{salt}"
+    )))
+}
+
+pub fn topup_message(guard_id: &str, digest: &str, nonce: &str) -> String {
+    format!("ripcord:topup:{guard_id}:{digest}:{nonce}")
+}
+
+/// A new rescue range: the owner signs the settings' new fingerprint.
+pub fn reseal_message(guard_id: &str, commitment: &str, nonce: &str) -> String {
+    format!("ripcord:reseal:{guard_id}:{commitment}:{nonce}")
 }
 
 /// sha256(borsh(tag) ‖ borsh(Payload { message, nonce: sha256(nonce), recipient, callback_url: None })).
