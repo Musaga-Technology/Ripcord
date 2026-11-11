@@ -1,5 +1,5 @@
 // Hyperliquid's public info API, read from the owner's browser, so Ripcord's servers never learn which account is
-// behind a session. Shapes as read from mainnet (Nov 1–5 2026): numbers arrive as strings, `liquidationPx` can be null.
+// behind a session. Numbers arrive as strings, `liquidationPx` can be null.
 const API = 'https://api.hyperliquid.xyz';
 
 export interface Holding {

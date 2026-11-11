@@ -1,15 +1,15 @@
 //! A guard's own custody wallet on OutLayer, opened by the checker's enclave key (docs/SPEC.md §3). Deterministic
 //! wallets: `wallet_id = f(checker account, seed = guard id)`, so only this code can ever open a guard's wallet.
-//! Formats from OutLayer's agent-custody skill (references/register-and-auth.md, confidential.md), Oct 30 2026.
+//! Formats from OutLayer's agent-custody skill (references/register-and-auth.md, confidential.md).
 use crate::actions::CHECKER_KEY;
 use crate::host::Host;
 use crate::near_tx::bs58_encode;
 use base64::Engine;
 use serde_json::{json, Value};
 
-/// What the keystore's sign-policy returns: the wallet's signature over OutLayer's `policy_store_message`, and,
-/// since Nov 6 2026 (testnet first), the policy version and filing deadline (unix seconds) it covers. The registry
-/// passes them to `store_wallet_policy` unchanged; an OutLayer that predates them returns neither.
+/// What the keystore's sign-policy returns: the wallet's signature over OutLayer's `policy_store_message`, and the
+/// policy version and filing deadline (unix seconds) it covers. The registry passes them to `store_wallet_policy`
+/// unchanged; an older OutLayer returns neither.
 pub struct PolicySignature {
     pub signature: String,
     pub public_key: String,

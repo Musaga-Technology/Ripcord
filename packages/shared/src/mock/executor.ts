@@ -1,6 +1,6 @@
 // A mock of the guard wallet's custody API (OutLayer `/confidential/withdraw` and `/requests/{id}`) with fault
 // injection, plus the rescue client's retry rules from ARCHITECTURE §8. Demo mode and CI use it; the checker's
-// Rust executor (Day 5) follows the same rules. Time is simulated, so a 120 s credit runs in microseconds.
+// Rust executor follows the same rules. Time is simulated, so a 120 s credit runs in microseconds.
 
 export type Fault = 'ok' | '502' | '503' | 'busy' | 'refund' | 'slow';
 

@@ -196,8 +196,8 @@ fn a_cross_guard_never_signs() {
 
 #[test]
 fn the_action_hash_matches_hyperliquids_format() {
-    // Packed separately in Python from the SDK's key order and hashed with eth_utils.keccak. On Nov 5 2026 Hyperliquid
-    // recovered a throwaway signer's address from this format (docs/EVIDENCE.md).
+    // Packed separately in Python from the SDK's key order and hashed with eth_utils.keccak. Hyperliquid recovered a
+    // throwaway signer's address from this format (docs/EVIDENCE.md).
     assert_eq!(
         hex::encode(action_hash(159, 1_250_500_000, 1_793_000_000_000, 1_793_000_060_000)),
         "f0becd3056e81f32621ad9bc0fc5e3327e5e6c22c953c9a7c7ecccd967d580b9"

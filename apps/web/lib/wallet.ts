@@ -43,7 +43,7 @@ export interface ApproveAgent {
   nonce: number;
 }
 
-/** Hyperliquid's user-signed action, as in hyperliquid-python-sdk `sign_agent` (read Nov 5 2026). */
+/** Hyperliquid's user-signed action, as in hyperliquid-python-sdk `sign_agent`. */
 export function approveAgentAction(
   agentAddress: string,
   name: string,

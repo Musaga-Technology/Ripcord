@@ -1,5 +1,5 @@
 // What a reserve can be: each asset funds from its own chain and stays in that asset until a rescue swaps it to USDC.
-// Ids are 1Click's (`GET /v0/tokens`, read Nov 5 2026). USDC can come from any chain and arrives as NEAR USDC.
+// Ids are 1Click's (`GET /v0/tokens`). USDC can come from any chain and arrives as NEAR USDC.
 export interface ReserveAsset {
   symbol: string;
   name: string;
@@ -14,7 +14,7 @@ export interface ReserveAsset {
   wait: string;
   /** An example price, for demo mode only. */
   demoPrice: number;
-  /** Sent on top of the amount: a send from Hyperliquid carries $1 for the transfer (1Click, measured Oct 21). */
+  /** Sent on top of the amount: 1Click needs $1 more on a send from Hyperliquid. */
   extra?: number;
   /** How to send it, when the wallet isn't an ordinary one. */
   how?: string;
@@ -78,10 +78,9 @@ export const ASSETS: ReserveAsset[] = [
 ];
 
 /**
- * A USDC reserve funded from the trader's own Hyperliquid account: the easiest way in, since the money is already
- * there. Hyperliquid's Send moves it to a one-time address and NEAR Intents credits the guard's private balance in
- * about a minute (Oct 21 on mainnet: 5.00 in, 4.80 credited). The send itself shows on Hyperliquid, so funding from
- * another chain stays the private way.
+ * A USDC reserve sent from the trader's own Hyperliquid account, where the money already is. NEAR Intents credits the
+ * guard's private balance in about a minute. The send itself is public on Hyperliquid, so another chain stays the
+ * private way to fund.
  */
 export const FROM_HYPERLIQUID: ReserveAsset = {
   symbol: 'USDC',

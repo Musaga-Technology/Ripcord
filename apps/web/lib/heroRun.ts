@@ -2,7 +2,7 @@
 // same fixture the replay harness runs in CI), through the guard's real rules (`GuardedPosition`). A 10× long opened
 // at 21:00 UTC; the public liquidation price is where an unguarded one dies. Within each minute the price moves from
 // the last close to the bar's extreme and on to its close, so the wick is the bar's real low. The rescue lands 38 s
-// after it fires, as measured on mainnet.
+// after it fires, as a mainnet rescue did.
 import { presetRanges } from '@ripcord/shared';
 import data from '../data/eth-2025-10-10.json';
 import { distance, GuardedPosition, liqPrice, rng, type GuardSpec, type PositionSpec } from './sim';

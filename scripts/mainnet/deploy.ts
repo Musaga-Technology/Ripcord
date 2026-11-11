@@ -1,18 +1,10 @@
-// Puts Ripcord on NEAR mainnet: the guard registry on its own named account, the checker as that account's OutLayer
-// project, and the enclave's account funded and named the registry's checker. The same calls the testnet scripts
-// make and check, against mainnet. `plan` spends nothing: it reads the chain and says what each stage would spend.
-// Every other stage checks its balance before it signs.
+// Deploys Ripcord to NEAR mainnet in stages. `plan` only reads the chain and prints what each stage would cost; the
+// others check their balance before signing. ripcord-registry.near owns both the contract and the checker project.
 //
-// One account is funded by hand: the deploy account, an implicit account that also uploads the checker to FastFS.
-// It creates ripcord-registry.near with the registry's storage and float. That account then owns the contract and
-// the checker project, so one key controls both until the registry is locked.
-//
-// Keys stay outside the repository and are never printed: ~/.near-credentials/mainnet/<account>.json (NEAR CLI
-// format); the payment key that pays for enclave runs is OUTLAYER_PAYMENT_KEY in .env. What the stages learn (the
-// enclave's account and sealing key, the published wasm) is kept in ~/.ripcord/mainnet.json.
+// Keys stay out of the repo: ~/.near-credentials/mainnet (NEAR CLI format), and OUTLAYER_PAYMENT_KEY in .env.
 //
 // usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | status
-// (`bash contracts/guard-registry/build.sh` and `bash checker/build.sh mainnet` first)
+// Build first: bash contracts/guard-registry/build.sh && bash checker/build.sh mainnet
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -39,7 +31,7 @@ const REGISTRY_EXTRA = 15n * MILLINEAR;
 /** Attached to create_project or add_version; OutLayer keeps the project's storage (≈ 0.0064) and refunds the rest. */
 const PROJECT_DEPOSIT = 20n * MILLINEAR;
 /**
- * NEAR holds a call's attached gas up front at a cautious price, about 10× today's (100 Tgas held ~0.1 NEAR on Nov 11),
+ * NEAR holds a call's attached gas up front at a cautious price, about 10× the current one (100 Tgas holds about 0.1 NEAR),
  * and refuses a call that would dip into the storage deposit; registering a project needs far less than 100 Tgas.
  */
 const PROJECT_GAS = 50n * TGAS;

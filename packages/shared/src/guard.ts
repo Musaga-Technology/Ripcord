@@ -112,7 +112,7 @@ export function rescueSize(i: SizeInput): number | null {
   return room < MIN_RESCUE_USD ? null : Math.min(Math.max(need, MIN_RESCUE_USD), room);
 }
 
-/** 3 % of a saved rescue, 0.5 % on any part above $50,000 (PRD §7). */
+/** 3 % of a saved rescue, 0.5 % on any part above $50,000. */
 export function saveFee(t: number): number {
   return 0.03 * Math.min(t, 50000) + 0.005 * Math.max(t - 50000, 0);
 }

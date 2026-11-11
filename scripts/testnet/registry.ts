@@ -193,7 +193,7 @@ async function e2eSteps(acc: Account): Promise<void> {
     encrypted_data: enc.encrypted_base64,
     caller: registry,
   });
-  // Since OutLayer's Nov 6 contract the answer also carries the policy's version, deadline and lock flag.
+  // OutLayer's answer also carries the policy's version, deadline and lock flag.
   const sig = answer as unknown as SignedPolicy;
   check(
     'policy encrypted and signed by the wallet for the registry, unlocked',
@@ -238,7 +238,7 @@ async function e2eSteps(acc: Account): Promise<void> {
       wallet_pubkey: walletPubkey,
       encrypted_policy: enc.encrypted_base64,
       wallet_signature: sig.signature_hex,
-      // The version and filing deadline the signature covers (OutLayer's policy_store_message v2, Nov 6 2026).
+      // The version and filing deadline the signature covers (OutLayer's policy_store_message v2).
       policy_version: sig.version,
       policy_valid_until: sig.valid_until,
     },

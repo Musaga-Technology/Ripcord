@@ -13,8 +13,8 @@ pub mod sig;
 #[cfg(test)]
 mod tests;
 
-/// Forwarded to OutLayer with each new policy. OutLayer keeps what the policy's storage costs (0.0093 NEAR on
-/// testnet, 0.01213 on mainnet, measured) and refunds the rest to the checker as `storage_refund_to`.
+/// Forwarded to OutLayer with each new policy. OutLayer keeps what the policy's storage costs (about 0.012 NEAR
+/// on mainnet) and refunds the rest to the checker as `storage_refund_to`.
 pub const POLICY_DEPOSIT: NearToken = NearToken::from_millinear(20);
 const GAS_POLICY: Gas = Gas::from_tgas(40);
 const GAS_CALLBACK: Gas = Gas::from_tgas(15);
@@ -174,9 +174,9 @@ fn key(guard_id: &str, n: impl std::fmt::Display) -> String {
     format!("{guard_id}/{n}")
 }
 
-/// Arguments for OutLayer's `store_wallet_policy`. Since Nov 6 2026 (testnet first) the wallet's signature also
-/// covers the policy's next version, its lock and a filing deadline, all three from the keystore's sign-policy; an
-/// OutLayer that predates it takes neither, so both are passed or neither. The registry stores only unlocked
+/// Arguments for OutLayer's `store_wallet_policy`. The wallet's signature covers the policy's next version, its lock
+/// and a filing deadline, all from the keystore's sign-policy; an older OutLayer takes neither, so both are passed or
+/// neither. The registry stores only unlocked
 /// policies, so the owner's freeze and close always reach the wallet.
 fn store_policy_args(
     wallet_pubkey: &str,
@@ -228,7 +228,7 @@ impl Registry {
             outlayer,
             deployer: env::predecessor_account_id(),
             locked: false,
-            // ≈ $0.001 at $4.4/NEAR: OutLayer's minimum per TEE check (G4).
+            // ≈ $0.001 at $4.4/NEAR: OutLayer's minimum per TEE check.
             check_fee: NearToken::from_yoctonear(230_000_000_000_000_000_000),
             stats: Stats::default(),
         }

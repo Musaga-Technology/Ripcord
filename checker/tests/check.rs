@@ -300,7 +300,7 @@ fn answers_with_a_bare_status() {
 
 #[test]
 fn reads_hyperliquid_clearinghouse_state() {
-    // The shape Hyperliquid answered on mainnet on Nov 1 (numbers scaled), plus an isolated position with no
+    // The shape Hyperliquid answers on mainnet (numbers scaled), plus an isolated position with no
     // liquidation price.
     let v: Value = serde_json::from_str(include_str!("fixtures/clearinghouse-state.json")).unwrap();
     let ps = ripcord_checker::hl::parse(&v).unwrap();

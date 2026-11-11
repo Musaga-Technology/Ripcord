@@ -319,7 +319,7 @@ async function create(): Promise<void> {
 }
 
 /**
- * The same wasm on mainnet FastFS, for when the testnet host is down (it was, Oct 31 – Nov 1): any HTTPS URL works,
+ * The same wasm on mainnet FastFS, for when the testnet host is down: any HTTPS URL works,
  * since the version pins the sha256. Uploaded by a fresh implicit mainnet account that holds a few cents of NEAR and
  * nothing else; its key stays in ~/.near-credentials/mainnet. One upload costs about 0.001 NEAR.
  */

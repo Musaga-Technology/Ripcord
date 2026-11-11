@@ -1,6 +1,5 @@
-// What Verify checks, on the owner's device, from the seal file and what NEAR holds (docs/DESIGN.md §4.6): the sealed
-// settings give the guard's three public fingerprints; every line the enclave drew sat inside the sealed range; and
-// OutLayer runs the build this repository publishes. The example account runs the same code on example records.
+// Verify's three checks, run on the owner's device: the seal file matches the guard's fingerprints on NEAR, every
+// line the enclave drew is inside the sealed range, and OutLayer runs the build this repo publishes.
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
   accountCommitment,

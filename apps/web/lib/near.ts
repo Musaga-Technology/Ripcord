@@ -1,5 +1,5 @@
-// Where Ripcord's NEAR pieces live on each network, for the reads and the links that prove them (docs/EVIDENCE.md).
-// NEXT_PUBLIC_NEAR_NETWORK picks the network; NEXT_PUBLIC_REGISTRY and NEXT_PUBLIC_NEAR_RPC override its defaults.
+// Ripcord's NEAR accounts per network. NEXT_PUBLIC_NEAR_NETWORK picks one; NEXT_PUBLIC_REGISTRY and
+// NEXT_PUBLIC_NEAR_RPC override its defaults.
 export const NETWORK: 'mainnet' | 'testnet' =
   process.env.NEXT_PUBLIC_NEAR_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';
 

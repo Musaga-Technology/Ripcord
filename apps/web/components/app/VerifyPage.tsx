@@ -1,8 +1,6 @@
 'use client';
 
-// Verify (docs/DESIGN.md §4.6): a seal file and its passphrase open the guard here, then three checks run against what
-// NEAR holds. Nothing leaves this device; the example guard runs the same checks on example records, and reads the
-// running build live.
+// Verify page: open a seal file in the browser and check the guard against NEAR. Nothing leaves the device.
 import { fingerprint, isSealFile, readSealFile, type SealContents, type SealFile } from '@ripcord/shared';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { random, readArms, readGuardHashes, readReceipts, readRunningBuild } from '../../lib/backend';

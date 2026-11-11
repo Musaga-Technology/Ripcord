@@ -1,5 +1,4 @@
-// The public ledger's figures (docs/DESIGN.md §4.7): what the registry counts for every guard, and the rescues whose
-// owners published proof, shown the way the registry keeps them: to the hour and rounded.
+// Ledger figures. Rescues are shown as the registry keeps them: to the hour, with rounded amounts.
 
 export interface Stats {
   guards: number;

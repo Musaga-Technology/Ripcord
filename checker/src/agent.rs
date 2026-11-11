@@ -1,8 +1,8 @@
 //! The agent key for isolated positions (ARCHITECTURE §4.6): the guard wallet's own EVM key, which the owner approves
 //! once on Hyperliquid. A rescue credits the account's balance; an isolated position only gets that margin through
 //! `updateIsolatedMargin`. This is the only action Ripcord ever signs with the key, and `ntli` is unsigned, so it can
-//! only add (T-SEC-07). Formats from hyperliquid-python-sdk `signing.py` and `exchange.py`, read Nov 5 2026; the same
-//! message moved a real position in G8.
+//! only add (T-SEC-07). Formats from hyperliquid-python-sdk `signing.py` and `exchange.py`; the same
+//! message moved a real position on mainnet.
 use crate::custody::Custody;
 use crate::host::Host;
 use serde_json::{json, Value};

@@ -1,7 +1,6 @@
 'use client';
 
-// The public ledger (docs/DESIGN.md §4.7): the registry's totals for every guard, read from NEAR in this browser, and
-// every rescue whose owner published proof, to the hour and rounded. No account, distance, range or reserve.
+// Public ledger: the registry's totals, read from NEAR in the browser, and the rescues their owners published.
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { readReceipts, readStats } from '../../lib/backend';

@@ -1,5 +1,5 @@
-// What the NEAR scripts share, on testnet and mainnet: one call and its outcome, the ✓/✗ report, and FastFS
-// uploads written the way OutLayer's CLI writes them (out-layer/outlayer-cli v0.2.1).
+// Helpers the testnet and mainnet scripts share: sending a call, the ✓/✗ report, and FastFS uploads in the format
+// OutLayer's CLI uses (out-layer/outlayer-cli v0.2.1).
 import { createHash, randomBytes } from 'node:crypto';
 import { actions, type Account } from 'near-api-js';
 

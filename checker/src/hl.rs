@@ -1,6 +1,6 @@
 //! Hyperliquid, read by the checker itself inside the TEE (ARCHITECTURE §2 rule 3): `clearinghouseState` only
-//! (weight 2). Numbers arrive as strings; `liquidationPx` is null when nothing can be liquidated. Shape as read from
-//! mainnet on Nov 1 2026.
+//! (weight 2). Numbers arrive as strings; `liquidationPx` is null when nothing can be
+//! liquidated.
 use crate::host::Host;
 use ripcord_rules::types::{LeverageType, Position};
 use serde_json::{json, Value};
@@ -83,8 +83,8 @@ pub fn asset_index(host: &dyn Host, api: &str, coin: &str) -> Result<u32, String
         .ok_or_else(|| "coin is not in the perps universe".into())
 }
 
-/// Has the owner approved this agent, and is the approval still good? (`extraAgents`, read Nov 5 2026:
-/// a list of `{name, address, validUntil}`.)
+/// Has the owner approved this agent, and is the approval still good? (`extraAgents`: a list of
+/// `{name, address, validUntil}`.)
 pub fn agent_approved(host: &dyn Host, api: &str, user: &str, agent: &str, now_ms: u64) -> Result<bool, String> {
     let list = info(host, api, &json!({ "type": "extraAgents", "user": user }))?;
     let list = list.as_array().ok_or("extraAgents is not a list")?;
