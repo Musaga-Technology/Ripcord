@@ -765,6 +765,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
               contents={opened}
               backend={backend}
               isDemo={false}
+              wallet={session?.kind === 'wallet' ? session.address : null}
               fallback={reserveWords(opened.settings)}
               onFunded={() => {
                 patchGuard(g.id, { funded: true });

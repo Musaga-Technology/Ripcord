@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ASSETS, sourcesFor } from '../../lib/assets';
 import { DEMO_ARRIVES_MS, random, Refused, type Backend, type Deposit } from '../../lib/backend';
 import { readAgents } from '../../lib/hl';
-import { approveAgent } from '../../lib/wallet';
+import { approveAgent, sendFromHyperliquid } from '../../lib/wallet';
 import { ghostBtn, primaryBtn } from './AppShell';
 
 export const assetOf = (reserve: string) => ASSETS.find((a) => a.reserve === reserve) ?? ASSETS[ASSETS.length - 1]!;
@@ -134,12 +134,15 @@ export function Fund({
   contents,
   backend,
   isDemo,
+  wallet,
   fallback,
   onFunded,
 }: {
   contents: SealContents;
   backend: Backend;
   isDemo: boolean;
+  /** The connected wallet, which can sign a send from Hyperliquid; null for a pasted address. */
+  wallet: string | null;
   /** The amount as first chosen, in words: shown in demo mode, where no price is quoted. */
   fallback: string;
   onFunded(): void;
@@ -147,6 +150,14 @@ export function Fund({
   const sources = sourcesFor(assetOf(contents.settings.reserve_asset));
   const [srcIx, setSrcIx] = useState(0);
   const asset = sources[srcIx] ?? sources[0]!;
+  // From Hyperliquid, a connected wallet signs the send here, so nobody copies an address between apps.
+  const inApp = !!asset.how && (isDemo || wallet !== null);
+  const [sending, setSending] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [sendError, setSendError] = useState<string | null>(null);
+  useEffect(() => {
+    setSending('idle');
+    setSendError(null);
+  }, [asset]);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'address' | 'amount' | null>(null);
@@ -195,10 +206,31 @@ export function Fund({
     deposit && deposit.decimals > 0
       ? Number(deposit.amount) / 10 ** deposit.decimals
       : Number(fallback.replace(/,/g, ''));
-  // What to send: the reserve, plus what the send itself carries (Hyperliquid: $1 for the transfer).
-  const exact = String(Math.round((forReserve + (asset.extra ?? 0)) * 1e8) / 1e8);
+  // What to send: the reserve, plus what the send itself carries (Hyperliquid: $1 for the transfer), in whole cents
+  // from Hyperliquid.
+  const total = forReserve + (asset.extra ?? 0);
+  const exact = String(asset.how ? Math.ceil(total * 100 - 1e-6) / 100 : Math.round(total * 1e8) / 1e8);
   const amount = Number(exact).toLocaleString('en-US', { maximumFractionDigits: 8 });
   const reserveAmount = forReserve.toLocaleString('en-US', { maximumFractionDigits: 8 });
+
+  const send = async () => {
+    if (!deposit) return;
+    setSendError(null);
+    setSending('sending');
+    if (isDemo) {
+      await new Promise((r) => setTimeout(r, 900));
+      setSending('sent');
+      return;
+    }
+    try {
+      const e = await sendFromHyperliquid(wallet as string, deposit.address, exact);
+      setSendError(e);
+      setSending(e ? 'idle' : 'sent');
+    } catch {
+      setSendError("Your wallet didn't sign. Try again, or send it yourself in Hyperliquid.");
+      setSending('idle');
+    }
+  };
 
   const copy = async (what: 'address' | 'amount') => {
     if (!deposit) return;
@@ -251,34 +283,72 @@ export function Fund({
       ) : !deposit ? (
         <div aria-busy="true" className="h-[208px] animate-pulse rounded-[20px] border border-line bg-panel" />
       ) : (
-        <div className="flex flex-wrap items-center gap-5 rounded-[20px] border border-line bg-panel p-5">
-          {/* A QR is for a phone wallet; a send from Hyperliquid happens in Hyperliquid itself. */}
-          {!asset.how && <Qr text={deposit.address} />}
-          <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
-            <span className="text-[13px] text-muted">
-              {isDemo ? 'Example address, no funds needed' : `Send to this address on ${asset.chain}`}
-            </span>
-            <code className="break-all font-mono text-[15px] leading-relaxed text-text">{deposit.address}</code>
-            <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] tabular-nums">
-              <span className="text-muted">Amount</span>
-              <span className="font-semibold">
-                {amount} {asset.symbol}
+        <>
+          {inApp && (
+            <div className="flex flex-col items-start gap-2">
+              <button type="button" className={primaryBtn} disabled={sending !== 'idle' || arrived} onClick={send}>
+                {sending === 'sending'
+                  ? 'Waiting for your wallet…'
+                  : sending === 'sent'
+                    ? 'Sent from Hyperliquid'
+                    : `Send ${amount} ${asset.symbol} from Hyperliquid`}
+              </button>
+              <p className="text-[13px] text-muted">
+                {isDemo
+                  ? 'In the simulation nothing is signed. For real, your wallet shows the amount and the address below before you sign.'
+                  : 'Your wallet shows the amount and the address below before you sign. Ripcord never holds a key.'}
+              </p>
+              {sendError && (
+                <p role="alert" className="text-[15px] text-red">
+                  {sendError}
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-5 rounded-[20px] border border-line bg-panel p-5">
+            {/* A QR is for a phone wallet; a send from Hyperliquid happens in Hyperliquid itself. */}
+            {!asset.how && <Qr text={deposit.address} />}
+            <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
+              <span className="text-[13px] text-muted">
+                {isDemo
+                  ? 'Example address, no funds needed'
+                  : inApp
+                    ? `Goes to this address on ${asset.chain}`
+                    : `Send to this address on ${asset.chain}`}
               </span>
-            </span>
-            <span className="flex flex-wrap gap-2">
-              <button type="button" className={`${ghostBtn} min-h-11 px-4 text-[13px]`} onClick={() => copy('address')}>
-                {copied === 'address' ? 'Copied' : 'Copy address'}
-              </button>
-              <button type="button" className={`${ghostBtn} min-h-11 px-4 text-[13px]`} onClick={() => copy('amount')}>
-                {copied === 'amount' ? 'Copied' : 'Copy amount'}
-              </button>
-            </span>
-            <span className="text-[13px] text-muted">
-              {asset.how ? `${asset.how} ` : ''}Send only {asset.symbol} on {asset.chain} to this address.
-            </span>
-            {asset.note && <span className="text-[13px] text-muted">{asset.note}</span>}
+              <code className="break-all font-mono text-[15px] leading-relaxed text-text">{deposit.address}</code>
+              <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] tabular-nums">
+                <span className="text-muted">Amount</span>
+                <span className="font-semibold">
+                  {amount} {asset.symbol}
+                </span>
+              </span>
+              <span className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={`${ghostBtn} min-h-11 px-4 text-[13px]`}
+                  onClick={() => copy('address')}
+                >
+                  {copied === 'address' ? 'Copied' : 'Copy address'}
+                </button>
+                <button
+                  type="button"
+                  className={`${ghostBtn} min-h-11 px-4 text-[13px]`}
+                  onClick={() => copy('amount')}
+                >
+                  {copied === 'amount' ? 'Copied' : 'Copy amount'}
+                </button>
+              </span>
+              <span className="text-[13px] text-muted">
+                {asset.how
+                  ? `${inApp ? `Or send it yourself: ${asset.how[0]!.toLowerCase()}${asset.how.slice(1)}` : asset.how} `
+                  : ''}
+                Send only {asset.symbol} on {asset.chain} to this address.
+              </span>
+              {asset.note && <span className="text-[13px] text-muted">{asset.note}</span>}
+            </div>
           </div>
-        </div>
+        </>
       )}
       {deposit && (
         <p aria-live="polite" className="flex items-center gap-2 text-[15px] text-text-2">

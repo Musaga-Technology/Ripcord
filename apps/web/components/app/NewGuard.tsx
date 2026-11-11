@@ -578,6 +578,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
             contents={prepared.contents}
             backend={backend}
             isDemo={isDemo}
+            wallet={session?.kind === 'wallet' ? session.address : null}
             fallback={amountStr}
             onFunded={() => {
               saveGuard({ ...local, funded: true });

@@ -1,6 +1,7 @@
 // The trader's wallet, through whatever the browser injects (EIP-6963, then window.ethereum). Connecting only gives
-// the address: a guard's owner is a key the app makes, so there is nothing to sign in with. The one signature a
-// wallet is ever asked for is an isolated guard's `approveAgent` (ARCHITECTURE §4.6).
+// the address: a guard's owner is a key the app makes, so there is nothing to sign in with. A wallet is asked to sign
+// two Hyperliquid actions, each shown in full in its own window: an isolated guard's `approveAgent`
+// (ARCHITECTURE §4.6), and the `usdSend` that funds a reserve from the trader's own Hyperliquid balance.
 import { postExchange } from './hl';
 
 interface Provider {
@@ -61,14 +62,23 @@ export function approveAgentAction(
   };
 }
 
+const EIP712Domain = [
+  { name: 'name', type: 'string' },
+  { name: 'version', type: 'string' },
+  { name: 'chainId', type: 'uint256' },
+  { name: 'verifyingContract', type: 'address' },
+];
+
+const domainOf = (signatureChainId: string) => ({
+  name: 'HyperliquidSignTransaction',
+  version: '1',
+  chainId: Number.parseInt(signatureChainId, 16),
+  verifyingContract: '0x0000000000000000000000000000000000000000',
+});
+
 export function approveAgentTypedData(a: ApproveAgent) {
   return {
-    domain: {
-      name: 'HyperliquidSignTransaction',
-      version: '1',
-      chainId: Number.parseInt(a.signatureChainId, 16),
-      verifyingContract: '0x0000000000000000000000000000000000000000',
-    },
+    domain: domainOf(a.signatureChainId),
     types: {
       'HyperliquidTransaction:ApproveAgent': [
         { name: 'hyperliquidChain', type: 'string' },
@@ -76,12 +86,7 @@ export function approveAgentTypedData(a: ApproveAgent) {
         { name: 'agentName', type: 'string' },
         { name: 'nonce', type: 'uint64' },
       ],
-      EIP712Domain: [
-        { name: 'name', type: 'string' },
-        { name: 'version', type: 'string' },
-        { name: 'chainId', type: 'uint256' },
-        { name: 'verifyingContract', type: 'address' },
-      ],
+      EIP712Domain,
     },
     primaryType: 'HyperliquidTransaction:ApproveAgent',
     message: {
@@ -93,24 +98,56 @@ export function approveAgentTypedData(a: ApproveAgent) {
   };
 }
 
-/** Asks the wallet to approve the guard's agent, once, and sends it to Hyperliquid. Returns its answer's error, if any. */
-export async function approveAgent(
+export interface UsdSend {
+  type: 'usdSend';
+  hyperliquidChain: 'Mainnet';
+  signatureChainId: string;
+  destination: string;
+  amount: string;
+  time: number;
+}
+
+/** Hyperliquid's USD send from the perps balance, as in hyperliquid-python-sdk `usd_transfer`. */
+export function usdSendAction(destination: string, amount: string, chainId: string, now: number): UsdSend {
+  return { type: 'usdSend', hyperliquidChain: 'Mainnet', signatureChainId: chainId, destination, amount, time: now };
+}
+
+export function usdSendTypedData(a: UsdSend) {
+  return {
+    domain: domainOf(a.signatureChainId),
+    types: {
+      'HyperliquidTransaction:UsdSend': [
+        { name: 'hyperliquidChain', type: 'string' },
+        { name: 'destination', type: 'string' },
+        { name: 'amount', type: 'string' },
+        { name: 'time', type: 'uint64' },
+      ],
+      EIP712Domain,
+    },
+    primaryType: 'HyperliquidTransaction:UsdSend',
+    message: { hyperliquidChain: a.hyperliquidChain, destination: a.destination, amount: a.amount, time: a.time },
+  };
+}
+
+/**
+ * Has the owner's wallet sign one Hyperliquid action and sends it. The wallet must be the account the guard pays.
+ * Wallets refuse typed data for another chain while Hyperliquid accepts any, so the wallet's own chain signs.
+ */
+async function signAndSend<A extends { type: string }>(
   owner: string,
-  agent: string,
-  name: string,
-  validUntilMs: number,
+  build: (chainId: string, now: number) => A,
+  typed: (a: A) => object,
+  nonceOf: (a: A) => number,
 ): Promise<string | null> {
   const p = await injected();
   if (!p) return 'No wallet found in this browser.';
   const accounts = (await p.request({ method: 'eth_requestAccounts' })) as string[];
   if (accounts[0]?.toLowerCase() !== owner.toLowerCase())
     return 'Switch your wallet to the account that holds this position.';
-  // Wallets refuse typed data for another chain, and Hyperliquid accepts any: use the wallet's own.
-  const chainId = (await p.request({ method: 'eth_chainId' })) as string;
-  const action = approveAgentAction(agent, name, validUntilMs, chainId, Date.now());
+  const action = build((await p.request({ method: 'eth_chainId' })) as string, Date.now());
   const sig = (await p.request({
     method: 'eth_signTypedData_v4',
-    params: [accounts[0], JSON.stringify(approveAgentTypedData(action))],
+    params: [accounts[0], JSON.stringify(typed(action))],
   })) as string;
   const hex = sig.slice(2);
   const signature = {
@@ -118,6 +155,39 @@ export async function approveAgent(
     s: `0x${hex.slice(64, 128)}`,
     v: Number.parseInt(hex.slice(128, 130), 16),
   };
-  const answer = await postExchange({ action, nonce: action.nonce, signature, vaultAddress: null, expiresAfter: null });
-  return answer.status === 'ok' ? null : "Hyperliquid didn't take the approval. Try again.";
+  const answer = await postExchange({
+    action,
+    nonce: nonceOf(action),
+    signature,
+    vaultAddress: null,
+    expiresAfter: null,
+  });
+  return answer.status === 'ok' ? null : 'refused';
+}
+
+/** Asks the wallet to approve the guard's agent, once, and sends it to Hyperliquid. Returns its answer's error, if any. */
+export async function approveAgent(
+  owner: string,
+  agent: string,
+  name: string,
+  validUntilMs: number,
+): Promise<string | null> {
+  const e = await signAndSend(
+    owner,
+    (chainId, now) => approveAgentAction(agent, name, validUntilMs, chainId, now),
+    approveAgentTypedData,
+    (a) => a.nonce,
+  );
+  return e === 'refused' ? "Hyperliquid didn't take the approval. Try again." : e;
+}
+
+/** Sends `amount` USDC from the owner's Hyperliquid balance to the reserve's deposit address, signed in the wallet. */
+export async function sendFromHyperliquid(owner: string, destination: string, amount: string): Promise<string | null> {
+  const e = await signAndSend(
+    owner,
+    (chainId, now) => usdSendAction(destination, amount, chainId, now),
+    usdSendTypedData,
+    (a) => a.time,
+  );
+  return e === 'refused' ? "Hyperliquid didn't take the send. Check your balance and try again." : e;
 }
