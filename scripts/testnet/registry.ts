@@ -1,7 +1,8 @@
 // Deploys the guard registry to NEAR testnet and checks it end to end against OutLayer's testnet: the registry
 // becomes a real guard wallet's policy controller, an unlisted transfer is refused, the owner freezes with a
 // NEP-413 signature, a frozen wallet refuses even an allowed transfer, a replayed signature is refused, the owner
-// unfreezes, and closing deletes the wallet policy.
+// unfreezes, a top-up raises the wallet's cap without its amount on chain, a new range swaps the guard's
+// fingerprint, and closing deletes the wallet policy.
 //
 // Keys stay outside the repository and are never printed: the registry account's key in
 // ~/.near-credentials/testnet/<account>.json (NEAR CLI format); the registry's name in ~/.ripcord/testnet.json.
@@ -19,6 +20,9 @@ import {
   newGuardId,
   nep413Hash,
   ownerCommitment,
+  resealMessage,
+  topupDigest,
+  topupMessage,
   type GuardSettings,
 } from '../../packages/shared/src/index';
 
@@ -296,6 +300,72 @@ async function e2eSteps(acc: Account): Promise<void> {
   const un = await call(acc, 'unfreeze_guard', signed(false, bytesToHex(random(8))));
   const after = await view<{ frozen: boolean }>(OUTLAYER, 'get_wallet_policy', { wallet_pubkey: walletPubkey });
   check('the owner unfreezes', un.ok && after?.frozen === false, un.error);
+
+  // A top-up: the checker builds the policy with the higher cap, the owner signs a digest that hides the amount.
+  const over = (15n * MILLINEAR).toString();
+  await outlayer('POST', '/wallet/v1/invalidate-cache', { wallet_id: wallet!.wallet_id });
+  const [c5] = await outlayer('POST', '/wallet/v1/transfer', { chain: 'near', to: ALLOWED, amount: over });
+  check('before a top-up, more than the cap is refused', c5 === 403, `${c5}`);
+  const raised = {
+    ...policy,
+    rules: { ...policy.rules, limits: { per_transaction: { native: (20n * MILLINEAR).toString() } } },
+  };
+  const [, enc2] = await outlayer('POST', '/wallet/v1/encrypt-policy', { wallet_id: wallet!.wallet_id, ...raised });
+  const [, answer2] = await outlayer('POST', '/wallet/v1/sign-policy', {
+    encrypted_data: enc2.encrypted_base64,
+    caller: registry,
+  });
+  const sig2 = answer2 as unknown as SignedPolicy;
+  const tNonce = bytesToHex(random(8));
+  const digest = topupDigest(guardId, 500, bytesToHex(random(16)));
+  const tSig = owner.sign(nep413Hash(topupMessage(guardId, digest, tNonce), tNonce, registry)).signature;
+  const top = await call(
+    acc,
+    'top_up',
+    {
+      guard_id: guardId,
+      digest,
+      encrypted_policy: enc2.encrypted_base64,
+      wallet_signature: sig2.signature_hex,
+      policy_version: sig2.version,
+      policy_valid_until: sig2.valid_until,
+      owner: ownerKey,
+      owner_salt: ownerSalt,
+      sig: bytesToHex(tSig),
+      nonce: tNonce,
+    },
+    20n * MILLINEAR,
+    80n * TGAS,
+  );
+  check(
+    'the owner tops up: a new policy, no amount on chain',
+    top.ok,
+    top.error || `${top.tgas.toFixed(1)} Tgas, tx ${top.tx}`,
+  );
+  await outlayer('POST', '/wallet/v1/invalidate-cache', { wallet_id: wallet!.wallet_id });
+  const [c6, t3] = await outlayer('POST', '/wallet/v1/transfer', { chain: 'near', to: ALLOWED, amount: over });
+  check('after it, the same amount passes the policy', c6 !== 403, `${c6} ${t3?.error ?? ''}`);
+
+  // A new range: the owner signs the new settings' fingerprint, and the registry swaps it.
+  const fresh = commitment(
+    { ...settings, preset: 'safer', line_range_pct: [8, 11], target_range_pct: [13, 17] },
+    bytesToHex(random(32)),
+  );
+  const rNonce = bytesToHex(random(8));
+  const rSig = bytesToHex(owner.sign(nep413Hash(resealMessage(guardId, fresh, rNonce), rNonce, registry)).signature);
+  const rArgs = {
+    guard_id: guardId,
+    commitment: fresh,
+    owner: ownerKey,
+    owner_salt: ownerSalt,
+    sig: rSig,
+    nonce: rNonce,
+  };
+  const rs = await call(acc, 'reseal', rArgs);
+  const swapped = await view<{ commitment: string }>(registry, 'get_guard', { guard_id: guardId });
+  check('a new range swaps the fingerprint', rs.ok && swapped?.commitment === fresh, rs.error || `tx ${rs.tx}`);
+  const again = await call(acc, 'reseal', rArgs);
+  check('the same range signature again is refused', !again.ok && again.error.includes('nonce already used'));
 
   const cl = await call(acc, 'close', { guard_id: guardId });
   const has = await view<boolean>(OUTLAYER, 'has_wallet_policy', { wallet_pubkey: walletPubkey });
