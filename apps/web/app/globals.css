@@ -360,3 +360,48 @@ p {
     background: var(--green);
   }
 }
+
+/* Verify: opening the envelope (DESIGN §8.1). The veil is the card's own dark material; it slides off at −12°, then
+   the three ticks land 120 ms apart. Reduced motion keeps only the fade. */
+.veil {
+  position: absolute;
+  inset: -1px;
+  border-radius: 28px;
+  border: 1px solid #26262c;
+  background:
+    linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.035) 50%, transparent 62%),
+    linear-gradient(160deg, #1a1a1f, #0b0b0d 65%);
+  transform-origin: 20% 90%;
+  transition:
+    transform var(--dur-4) var(--ease),
+    opacity var(--dur-4) var(--ease);
+}
+.veil-off {
+  transform: translate(58%, -14%) rotate(-12deg);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .veil {
+    border-radius: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .veil-off {
+    transform: none;
+  }
+}
+.tick-in {
+  opacity: 0;
+  animation: tick-in var(--dur-2) var(--ease) forwards;
+}
+@keyframes tick-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

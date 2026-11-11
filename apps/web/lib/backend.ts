@@ -13,6 +13,8 @@ import {
   type CreateInput,
   type SealContents,
 } from '@ripcord/shared';
+import { CHECKER_PROJECT, NEAR_RPC, OUTLAYER, REGISTRY } from './near';
+import type { OnChainArm, OnChainGuard } from './verify';
 
 export const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
@@ -125,13 +127,10 @@ let demoInstance: Backend | null = null;
 export const demo = (): Backend => (demoInstance ??= demoBackend());
 
 // The public registry and the pokers, read and told directly from the browser, not through Ripcord's server.
-const RPC = process.env.NEXT_PUBLIC_NEAR_RPC ?? 'https://rpc.testnet.near.org';
-const REGISTRY = process.env.NEXT_PUBLIC_REGISTRY ?? '';
 const POKERS = (process.env.NEXT_PUBLIC_POKERS ?? '').split(',').filter(Boolean);
 
-async function view<T>(method: string, args: object): Promise<T | null> {
-  if (!REGISTRY) return null;
-  const r = await fetch(RPC, {
+async function view<T>(method: string, args: object, contract = REGISTRY): Promise<T | null> {
+  const r = await fetch(NEAR_RPC, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -141,7 +140,7 @@ async function view<T>(method: string, args: object): Promise<T | null> {
       params: {
         request_type: 'call_function',
         finality: 'final',
-        account_id: REGISTRY,
+        account_id: contract,
         method_name: method,
         args_base64: btoa(JSON.stringify(args)),
       },
@@ -159,6 +158,12 @@ export interface OnChainReceipt {
 export const readGuard = (id: string) => view<{ status: string }>('get_guard', { guard_id: id });
 export const readReceipts = (id: string) =>
   view<OnChainReceipt[]>('get_receipts', { guard_id: id, from: 0, limit: 50 });
+export const readGuardHashes = (id: string) => view<OnChainGuard>('get_guard', { guard_id: id });
+export const readArms = (id: string) => view<OnChainArm[]>('get_arms', { guard_id: id, from: 0, limit: 100 });
+/** The build OutLayer runs for the checker: its project's active version, the wasm's sha256. */
+export const readRunningBuild = async () =>
+  (await view<{ active_version: string }>('get_project', { project_id: CHECKER_PROJECT }, OUTLAYER))?.active_version ??
+  null;
 
 /** Asks each poker to watch the guard: only the owner's device can prove the address (docs/SPEC.md §4). */
 export async function watch(c: SealContents): Promise<void> {

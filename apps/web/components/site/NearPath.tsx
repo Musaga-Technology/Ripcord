@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { accountUrl, CHECKER_HASH, codeUrl, FREEZE_TX, REGISTER_TX, REGISTRY, short, txUrl } from '../../lib/near';
+import { accountUrl, CHECKER_HASH, codeUrl, FREEZE_TX_URL, REGISTER_TX_URL, REGISTRY, short } from '../../lib/near';
 
 // "How NEAR keeps it hidden.": the path a guard takes, from your device to your margin, each step the NEAR piece that
 // does it, what it hides or moves, and a link that proves it (the code, or a transaction on NEAR). When the path
@@ -45,8 +45,8 @@ const STEPS: Step[] = [
     body: "A public registry holds each guard as hashes, never an address. It controls the reserve wallet's rules, so only your signature can freeze it, even if Ripcord disappears.",
     proof: [
       { label: 'The registry', href: accountUrl(REGISTRY) },
-      { label: 'A guard registered', href: txUrl(REGISTER_TX) },
-      { label: 'A reserve frozen', href: txUrl(FREEZE_TX) },
+      { label: 'A guard registered', href: REGISTER_TX_URL },
+      { label: 'A reserve frozen', href: FREEZE_TX_URL },
     ],
   },
 ];

@@ -1,6 +1,6 @@
 // What this guard runs on, piece by piece, with the links that prove each: the app's own "how NEAR keeps it hidden",
 // for one guard. Plain words first; the NEAR piece names the work it does.
-import { accountUrl, CHECKER_HASH, codeUrl, FREEZE_TX, REGISTRY, short, txUrl } from '../../lib/near';
+import { accountUrl, CHECKER_HASH, codeUrl, FREEZE_TX_URL, REGISTRY, short } from '../../lib/near';
 
 export function OnNear({ guardId, example }: { guardId: string; example: boolean }) {
   const rows: { what: string; how: string; link?: { label: string; href: string } }[] = [
@@ -28,7 +28,7 @@ export function OnNear({ guardId, example }: { guardId: string; example: boolean
     {
       what: 'A freeze',
       how: 'One signature with your owner key, checked by that contract. It works even if Ripcord is down.',
-      link: { label: 'A freeze on NEAR', href: txUrl(FREEZE_TX) },
+      link: { label: 'A freeze on NEAR', href: FREEZE_TX_URL },
     },
   ];
   return (
