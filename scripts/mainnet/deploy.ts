@@ -12,7 +12,7 @@
 // enclave's account and sealing key, the published wasm) is kept in ~/.ripcord/mainnet.json.
 //
 // usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | status
-// (`bash contracts/guard-registry/build.sh` and `RIPCORD_FEE_WALLET=… bash checker/build.sh mainnet` first)
+// (`bash contracts/guard-registry/build.sh` and `bash checker/build.sh mainnet` first)
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -96,9 +96,8 @@ function mainnetChecker(): Uint8Array | null {
   const wasm = readWasm(CHECKER_WASM);
   if (!wasm) return null;
   const text = Buffer.from(wasm);
-  return text.includes(REGISTRY) && text.includes(OUTLAYER_API) && !text.includes('testnet-api.outlayer.ai')
-    ? wasm
-    : null;
+  // Hosts can't tell (the embedded manifest names both networks'); the registry compiled in can.
+  return text.includes(REGISTRY) && !text.includes('ripcord-registry-db06d339.testnet') ? wasm : null;
 }
 
 /** What the registry account needs when it is created: the contract's storage, its state and gas, and the floats. */
@@ -147,7 +146,7 @@ async function plan(): Promise<void> {
   check(
     `checker built for mainnet (${CHECKER_WASM})`,
     !!checker,
-    checker ? `sha256 ${sha256(checker).toString('hex')}` : 'run `RIPCORD_FEE_WALLET=… bash checker/build.sh mainnet`',
+    checker ? `sha256 ${sha256(checker).toString('hex')}` : 'run `bash checker/build.sh mainnet`',
   );
   check(
     `${REGISTRY} is free, or ours`,
@@ -230,7 +229,7 @@ async function registry(): Promise<void> {
 /** Publishes the mainnet checker to FastFS and makes it ripcord-registry.near/checker's active version. */
 async function checkerStage(): Promise<void> {
   const wasm = mainnetChecker();
-  if (!wasm) throw new Error('build the mainnet checker first: RIPCORD_FEE_WALLET=… bash checker/build.sh mainnet');
+  if (!wasm) throw new Error('build the mainnet checker first: bash checker/build.sh mainnet');
   const hash = sha256(wasm).toString('hex');
   const dep = deployer();
   const url = `${FASTFS}/${dep.accountId}/${OUTLAYER}/${hash}.wasm`;
