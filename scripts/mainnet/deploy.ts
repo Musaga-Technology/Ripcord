@@ -3,7 +3,7 @@
 //
 // Keys stay out of the repo: ~/.near-credentials/mainnet (NEAR CLI format), and OUTLAYER_PAYMENT_KEY in .env.
 //
-// usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | status
+// usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | status
 // Build first: bash contracts/guard-registry/build.sh && bash checker/build.sh mainnet
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -300,6 +300,24 @@ async function wire(): Promise<void> {
   check("registry config names the enclave's account", after.checker === s.checker_account, after.checker);
 }
 
+/**
+ * Tops up the enclave's account from the deploy account (default 0.1 NEAR). A registration holds about 0.1 NEAR up
+ * front (its gas at NEAR's cautious price plus the policy deposit), most of it returned once it runs.
+ */
+async function topup(): Promise<void> {
+  const s = readState();
+  if (!s.checker_account) throw new Error('run `pubkey` first');
+  const amount = BigInt(Math.round(Number(process.argv[3] ?? '0.1') * 1e4)) * 10n ** 20n;
+  const dep = deployer();
+  const has = spendable(await viewAccount(dep.accountId));
+  if (has < amount + 5n * MILLINEAR)
+    return check('the deploy account holds enough', false, `${near(has)} of ${near(amount)} NEAR`);
+  const t = await sendActions(dep, s.checker_account, [actions.transfer(amount)]);
+  check(`sent ${near(amount)} NEAR to the enclave's account`, t.ok, t.tx || t.error);
+  const after = spendable(await viewAccount(s.checker_account));
+  check("the enclave's account can pay for a registration", after >= 100n * MILLINEAR, `${near(after)} NEAR`);
+}
+
 /** What is live, read from the chain and compared with the local builds; signs nothing. */
 async function status(): Promise<void> {
   const s = readState();
@@ -328,9 +346,9 @@ async function status(): Promise<void> {
 }
 
 const stage = process.argv[2] ?? 'plan';
-const run = { plan, registry, checker: checkerStage, pubkey, wire, status }[stage as 'plan'];
+const run = { plan, registry, checker: checkerStage, pubkey, wire, topup, status }[stage as 'plan'];
 if (!run) {
-  console.log('usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | status');
+  console.log('usage: corepack pnpm mainnet:deploy plan | registry | checker | pubkey | wire | topup [NEAR] | status');
   process.exit(2);
 }
 await run();
