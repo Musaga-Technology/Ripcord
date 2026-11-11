@@ -40,6 +40,8 @@ if command -v cargo >/dev/null; then
   run cargo test --quiet -p ripcord-checker --test create && ok "settings open only inside the enclave, for their guard, matching all three public hashes; the guard's own wallet is opened and registered with a transaction of hashes only"
   run cargo test --quiet -p ripcord-checker --test check && ok "arms with a draw sealed to the owner, fires only below the line, pays only the owner within the caps, cooldown, budget, 503 pauses, bare status"
   run cargo test --quiet -p ripcord-checker --test near_tx && ok "signs its own NEAR transactions, byte for byte with near-api-js"
+  run cargo test --quiet -p ripcord-checker --test owner && ok "only the owner's key freezes or closes a guard; a close pays the rest to the owner's own Hyperliquid account"
+  run cargo test --quiet -p ripcord-checker --test agent && ok "an isolated position's agent signs only one add of the credit that landed; a cross guard never signs"
 else
   skip "cargo not found; the checker's tests need Rust"
 fi
