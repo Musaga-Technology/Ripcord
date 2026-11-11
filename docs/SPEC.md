@@ -1,6 +1,6 @@
 # Ripcord — Build specs (v2)
 
-Exact interfaces for Nov 1–14. ARCHITECTURE says what and why; this file fixes the shapes, so each build day is execution. Everything here was read or measured by Oct 22 2026 (gates G1–G12, RESEARCH_NOTES); **verify Day N** marks what still needs a live check. When this file and ARCHITECTURE disagree, fix both.
+Exact interfaces. ARCHITECTURE says what and why; this file fixes the shapes. Everything here was checked against the live services; **verify Day N** marks what needed a live check during the build. When this file and ARCHITECTURE disagree, fix both.
 
 ## 1. Shared types and hashes
 `packages/shared/src/*.ts` ↔ `crates/rules/src/*.rs` (shared by the checker and the contract) ↔ contract `Guard`, `Receipt`, `ArmRecord`. Golden vectors from `scripts/vectors.py` (a Python reference) test both. Salts are 64 lowercase hex characters, and ‖ joins UTF-8 text. The card fingerprint is the first 4 and last 2 bytes of the commitment (`7F3A 91C2 ···· C91E`); the ledger shows the first 2 and last 2.

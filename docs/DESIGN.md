@@ -1,6 +1,6 @@
 # Ripcord — Design (v3: Vault)
 
-Design is a scored criterion. Treat it as a feature with build days (see BUILD_PLAN.md), not leftovers.
+Design is a scored criterion. Treat it as a feature, not leftovers.
 Chosen Oct 21 2026 from three directions (canvas "Ripcord Directions": A Terminal, B Calm, **C Vault**). Every screen is drawn on the canvas "Ripcord Product" (revised Oct 21 for pay per save, isolated margin and guard health); this file is its written spec, so a change to one goes into the other.
 ## 1. Concept: the guard is a card
 
@@ -74,8 +74,8 @@ Rescue history: when · margin added · before → after · landed in · outcome
    - "This is the app.": the app's own Dashboard and Guard components on the example account, framed as a desktop window and a phone, arriving once out of focus into focus (600 ms), with **Open the example account** (`/guards?example`).
    - Four stats, each with its source and date, rendered with their real values (no count from zero in the HTML): 27–46 s (mainnet test rescues, Oct 21), 0 of 53 (BTC 10× longs liquidated in the Oct 10, 2025 crash replay, Balanced with the speed-aware trigger and a 1× reserve; 53 of 53 without a guard; `crates/replay`), 35+ (chains a reserve can come from), $0 (Ripcord's fee when a rescue doesn't save you).
    - "Your liquidation price is public.": an illustrated stack of liquidation levels in shallow 3D, rising when seen, yours in red.
-   - **"How NEAR keeps it hidden."** (Nov 8, after Jero: "the app doesn't talk about how we solve the issues with NEAR"): the rescue's path from your device to your margin, one step per NEAR piece — OutLayer seals the line, NEAR Confidential Intents hides the reserve, NEAR Intents moves it to Hyperliquid in under a minute, a NEAR contract holds the rules and the owner's freeze — each with the code or testnet transaction that proves it; a rescue travels the path once when it scrolls into view. The hero names the three pieces under its actions ("Runs on NEAR"), and the nav links here.
-   - **"The edge, right now."**: the five largest positions near liquidation in a scan of public Hyperliquid data (the 1,500 largest accounts, addresses left out), each with a distance bar, red under 5 %. On Oct 21 every position within 5 % was isolated. Re-run the scan (RESEARCH_NOTES, "Isolated margin among hunted positions") before the video and the submission, and keep its date on screen.
+   - **"How NEAR keeps it hidden."**: the rescue's path from your device to your margin, one step per NEAR piece — OutLayer seals the line, NEAR Confidential Intents hides the reserve, NEAR Intents moves it to Hyperliquid in under a minute, a NEAR contract holds the rules and the owner's freeze — each with the code or testnet transaction that proves it; a rescue travels the path once when it scrolls into view. The hero names the three pieces under its actions ("Runs on NEAR"), and the nav links here.
+   - **"The edge, right now."**: the five largest positions near liquidation in a scan of public Hyperliquid data (the 1,500 largest accounts, addresses left out), each with a distance bar, red under 5 %. On Oct 21 every position within 5 % was isolated. Re-run the scan (`scripts/scan/edge.py`) before the video and the submission, and keep its date on screen.
    - Three steps: Seal, Fund, Guarded; an isolated position takes one approval on Hyperliquid first.
    - **"Try to hunt it."**: the Hunt simulator (screen 5), on the page.
    - **"Pay for saves, not alarms."**: $0 for a close call, 3 % for a save, $1 a month per guard (the headline names the monthly charge so it never contradicts it).
@@ -109,7 +109,7 @@ Responsive to 360 px; both themes, following the system setting with a toggle; k
 ## 7. Demo video (≤ 2 min, made for the grand prize)
 The hackathon's own rules for a demo (HACKATHON.md, "A good demo post"): lead with the user problem, in a first line anyone understands; show **one complete moment**, a real user action going to a visible result; say concretely what NEAR enables; end with a next step and a genuine question. So: no title card, no architecture slide, no sped-up setup. NEAR's pieces appear **inside the story, at the moment each one does its work**, as callouts on the real screens, never as a diagram. One guard is shown end to end; both margin types are explained.
 
-Production (Jero, Nov 11: "graphics and demo flow seamless and strong"):
+Production:
 - **One visual language.** Every graphic is the app's own component (the card and its rosette, the liquidation stack, "The edge, right now", the NEAR path, Verify's envelope), played as a scripted sequence on a `/film` page at 1920×1080. Nothing from a stock library and no slides, so footage and graphics cut together without a seam.
 - **The real moment is real.** The rescue beat is a mainnet screen recording, **unedited and in real time**, with a clock in frame (Hyperliquid on the left, Ripcord on the right). The film page plays it as recorded, without cuts or speed-ups.
 - Captions burned in (X autoplays muted), one idea per beat, every number real and dated, the replays labelled as replays, no individual named, no jargon in a caption that a NEAR callout doesn't explain. A 16:9 cut for the submission and a 30–40 s vertical cut for X (beats 1, 4, 5 and 9).
@@ -154,4 +154,4 @@ Motion tokens: `--dur-1: 120ms`, `--dur-2: 240ms`, `--dur-3: 420ms`, `--dur-4: 6
 - [ ] **Interaction:** hover, active, focus-visible and disabled states; 44 px touch targets; Escape closes overlays.
 - [ ] **AA contrast** verified with a tool.
 
-Score each screen 0–5 against this list in `docs/SCORECARD.md` notes; below 5 means another pass.
+Score each screen 0–5 against this list; below 5 means another pass.
