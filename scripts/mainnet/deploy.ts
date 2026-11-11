@@ -38,6 +38,11 @@ const PER_BYTE = 10n ** 19n;
 const REGISTRY_EXTRA = 15n * MILLINEAR;
 /** Attached to create_project or add_version; OutLayer keeps the project's storage (≈ 0.0064) and refunds the rest. */
 const PROJECT_DEPOSIT = 20n * MILLINEAR;
+/**
+ * NEAR holds a call's attached gas up front at a cautious price, about 10× today's (100 Tgas held ~0.1 NEAR on Nov 11),
+ * and refuses a call that would dip into the storage deposit; registering a project needs far less than 100 Tgas.
+ */
+const PROJECT_GAS = 50n * TGAS;
 /** The enclave's account: gas, and 0.03 NEAR per guard it registers (OutLayer keeps ≈ 0.012, the rest returns). */
 const ENCLAVE_FUND = 80n * MILLINEAR;
 /** Kept on the deploy account after it creates the registry: the FastFS upload and its own gas. */
@@ -248,8 +253,15 @@ async function checkerStage(): Promise<void> {
   if (existing?.active_version === hash)
     return check(`${REGISTRY}/${PROJECT} already runs ${hash.slice(0, 12)}…`, true);
   const r = existing
-    ? await send(acc, OUTLAYER, 'add_version', { project_name: PROJECT, source, set_active: true }, PROJECT_DEPOSIT)
-    : await send(acc, OUTLAYER, 'create_project', { name: PROJECT, source }, PROJECT_DEPOSIT);
+    ? await send(
+        acc,
+        OUTLAYER,
+        'add_version',
+        { project_name: PROJECT, source, set_active: true },
+        PROJECT_DEPOSIT,
+        PROJECT_GAS,
+      )
+    : await send(acc, OUTLAYER, 'create_project', { name: PROJECT, source }, PROJECT_DEPOSIT, PROJECT_GAS);
   check(
     `${existing ? 'added version' : 'created project'} ${REGISTRY}/${PROJECT} at ${hash.slice(0, 12)}…`,
     r.ok,
@@ -283,7 +295,8 @@ async function wire(): Promise<void> {
   const acc = signer(REGISTRY);
   const enclave = await viewAccount(s.checker_account);
   if (spendable(enclave) < ENCLAVE_FUND / 2n) {
-    const t = await sendActions(acc, s.checker_account, [actions.transfer(ENCLAVE_FUND)]);
+    // From the deploy account, so the registry keeps its float for its own admin calls.
+    const t = await sendActions(deployer(), s.checker_account, [actions.transfer(ENCLAVE_FUND)]);
     check(`funded the enclave's account with ${near(ENCLAVE_FUND)} NEAR`, t.ok, t.tx || t.error);
   } else console.log(`the enclave's account holds ${near(spendable(enclave))} NEAR`);
   const cfg = await view<{ checker: string }>(REGISTRY, 'config');
