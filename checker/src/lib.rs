@@ -3,12 +3,14 @@
 pub mod actions;
 pub mod agent;
 pub mod check;
+pub mod close;
 pub mod config;
 pub mod custody;
 pub mod hl;
 pub mod host;
 pub mod near_tx;
 pub mod oneclick;
+pub mod owner;
 pub mod policy;
 pub mod registry;
 pub mod settings;

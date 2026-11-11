@@ -116,6 +116,9 @@ pub fn host(seed: u8) -> (MockHost, Rc<RefCell<Net>>) {
                         "record_rescue",
                         "record_outcome",
                         "set_status",
+                        "unfreeze_guard",
+                        "freeze_guard",
+                        "close",
                     ]
                     .into_iter()
                     .find(|m| text.contains(m))

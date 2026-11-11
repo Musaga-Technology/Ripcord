@@ -1,7 +1,8 @@
 //! The checker's actions (docs/SPEC.md §3). Input is JSON on stdin, output is JSON on stdout (≤ 900 bytes) and
 //! carries a status, never a setting. Refusal reasons name the rule that failed, never the value.
 use crate::check::{self, seal_to_owner};
-use crate::config::{NET, REGISTER_DEPOSIT, REGISTER_GAS};
+use crate::close::{self, CloseInput};
+use crate::config::{NET, OWNER_GAS, REGISTER_DEPOSIT, REGISTER_GAS};
 use crate::custody::Custody;
 use crate::host::Host;
 use crate::{oneclick, policy, registry, settings, vault};
@@ -22,6 +23,20 @@ pub enum Input {
     Fund(FundInput),
     Reserve { guard_id: String },
     Check { guard_id: String },
+    Freeze(FreezeInput),
+    Close(CloseInput),
+}
+
+/// An owner's freeze or unfreeze, signed with the owner key; the enclave only submits it and pays the gas, and the
+/// registry checks the signature.
+#[derive(Deserialize)]
+pub struct FreezeInput {
+    pub guard_id: String,
+    pub owner: String,
+    pub owner_salt: String,
+    pub sig: String,
+    pub nonce: String,
+    pub frozen: bool,
 }
 
 #[derive(Deserialize)]
@@ -80,11 +95,26 @@ pub fn run(host: &dyn Host, input: &str) -> Value {
         Ok(Input::Create(c)) => create(host, &c).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Fund(f)) => fund(host, &f).unwrap_or_else(|e| refuse(&e)),
         Ok(Input::Reserve { guard_id }) => reserve(host, &guard_id).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Freeze(f)) => freeze(host, &f).unwrap_or_else(|e| refuse(&e)),
+        Ok(Input::Close(c)) => close::close(host, &c).unwrap_or_else(|e| refuse(&e)),
         // A check answers with its status alone, even when it fails (rule 4).
         Ok(Input::Check { guard_id }) => {
             json!({ "status": check::check(host, &guard_id).unwrap_or(CheckStatus::Skipped) })
         }
     }
+}
+
+/// Submits an owner's signed freeze or unfreeze to the registry, which freezes the guard's wallet on OutLayer.
+pub fn freeze(host: &dyn Host, f: &FreezeInput) -> Result<Value, String> {
+    if !is_guard_id(&f.guard_id) {
+        return Err("invalid guard_id".into());
+    }
+    let method = if f.frozen { "freeze_guard" } else { "unfreeze_guard" };
+    let args = json!({
+        "guard_id": f.guard_id, "owner": f.owner, "owner_salt": f.owner_salt, "sig": f.sig, "nonce": f.nonce,
+    });
+    registry::call(host, method, &args, OWNER_GAS, 0)?;
+    Ok(json!({ "status": if f.frozen { "frozen" } else { "guarding" } }))
 }
 
 pub fn pubkey(host: &dyn Host) -> Result<Value, String> {

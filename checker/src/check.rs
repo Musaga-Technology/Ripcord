@@ -382,6 +382,10 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
         return Err("invalid guard_id".into());
     }
     let mut g: StoredGuard = vault::get(host, &format!("s/{guard_id}"))?.ok_or("no such guard")?;
+    // The owner is closing it: no more rescues.
+    if crate::close::is_closing(host, guard_id)? {
+        return Ok(CheckStatus::Skipped);
+    }
     if g.registered.is_none() {
         // A guard goes on chain once its reserve arrives; until then there is nothing to guard.
         let balances = Custody::new(host, NET.outlayer_api)?
