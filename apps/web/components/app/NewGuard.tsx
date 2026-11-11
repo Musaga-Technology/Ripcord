@@ -30,6 +30,7 @@ import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } 
 import { pct, price, usd } from '../format';
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
+import { connectNearOwner, type NearOwner } from '../../lib/nearWallet';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { PlainWords } from './PlainWords';
 import { PriceLadder } from './PriceLadder';
@@ -123,6 +124,27 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   // A pasted address isn't proven to be the visitor's own, and a guard pays only that account.
   const pasted = session?.kind === 'address';
   const [mine, setMine] = useState(false);
+  // Who signs for the guard: the seal file's own key (most private), or the owner's NEAR wallet.
+  const [ownBy, setOwnBy] = useState<'key' | 'near'>('key');
+  const [nearOwner, setNearOwner] = useState<NearOwner | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [nearError, setNearError] = useState<string | null>(null);
+  const connectNear = async () => {
+    setConnecting(true);
+    setNearError(null);
+    try {
+      setNearOwner(await connectNearOwner());
+      setPrepared(null);
+    } catch (e) {
+      setNearError(
+        e instanceof Error && e.message
+          ? `${e.message[0]!.toUpperCase()}${e.message.slice(1)}.`
+          : "The wallet didn't connect.",
+      );
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const suggestion = assetPrice ? suggestAmount(asset, margin * 2, assetPrice) : '';
   const amountStr = amount ?? suggestion;
@@ -190,7 +212,9 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
             ? "The two passphrases don't match yet."
             : pasted && !mine
               ? 'Confirm the account is yours.'
-              : '';
+              : ownBy === 'near' && !nearOwner
+                ? 'Connect your NEAR wallet first.'
+                : '';
   const canSeal = phase === 'edit' && blocker === '';
 
   /** The seal (DESIGN §8.1): the rosette prints, each sealed value collapses, the fingerprint types in. */
@@ -235,6 +259,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
               reserve_asset: asset.reserve,
               isolated: holding.margin === 'isolated' ? holding.coin : null,
               days: GUARD_DAYS,
+              owner: ownBy === 'near' && nearOwner ? nearOwner : undefined,
             },
             random,
             Date.now(),
@@ -461,6 +486,69 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                   if (canSeal) void seal();
                 }}
               >
+                {!isDemo && (
+                  <fieldset className="flex max-w-[640px] flex-col gap-2" disabled={phase !== 'edit'}>
+                    <legend className="pb-2 text-[13px] text-muted">Who signs for this guard</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {(
+                        [
+                          ['key', 'Your seal file', 'Most private: nothing on chain points to you.'],
+                          [
+                            'near',
+                            'Your NEAR wallet',
+                            'Freeze it from any device with just your wallet. Your NEAR account is named on chain when you freeze, top up or change the range.',
+                          ],
+                        ] as const
+                      ).map(([id, name, note]) => (
+                        <label
+                          key={id}
+                          className={`flex cursor-pointer items-start gap-3 rounded-[16px] border px-4 py-3 text-[14px] transition-colors duration-[120ms] ${ownBy === id ? 'border-text' : 'border-line hover:border-line-3'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="owner"
+                            className="mt-1 accent-[var(--text)]"
+                            checked={ownBy === id}
+                            onChange={() => {
+                              setOwnBy(id);
+                              setPrepared(null);
+                            }}
+                          />
+                          <span className="flex flex-col gap-0.5">
+                            <span className="font-semibold">{name}</span>
+                            <span className="text-text-2">{note}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {ownBy === 'near' && (
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        {nearOwner ? (
+                          <p className="text-[15px] text-text-2">
+                            Signs as <span className="font-mono text-[13px] text-text">{nearOwner.account}</span>
+                          </p>
+                        ) : null}
+                        <button
+                          type="button"
+                          className={`${ghostBtn} min-h-11 px-4 text-[14px]`}
+                          disabled={connecting}
+                          onClick={() => void connectNear()}
+                        >
+                          {connecting
+                            ? 'Waiting for your wallet…'
+                            : nearOwner
+                              ? 'Use another wallet'
+                              : 'Connect NEAR wallet'}
+                        </button>
+                        {nearError && (
+                          <p role="alert" className="text-[15px] text-red">
+                            {nearError}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </fieldset>
+                )}
                 <div className="grid max-w-[520px] gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1.5 text-[13px] text-muted">
                     Passphrase

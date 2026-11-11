@@ -25,10 +25,16 @@ const sealTo = (enclavePk: string, v: unknown, guardId: string) =>
   bytesToHex(seal(hexToBytes(enclavePk), utf8ToBytes(JSON.stringify(v)), guardId, random));
 
 /** A fresh nonce in the registry's alphabet ([A-Za-z0-9_-], 1–64 characters). */
-const nonce = () => bytesToHex(crypto.getRandomValues(new Uint8Array(12)));
+export const nonce = () => bytesToHex(crypto.getRandomValues(new Uint8Array(12)));
 
-const sign = (c: SealContents, message: string, n: string) =>
-  bytesToHex(ed25519.sign(nep413Hash(message, n, REGISTRY), hexToBytes(c.owner_secret)));
+/** Signs an owner message for the registry (NEP-413) and answers the signature in hex. */
+export type Signer = (message: string, nonce: string) => Promise<string>;
+
+/** The seal file's owner key signs here, silently. A guard a NEAR wallet owns signs with that wallet instead. */
+export const keySigner =
+  (c: SealContents): Signer =>
+  async (message, n) =>
+    bytesToHex(ed25519.sign(nep413Hash(message, n, REGISTRY), hexToBytes(c.owner_secret)));
 
 export interface FreezeInput {
   action: 'freeze';
@@ -40,14 +46,14 @@ export interface FreezeInput {
   frozen: boolean;
 }
 
-export function signFreeze(c: SealContents, frozen: boolean): FreezeInput {
+export async function signFreeze(c: SealContents, frozen: boolean, sign = keySigner(c)): Promise<FreezeInput> {
   const n = nonce();
   return {
     action: 'freeze',
     guard_id: c.guard_id,
     owner: c.settings.owner,
     owner_salt: c.owner_salt,
-    sig: sign(c, freezeMessage(c.guard_id, n, frozen), n),
+    sig: await sign(freezeMessage(c.guard_id, n, frozen), n),
     nonce: n,
     frozen,
   };
@@ -61,12 +67,12 @@ export interface CloseInput {
 }
 
 /** Closes the guard and pays what is left to the owner's own Hyperliquid account: the only place it can go. */
-export function signClose(c: SealContents): CloseInput {
+export async function signClose(c: SealContents, sign = keySigner(c)): Promise<CloseInput> {
   const n = nonce();
   return {
     action: 'close',
     guard_id: c.guard_id,
-    sig: sign(c, closeMessage(c.guard_id, 'hypercore', c.settings.hl_address, n), n),
+    sig: await sign(closeMessage(c.guard_id, 'hypercore', c.settings.hl_address, n), n),
     nonce: n,
   };
 }
@@ -81,7 +87,12 @@ export interface TopupInput {
 }
 
 /** Signs a top-up of `usd` once; each source the owner picks after it gets its own address, and the budget rises once. */
-export function signTopup(c: SealContents, usd: number, enclavePk: string): TopupInput {
+export async function signTopup(
+  c: SealContents,
+  usd: number,
+  enclavePk: string,
+  sign = keySigner(c),
+): Promise<TopupInput> {
   const cents = Math.round(usd * 100);
   const salt = bytesToHex(random(16));
   const n = nonce();
@@ -90,7 +101,7 @@ export function signTopup(c: SealContents, usd: number, enclavePk: string): Topu
     guard_id: c.guard_id,
     enc_amount: sealTo(enclavePk, { cents, salt }, c.guard_id),
     owner_salt: c.owner_salt,
-    sig: sign(c, topupMessage(c.guard_id, topupDigest(c.guard_id, cents, salt), n), n),
+    sig: await sign(topupMessage(c.guard_id, topupDigest(c.guard_id, cents, salt), n), n),
     nonce: n,
   };
 }
@@ -112,7 +123,12 @@ export interface ResealInput {
 }
 
 /** Signs the new settings' fingerprint and seals their range to the enclave. */
-export function signReseal(c: SealContents, next: GuardSettings, enclavePk: string): ResealInput {
+export async function signReseal(
+  c: SealContents,
+  next: GuardSettings,
+  enclavePk: string,
+  sign = keySigner(c),
+): Promise<ResealInput> {
   const n = nonce();
   const fingerprint = commitment(next, c.salt);
   const { preset, line_range_pct, target_range_pct } = next;
@@ -122,7 +138,7 @@ export function signReseal(c: SealContents, next: GuardSettings, enclavePk: stri
     enc_range: sealTo(enclavePk, { preset, line_range_pct, target_range_pct }, c.guard_id),
     commitment: fingerprint,
     owner_salt: c.owner_salt,
-    sig: sign(c, resealMessage(c.guard_id, fingerprint, n), n),
+    sig: await sign(resealMessage(c.guard_id, fingerprint, n), n),
     nonce: n,
   };
 }

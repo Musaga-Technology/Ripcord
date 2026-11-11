@@ -24,8 +24,10 @@ import {
   signReseal,
   signTopup,
   withRange,
+  type Signer,
   type TopupInput,
 } from '../../lib/ownerActions';
+import { nearSign } from '../../lib/nearWallet';
 import { CrashRun, marginFor } from '../../lib/crash';
 import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
 import { ASSETS } from '../../lib/assets';
@@ -720,27 +722,31 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
     return () => clearInterval(t);
   }, [g.id]);
 
-  // Every owner action is signed here with the owner key from the opened seal file.
+  // Every owner action is signed with the owner: the seal file's key, or the NEAR wallet that owns the guard.
+  const sign: Signer | undefined =
+    opened && !opened.owner_secret ? (m, n) => nearSign(opened.settings.owner, m, n) : undefined;
   const owner: OwnerActions | null = opened
     ? {
-        freeze: (frozen) => backend.freeze(signFreeze(opened, frozen)),
+        freeze: async (frozen) => backend.freeze(await signFreeze(opened, frozen, sign)),
         async close() {
-          // Each step is its own signed request: the payout first, then the guard leaves the chain.
+          // Signed once; each step sends it again: the payout first, then the guard leaves the chain. A close only
+          // ever pays the owner's own account, so sending it again can't do anything else.
+          const input = await signClose(opened, sign);
           for (let i = 0; i < 24; i++) {
-            if ((await backend.close(signClose(opened))) === 'closed') return;
+            if ((await backend.close(input)) === 'closed') return;
             await new Promise((r) => setTimeout(r, 8_000));
           }
           throw new Error('still closing: the payout is taking longer than usual. Check again in a minute');
         },
         async topup(amountUsd) {
-          setTopping({ input: signTopup(opened, amountUsd, await backend.pubkey()), usd: amountUsd });
+          setTopping({ input: await signTopup(opened, amountUsd, await backend.pubkey(), sign), usd: amountUsd });
         },
         async reseal(preset) {
           const key = openedKey(g.id);
           if (!key) throw new Error('open your seal file again first: the new range is written into it');
           const next = h?.distance ? withRange(opened.settings, preset, h.distance) : null;
           if (!next) throw new Error("that range doesn't fit this close to liquidation");
-          const input = signReseal(opened, next, await backend.pubkey());
+          const input = await signReseal(opened, next, await backend.pubkey(), sign);
           const contents = resealed(opened, next, await backend.reseal(opened, input));
           const file = rewriteSealFile(contents, input.commitment, key, seal.file.kdf, random);
           const changed = { file, commitment: input.commitment, fingerprint: fingerprintOf(input.commitment) };
@@ -906,6 +912,14 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
           <button type="button" className={ghostBtn} onClick={() => downloadSealFile(seal)}>
             Save seal file
           </button>
+          {opened?.owner_account && (
+            <p className="text-[13px] text-muted">
+              Signs with your NEAR wallet, <span className="font-mono text-text-2">{opened.owner_account}</span>.{' '}
+              <Link href="/freeze" className="underline decoration-line-3 underline-offset-4 hover:text-text">
+                Freeze it from any device
+              </Link>
+            </p>
+          )}
         </aside>
       </div>
       <History rows={rows} />

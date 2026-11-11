@@ -35,9 +35,9 @@ const contents = prepareGuard(
 const ownerKey = ed25519.getPublicKey(hexToBytes(contents.owner_secret));
 
 describe("the owner's own actions", () => {
-  it('freezes with a signature for this registry only', () => {
+  it('freezes with a signature for this registry only', async () => {
     expect(contents.settings.owner).toBe(`ed25519:${base58(ownerKey)}`);
-    const f = signFreeze(contents, true);
+    const f = await signFreeze(contents, true);
     const hash = nep413Hash(freezeMessage(contents.guard_id, f.nonce, true), f.nonce, REGISTRY);
     expect(ed25519.verify(hexToBytes(f.sig), hash, ownerKey)).toBe(true);
     const elsewhere = nep413Hash(freezeMessage(contents.guard_id, f.nonce, true), f.nonce, 'another.near');
@@ -45,8 +45,8 @@ describe("the owner's own actions", () => {
     expect(f).toMatchObject({ owner: contents.settings.owner, owner_salt: contents.owner_salt, frozen: true });
   });
 
-  it('closes to the owner’s own Hyperliquid account and nowhere else', () => {
-    const c = signClose(contents);
+  it('closes to the owner’s own Hyperliquid account and nowhere else', async () => {
+    const c = await signClose(contents);
     const own = closeMessage(contents.guard_id, 'hypercore', contents.settings.hl_address, c.nonce);
     const other = closeMessage(contents.guard_id, 'hypercore', '0x0000000000000000000000000000000000000001', c.nonce);
     expect(ed25519.verify(hexToBytes(c.sig), nep413Hash(own, c.nonce, REGISTRY), ownerKey)).toBe(true);
@@ -59,8 +59,8 @@ describe("the owner's own actions", () => {
   const opens = (hex: string) =>
     JSON.parse(new TextDecoder().decode(open(enclave, hexToBytes(hex), contents.guard_id))) as Record<string, unknown>;
 
-  it('tops up with an amount only the enclave reads, and a signature over its hidden digest', () => {
-    const t = signTopup(contents, 12.5, enclavePk);
+  it('tops up with an amount only the enclave reads, and a signature over its hidden digest', async () => {
+    const t = await signTopup(contents, 12.5, enclavePk);
     const { cents, salt } = opens(t.enc_amount) as { cents: number; salt: string };
     expect(cents).toBe(1250);
     expect(JSON.stringify(t)).not.toContain('1250');
@@ -70,12 +70,12 @@ describe("the owner's own actions", () => {
     expect(ed25519.verify(hexToBytes(t.sig), nep413Hash(more, t.nonce, REGISTRY), ownerKey)).toBe(false);
   });
 
-  it('signs a new range as the fingerprint of the new settings, and seals the range to the enclave', () => {
+  it('signs a new range as the fingerprint of the new settings, and seals the range to the enclave', async () => {
     const next = withRange(contents.settings, 'safer', 17.3)!;
     expect(next.preset).toBe('safer');
     expect(next.line_range_pct).not.toEqual(contents.settings.line_range_pct);
     expect(withRange(contents.settings, 'lean', 0.6)).toBeNull();
-    const r = signReseal(contents, next, enclavePk);
+    const r = await signReseal(contents, next, enclavePk);
     expect(r.commitment).toBe(commitment(next, contents.salt));
     expect(opens(r.enc_range)).toEqual({
       preset: 'safer',
@@ -101,10 +101,13 @@ describe("the owner's own actions", () => {
     const b = demo();
     const pk = await b.pubkey();
     const next = withRange(contents.settings, 'safer', 17.3)!;
-    expect(await b.reseal(contents, signReseal(contents, next, pk))).toBe(1);
+    expect(await b.reseal(contents, await signReseal(contents, next, pk))).toBe(1);
     const other = withRange(contents.settings, 'lean', 17.3)!;
-    const forged = { ...signReseal(contents, next, pk), enc_range: signReseal(contents, other, pk).enc_range };
+    const forged = {
+      ...(await signReseal(contents, next, pk)),
+      enc_range: (await signReseal(contents, other, pk)).enc_range,
+    };
     await expect(b.reseal(contents, forged)).rejects.toThrow('does not match the signed fingerprint');
-    await expect(b.topup(contents, signTopup(contents, 1.5, pk), 'x')).rejects.toThrow('$2 or more');
+    await expect(b.topup(contents, await signTopup(contents, 1.5, pk), 'x')).rejects.toThrow('$2 or more');
   });
 });
