@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useSession } from '../../lib/session';
 import { ThemeToggle } from '../ThemeToggle';
@@ -13,6 +14,33 @@ function Logo() {
       <circle cx="11" cy="11" r="5.5" stroke="var(--amber)" strokeWidth="1.4" />
     </svg>
   );
+}
+
+const TABS = [
+  { href: '/guards', label: 'Guards' },
+  { href: '/ledger', label: 'Ledger' },
+  { href: '/verify', label: 'Verify' },
+] as const;
+
+function Tabs({ phone }: { phone?: boolean }) {
+  const path = usePathname() ?? '';
+  return TABS.map((t) => {
+    const here = path === t.href || path.startsWith(`${t.href}/`);
+    return (
+      <Link
+        key={t.href}
+        href={t.href}
+        aria-current={here ? 'page' : undefined}
+        className={
+          phone
+            ? `flex min-h-12 flex-1 items-center justify-center text-[15px] ${here ? 'font-semibold text-text' : 'text-muted'}`
+            : `rounded-full px-3 py-2 transition-colors duration-[120ms] ${here ? 'bg-line' : 'text-text-2 hover:text-text'}`
+        }
+      >
+        {t.label}
+      </Link>
+    );
+  });
 }
 
 export const appWrap =
@@ -30,9 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Ripcord
             </Link>
             <nav aria-label="App" className="hidden gap-1 text-[15px] sm:flex">
-              <Link href="/guards" className="rounded-full bg-line px-3 py-2">
-                Guards
-              </Link>
+              <Tabs />
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -44,7 +70,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className={`${appWrap} flex flex-1 flex-col py-7`}>{children}</main>
+      <main className={`${appWrap} flex flex-1 flex-col pb-24 pt-7 sm:pb-7`}>{children}</main>
+      {/* Phone: the tab bar (DESIGN §3), above the home indicator. */}
+      <nav
+        aria-label="App"
+        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-ground/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur sm:hidden"
+      >
+        <Tabs phone />
+      </nav>
     </div>
   );
 }
