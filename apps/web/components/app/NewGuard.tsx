@@ -22,6 +22,7 @@ import { random, watch } from '../../lib/backend';
 import { guardOf, guardsFor, labelOf, watchedDistance } from '../../lib/guards';
 import type { Holding } from '../../lib/hl';
 import { markedPreset, replayFigure } from '../../lib/replay';
+import { reserveToSurvive, type Intent } from '../../lib/copilot';
 import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/session';
 import { accountUrl, REGISTRY } from '../../lib/near';
 import { radioKeys } from '../../lib/radio';
@@ -30,6 +31,7 @@ import { pct, price, usd } from '../format';
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
+import { PlainWords } from './PlainWords';
 import { PriceLadder } from './PriceLadder';
 import { Connect } from './Connect';
 import { Approve, explain, Fund } from './steps';
@@ -128,6 +130,27 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
   const ranges = presetRanges(preset, distance);
   const figure = replayFigure(holding.coin, holding.leverage, reserveX, preset);
   const atTwo = replayFigure(holding.coin, holding.leverage, 2, preset);
+
+  /** Fills the form from the trader's words; the amounts are computed here, never taken from the model. */
+  const applyIntent = (i: Intent): string => {
+    const ix = i.asset ? ASSETS.findIndex((a) => a.symbol === i.asset) : -1;
+    const next = ix >= 0 ? ASSETS[ix]! : asset;
+    if (ix >= 0) setAssetIx(ix);
+    if (i.preset) setChosen(i.preset);
+    const unitPrice = prices?.[next.source] ?? null;
+    const drop = i.surviveDropPct;
+    const survive = drop !== null ? reserveToSurvive(watched, drop) : null;
+    const wanted = i.reserveUsd ?? (survive !== null && survive > 0 ? survive : null);
+    const usdNow = wanted !== null && unitPrice ? Math.max(wanted, MIN_RESERVE_USD) : null;
+    setAmount(usdNow !== null && unitPrice ? suggestAmount(next, usdNow, unitPrice) : null);
+    const parts = [
+      usdNow !== null ? `a ${usd(usdNow)} reserve in ${next.symbol}` : `a reserve in ${next.symbol}`,
+      drop !== null && survive === 0 ? `it already survives a ${drop}% drop` : null,
+      drop !== null && survive !== null && survive > 0 ? `enough to survive a ${drop}% drop` : null,
+      i.preset ? `${i.preset[0]!.toUpperCase()}${i.preset.slice(1)}` : null,
+    ].filter(Boolean);
+    return `${i.say ? `“${i.say}”: ` : ''}${parts.join(', ')}.`;
+  };
 
   const [phase, setPhase] = useState<Phase>('edit');
   const [error, setError] = useState<string | null>(null);
@@ -281,6 +304,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                   : 'Isolated margin, so this guard needs one approval on Hyperliquid. Its code only adds margin.'}
               </p>
             </div>
+
+            <PlainWords holding={watched} disabled={phase !== 'edit'} onIntent={applyIntent} />
 
             <section aria-label="Reserve" className="flex flex-col gap-3">
               <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Your reserve</h2>
