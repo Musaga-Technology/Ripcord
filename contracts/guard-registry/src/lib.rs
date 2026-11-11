@@ -463,6 +463,70 @@ impl Registry {
         )
     }
 
+    /// The owner topped up the reserve: stores the wallet policy the checker built with the higher daily cap. The
+    /// owner signs a digest that hides the amount; only the checker, which holds the settings sealed, can build the
+    /// policy, so both are needed. Nothing here says how much.
+    #[payable]
+    #[allow(clippy::too_many_arguments)]
+    pub fn top_up(
+        &mut self,
+        guard_id: String,
+        digest: String,
+        encrypted_policy: String,
+        wallet_signature: String,
+        policy_version: Option<u64>,
+        policy_valid_until: Option<u64>,
+        owner: String,
+        owner_salt: String,
+        sig: String,
+        nonce: String,
+    ) -> Promise {
+        self.only_checker();
+        require!(is_hex64(&digest), "digest must be 64 lowercase hex characters");
+        let message = format!("ripcord:topup:{guard_id}:{digest}:{nonce}");
+        let g = self.authorize(&guard_id, &owner, &owner_salt, &sig, &nonce, &message);
+        require!(g.status != GuardStatus::Closed, "already closed");
+        emit("policy_updated", json!({ "guard_id": guard_id }));
+        Promise::new(self.outlayer.clone()).function_call(
+            "store_wallet_policy",
+            store_policy_args(
+                &g.wallet_pubkey,
+                &encrypted_policy,
+                &wallet_signature,
+                policy_version,
+                policy_valid_until,
+                Some(env::predecessor_account_id()),
+            ),
+            env::attached_deposit(),
+            GAS_POLICY,
+        )
+    }
+
+    /// The owner changed the rescue range: the checker, which holds the new settings sealed, swaps the guard's
+    /// fingerprint for theirs. Every line drawn from here on falls inside the new range.
+    pub fn reseal(
+        &mut self,
+        guard_id: String,
+        commitment: String,
+        owner: String,
+        owner_salt: String,
+        sig: String,
+        nonce: String,
+    ) {
+        self.only_checker();
+        require!(is_hex64(&commitment), "commitments must be 64 lowercase hex characters");
+        let message = format!("ripcord:reseal:{guard_id}:{commitment}:{nonce}");
+        self.authorize(&guard_id, &owner, &owner_salt, &sig, &nonce, &message);
+        let g = self.guard_mut(&guard_id);
+        require!(g.status != GuardStatus::Closed, "already closed");
+        g.commitment = commitment.clone();
+        let from_arm = g.arm_count;
+        emit(
+            "guard_resealed",
+            json!({ "guard_id": guard_id, "commitment": commitment, "from_arm": from_arm }),
+        );
+    }
+
     // ---------- the owner, by signature (anyone may submit) ----------
 
     /// Freezes the guard wallet: nothing can leave it until the owner unfreezes. Works without Ripcord's servers.

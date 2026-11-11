@@ -470,6 +470,101 @@ fn a_near_signature_for_another_contract_is_refused() {
     let _ = r.freeze_guard(GID.into(), o.key(), SALT.into(), sig, "n1".into());
 }
 
+// ---------- the owner, through the checker: top up and a new range ----------
+
+const DIGEST: &str = "554e4840cd71e67eaecebac68970ce2a3b6560f4c07a9b5246b25bde59235282";
+
+fn top_up(r: &mut Registry, o: &NearOwner, by: &str, nonce: &str) {
+    ctx(by, NearToken::from_millinear(20));
+    let _ = r.top_up(
+        GID.into(),
+        DIGEST.into(),
+        "encrypted-policy-2".into(),
+        "wallet-signature-2".into(),
+        Some(POLICY_VERSION + 1),
+        Some(VALID_UNTIL),
+        o.key(),
+        SALT.into(),
+        o.sign(&format!("ripcord:topup:{GID}:{DIGEST}:{nonce}"), nonce, REGISTRY),
+        nonce.into(),
+    );
+}
+
+#[test]
+fn a_top_up_stores_the_new_policy_without_its_amount() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    top_up(&mut r, &o, CHECKER, "t1");
+    let v = stored_policy_args();
+    assert_eq!(v["encrypted_data"], "encrypted-policy-2");
+    assert_eq!(v["version"], POLICY_VERSION + 1);
+    assert_eq!(v["storage_refund_to"], CHECKER);
+    let logs = get_logs().join("\n");
+    assert!(logs.contains("\"event\":\"policy_updated\""), "{logs}");
+    assert!(
+        !logs.contains(DIGEST) && !logs.contains("500"),
+        "no amount, not even its digest: {logs}"
+    );
+}
+
+#[test]
+#[should_panic(expected = "only the checker")]
+fn only_the_checker_tops_up() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    top_up(&mut r, &o, STRANGER, "t1");
+}
+
+#[test]
+#[should_panic(expected = "nonce already used")]
+fn a_top_up_signature_works_once() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    top_up(&mut r, &o, CHECKER, "t1");
+    top_up(&mut r, &o, CHECKER, "t1");
+}
+
+fn reseal(r: &mut Registry, o: &NearOwner, by: &str, commitment: &str, signed: &str) {
+    ctx(by, NearToken::from_yoctonear(0));
+    r.reseal(
+        GID.into(),
+        commitment.into(),
+        o.key(),
+        SALT.into(),
+        o.sign(&format!("ripcord:reseal:{GID}:{signed}:r1"), "r1", REGISTRY),
+        "r1".into(),
+    );
+}
+
+#[test]
+fn a_new_range_swaps_the_fingerprint() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    let new = "5d1e".repeat(16);
+    reseal(&mut r, &o, CHECKER, &new, &new);
+    assert_eq!(r.get_guard(GID.into()).unwrap().commitment, new);
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("\"event\":\"guard_resealed\"") && l.contains("\"from_arm\":0")));
+}
+
+#[test]
+#[should_panic(expected = "signature is not the owner's")]
+fn a_new_range_needs_the_owners_signature_for_that_fingerprint() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    reseal(&mut r, &o, CHECKER, &"5d1e".repeat(16), &"0bad".repeat(16));
+}
+
+#[test]
+#[should_panic(expected = "only the checker")]
+fn only_the_checker_reseals() {
+    let o = NearOwner::new(9);
+    let mut r = guarding(&o.key());
+    let new = "5d1e".repeat(16);
+    reseal(&mut r, &o, STRANGER, &new, &new);
+}
+
 #[test]
 fn the_owner_publishes_proof_and_a_changed_proof_is_refused() {
     let o = EvmOwner::new(7);
@@ -621,6 +716,8 @@ fn owner_messages_and_nep413_hashes_match_the_reference() {
             }
             "freeze" => format!("ripcord:freeze:{gid}:{nonce}"),
             "unfreeze" => format!("ripcord:unfreeze:{gid}:{nonce}"),
+            "topup" => format!("ripcord:topup:{gid}:{}:{nonce}", m["digest"].as_str().unwrap()),
+            "reseal" => format!("ripcord:reseal:{gid}:{}:{nonce}", m["commitment"].as_str().unwrap()),
             _ => continue, // close is signed for the checker, not the registry
         };
         assert_eq!(built, m["message"].as_str().unwrap());
