@@ -11,7 +11,7 @@ const NETS = {
     explorer: 'https://nearblocks.io',
     // The checker's OutLayer project, and the sha256 of the build it runs (`bash checker/build.sh mainnet`).
     checkerProject: 'ripcord-registry.near/checker',
-    checkerHash: '',
+    checkerHash: '7bc9070148ebf50f794e8abd4b59cdb00323adbae25c2de9d2c0c65792fe0fad',
     // Guards whose owners publish every rescue in full on the ledger: Ripcord's own.
     publishedGuards: [] as string[],
   },
