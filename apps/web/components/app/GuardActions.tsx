@@ -1,8 +1,9 @@
 'use client';
 
 // What the owner can do with a guard (DESIGN §4.3): top up the reserve, change the rescue range, freeze the reserve,
-// close the guard. In the simulation each one works. On a real guard, freeze and close are signed with the owner key
-// from the opened seal file; top up and change range say what they will do. One panel at a time; Escape closes it.
+// close the guard. In the simulation each one works. A real guard offers freeze and close, signed with the owner key
+// from the opened seal file; topping up or changing its range means resealing it, so those stay in the simulation for
+// now. One panel at a time; Escape closes it.
 import { presetRanges, type Preset } from '@ripcord/shared';
 import { useEffect, useState } from 'react';
 import { radioKeys } from '../../lib/radio';
@@ -113,8 +114,12 @@ export function GuardActions({
     ) : null;
 
   const buttons: { id: Panel; label: string }[] = [
-    { id: 'topup', label: 'Top up reserve' },
-    { id: 'range', label: 'Change range' },
+    ...(example
+      ? [
+          { id: 'topup' as const, label: 'Top up reserve' },
+          { id: 'range' as const, label: 'Change range' },
+        ]
+      : []),
     { id: 'freeze', label: control.frozen ? 'Unfreeze reserve' : 'Freeze reserve' },
     { id: 'close', label: 'Close guard' },
   ];
@@ -137,7 +142,10 @@ export function GuardActions({
       </div>
       {(busy || control.frozen) && (
         <p className="text-[13px] text-muted">
-          {busy ?? 'Top up, change range and close wait until you unfreeze the reserve.'}
+          {busy ??
+            (example
+              ? 'Top up, change range and close wait until you unfreeze the reserve.'
+              : 'Closing waits until you unfreeze the reserve.')}
         </p>
       )}
       {done && (
@@ -148,9 +156,7 @@ export function GuardActions({
       )}
       {panel && (
         <div className="step-in flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-5">
-          {!example && (panel === 'topup' || panel === 'range') ? (
-            <Coming panel={panel} />
-          ) : !example && !owner ? (
+          {!example && !owner ? (
             <p className="text-[15px] text-text-2">
               Open your seal file above: {panel === 'freeze' ? 'freezing' : 'closing'} is signed with the owner key it
               holds.
@@ -292,19 +298,5 @@ export function GuardActions({
         </div>
       )}
     </div>
-  );
-}
-
-function Coming({ panel }: { panel: Panel }) {
-  const what: Record<Panel, string> = {
-    topup: 'A top-up goes to a new private deposit address, like the first funding.',
-    range: 'A new range is sealed like the first, and every later line is drawn inside it.',
-    freeze: 'One signature with your owner key freezes the reserve, even if Ripcord is down.',
-    close: 'Closing returns what is left of the reserve to your own Hyperliquid account.',
-  };
-  return (
-    <p className="text-[15px] text-text-2">
-      {what[panel]} This arrives with the mainnet launch; try it in the simulation today.
-    </p>
   );
 }
