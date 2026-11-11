@@ -2,7 +2,17 @@
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import v from '../vectors/commitment.json' with { type: 'json' };
-import { closeMessage, freezeMessage, nep413Hash, policyMessage, publishMessage, type Proof } from '../src/index';
+import {
+  closeMessage,
+  freezeMessage,
+  nep413Hash,
+  policyMessage,
+  publishMessage,
+  resealMessage,
+  topupDigest,
+  topupMessage,
+  type Proof,
+} from '../src/index';
 
 describe('owner messages', () => {
   it.each(v.messages)('$kind', (m) => {
@@ -12,6 +22,8 @@ describe('owner messages', () => {
       policy: () => policyMessage(m.guard_id, m.encrypted_policy!, m.nonce),
       publish: () => publishMessage(m.guard_id, m.index!, m.proof as Proof, m.nonce),
       close: () => closeMessage(m.guard_id, m.chain!, m.address!, m.nonce),
+      topup: () => topupMessage(m.guard_id, topupDigest(m.guard_id, m.cents!, m.salt!), m.nonce),
+      reseal: () => resealMessage(m.guard_id, m.commitment!, m.nonce),
     }[m.kind as 'freeze']();
     expect(built).toBe(m.message);
   });

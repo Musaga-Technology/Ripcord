@@ -272,6 +272,22 @@
    "chain": "btc",
    "address": "bc1qexample",
    "message": "ripcord:close:g-vf6per4bfx:btc:bc1qexample:c1"
+  },
+  {
+   "kind": "topup",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "t1",
+   "cents": 500,
+   "salt": "9f3c",
+   "digest": "554e4840cd71e67eaecebac68970ce2a3b6560f4c07a9b5246b25bde59235282",
+   "message": "ripcord:topup:g-vf6per4bfx:554e4840cd71e67eaecebac68970ce2a3b6560f4c07a9b5246b25bde59235282:t1"
+  },
+  {
+   "kind": "reseal",
+   "guard_id": "g-vf6per4bfx",
+   "nonce": "r1",
+   "commitment": "000000000000000000000000000000000000000000000000000000000000000a",
+   "message": "ripcord:reseal:g-vf6per4bfx:000000000000000000000000000000000000000000000000000000000000000a:r1"
   }
  ],
  "nep413": [

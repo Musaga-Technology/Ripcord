@@ -173,6 +173,19 @@ def close_message(guard_id, chain, address, nonce):
     return f'ripcord:close:{guard_id}:{chain}:{address}:{nonce}'
 
 
+def topup_digest(guard_id, cents, salt):
+    """Hides a top-up's amount: the owner signs this, the registry sees only this, the enclave opens the amount."""
+    return sha256_hex(f'ripcord:topup-amount:{guard_id}:{cents}:{salt}')
+
+
+def topup_message(guard_id, digest, nonce):
+    return f'ripcord:topup:{guard_id}:{digest}:{nonce}'
+
+
+def reseal_message(guard_id, commitment, nonce):
+    return f'ripcord:reseal:{guard_id}:{commitment}:{nonce}'
+
+
 # ---------- guard logic ----------
 def distance_pct(liquidation_px, mark):
     if liquidation_px is None:
@@ -364,6 +377,11 @@ def vectors_commitment():
          'message': publish_message('g-vf6per4bfx', 0, proof, 'p2')},
         {'kind': 'close', 'guard_id': 'g-vf6per4bfx', 'nonce': 'c1', 'chain': 'btc', 'address': 'bc1qexample',
          'message': close_message('g-vf6per4bfx', 'btc', 'bc1qexample', 'c1')},
+        {'kind': 'topup', 'guard_id': 'g-vf6per4bfx', 'nonce': 't1', 'cents': 500, 'salt': '9f3c',
+         'digest': topup_digest('g-vf6per4bfx', 500, '9f3c'),
+         'message': topup_message('g-vf6per4bfx', topup_digest('g-vf6per4bfx', 500, '9f3c'), 't1')},
+        {'kind': 'reseal', 'guard_id': 'g-vf6per4bfx', 'nonce': 'r1', 'commitment': '0' * 63 + 'a',
+         'message': reseal_message('g-vf6per4bfx', '0' * 63 + 'a', 'r1')},
     ]
     nep413 = [{'message': m, 'nonce': n, 'recipient': r, 'hash': nep413_hash(m, n, r)}
               for m, n, r in [('ripcord:freeze:g-vf6per4bfx:n1', 'n1', 'registry.testnet'),

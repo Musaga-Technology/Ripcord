@@ -24,6 +24,17 @@ export const publishMessage = (guardId: string, index: number, proof: Proof, non
 export const closeMessage = (guardId: string, chain: string, address: string, nonce: string) =>
   `ripcord:close:${guardId}:${chain}:${address}:${nonce}`;
 
+/** Hides a top-up's amount: the owner signs this, the registry sees only this, and the enclave opens the amount. */
+export const topupDigest = (guardId: string, cents: number, salt: string) =>
+  sha256Hex(`ripcord:topup-amount:${guardId}:${cents}:${salt}`);
+
+export const topupMessage = (guardId: string, digest: string, nonce: string) =>
+  `ripcord:topup:${guardId}:${digest}:${nonce}`;
+
+/** A new rescue range: the owner signs the settings' new fingerprint. */
+export const resealMessage = (guardId: string, commitment: string, nonce: string) =>
+  `ripcord:reseal:${guardId}:${commitment}:${nonce}`;
+
 /** NEP-413 tag: 2^31 + 413. */
 const NEP413_TAG = 2 ** 31 + 413;
 
