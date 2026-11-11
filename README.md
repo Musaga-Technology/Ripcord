@@ -1,155 +1,156 @@
 # Ripcord
 
-**Hidden margin that lands before the liquidator does.**
+**Hidden margin for Hyperliquid: a reserve nobody can see lands in your margin before the liquidator does.**
 
-On Hyperliquid, everyone can see the price where your position gets liquidated, and some traders push price toward it. Ripcord keeps a hidden reserve, in any asset on any chain, and moves it into your margin account seconds before liquidation. You give no keys and use no new exchange, and nobody can see how deep your defence goes.
+On Hyperliquid every position's liquidation price is public, and traders push the price to those lines. Ripcord guards a position with a reserve whose size and trigger point are hidden: the trigger is sealed in a TEE on NEAR, the reserve sits in a private NEAR Intents balance, and when the price crosses your hidden line the reserve is moved into your Hyperliquid margin in under a minute. It can only ever pay your own account.
 
-**Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data. All six held. Of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin: the same 20 as posting that reserve on the exchange, where hunters can see it. `bash scripts/demo.sh` checks the seal and rescores the result ([evidence](docs/EVIDENCE.md)).
+Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`. Live on NEAR mainnet.
 
-Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`, `agents`.
+Design notes, research and feasibility tests were prepared from Oct 20, inside the hackathon window that opened with the Oct 19 announcement; their results are in `docs/EVIDENCE.md` and `docs/ARCHITECTURE.md`. All code in this repository was written from Oct 30 to Nov 14. Libraries are listed under "Built with".
 
-Design notes, research and feasibility tests were prepared from Oct 20 (results summarised in `docs/EVIDENCE.md`), inside the hackathon window that opened with the Oct 19 announcement. All code in this repository is written from Oct 30 to Nov 14; the October test scripts are not part of it. Libraries are listed under "Built with".
+## Proof at a glance
 
-> ⚠️ This README is a skeleton for v2. Sections marked _(fill in)_ get real numbers and links during the build. Every section must be true on submission day.
+- **Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data, and committed only their hash. All six held: of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin, the same 20 as posting that reserve openly on the exchange. `bash scripts/demo.sh` checks the hash and rescores the result ([evidence](docs/EVIDENCE.md)).
+- **Live on NEAR mainnet.** The guard registry [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) and the checker `ripcord-registry.near/checker` on OutLayer run exactly the code in this repo: rebuild them and compare the hashes (table below), or open `/verify?example` and watch the app check the running build live.
+- **The money route is real.** In October we sent 4.79 USDC from a guard-style custody wallet into a Hyperliquid account's margin on mainnet; it landed 33.6 s after the call ([ARCHITECTURE §2](docs/ARCHITECTURE.md)).
+- **Tested.** 279 tests: 27 for the contract, 53 for the enclave, 14 for the Rust rules and replays, 120 shared, 43 web and 22 for the poker. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
 
 ## The problem
 
-- Every Hyperliquid position (size, entry, margin, liquidation price) is public. Heatmap tools draw every trader's liquidation level in real time, and hunting those levels is a documented pattern.
-- The only defence today is visible: extra USDC parked on the exchange, which tells a hunter exactly how far to push, or watching the screen all night.
+- Every Hyperliquid position (size, entry, margin, liquidation price) is public. Heatmap tools draw every trader's liquidation level in real time, and pushing the price into those clusters is a documented pattern: on Oct 10, 2025, $3.21B was liquidated in the peak minute ([Kaiko](https://www.kaiko.com/resources/how-3-21b-vanished-in-60-seconds-october-2025-crypto-crash-explained-through-7-charts)).
+- The only defence today is visible: extra USDC on the exchange, which tells a hunter exactly how far to push, or watching the screen all night.
 - Existing protection is tied to one venue (Synthetix Wick Insurance) or covers lending only (DeFi Saver). We found none for Hyperliquid.
 
-## How it works
+## How it works, for a trader
 
-1. Sign in with the wallet you trade with. Ripcord reads your Hyperliquid positions from the public API. You approve nothing on Hyperliquid.
-2. Set a guard: "rescue me somewhere between 5 % and 8 % from liquidation". Or say it in plain English and confirm what Ripcord reads back. The guard picks the exact point privately and changes it after every rescue, so watching rescues doesn't reveal it.
-3. Your browser seals the settings. It encrypts them to the guard running in an OutLayer TEE and publishes only a fingerprint. You keep a **seal file**.
-4. Fund a reserve in any supported asset (BTC, SOL, ETH, NEAR, USDC…) from its own chain. It sits in a Confidential Intents balance, so its size is private.
-5. The guard reads your account inside the TEE. When you cross your line, it swaps part of the reserve into USDC through NEAR Intents and has it credited to **your** Hyperliquid perps balance in under a minute (about 45 s end to end, measured on mainnet). Your liquidation price moves away.
-6. Hunters can see that USDC arrived. They can't link it to the reserve, see what's left, or look up which accounts are guarded: the registry stores only hashes.
-7. Close any time: the rest of the reserve goes to the chain and address you choose. With your seal file, anyone can verify every rescue happened inside your sealed line.
+1. **Connect** the wallet you trade with, or paste your Hyperliquid address. Nothing is signed: positions are public.
+2. **Say what you want**: "keep my SOL long alive through a 25% drop, with BTC". NEAR AI reads it inside its TEE (your words are encrypted in the browser, so Ripcord's server only relays ciphertext) and fills in the reserve and the timing; the amounts are computed by Ripcord's code. Or set them by hand.
+3. **Seal.** Your browser encrypts the settings to Ripcord's checker in an OutLayer TEE and keeps a passphrase-locked seal file. Only fingerprints are public.
+4. **Fund the reserve**: one wallet signature sends USDC from your own Hyperliquid balance, or send BTC, ETH, SOL, NEAR or USDC from their own chains. It lands in a private NEAR Confidential Intents balance held by the guard's own wallet, whose rules let it pay only your Hyperliquid account. When it arrives, the guard registers on NEAR.
+5. **Guarded.** Pokers watch public prices and wake the checker near your line. Inside the TEE it reads your account from Hyperliquid itself, and when you cross the line it sends part of the reserve through NEAR Intents into your perps margin; your liquidation price moves away. The line is redrawn after every rescue, so watching rescues doesn't reveal it.
+6. **Settled.** Within 24 hours a rescue is marked Saved (the price passed your old liquidation price: 3 % fee) or Close call (no fee). NEAR records only the hour and a rounded amount.
+7. **In your hands.** Freeze the reserve or close the guard with one signature from your seal file's owner key; closing sends the rest to your own Hyperliquid account. Verify, with the seal file, checks what the guard did.
 
-**For AI trading agents** _(fill in from Nov 11)_: an MCP tool lets an agent hire a guard for its own positions. You seal the guard, so the agent can't see or change it.
-
-## Try it (demo mode, no funds needed)
+## Try it (no funds needed)
 
 | Do | See |
 |---|---|
-| `bash scripts/demo.sh` (needs Node 22; Python 3 and Rust optional) | Installs, checks that Python, TypeScript and Rust agree on every hash and guard decision, runs the fault-injection tests, builds the web app; every step ✓ |
-| `corepack pnpm dev`, open http://localhost:3000 | The home page: a live rescue under the card, then "Try to hunt it" |
-| Open http://localhost:3000/guards, then **Try a simulation** | A simulation of the app: example positions and guards, simulated prices, a banner on every screen; each guard is a card whose pattern is drawn from its commitment |
-| Press **Guard** on SOL, then **Seal guard** | The real set-up: your settings are sealed in the browser, the rosette prints, the values collapse, and you save a seal file. Then one approval and a funded reserve, simulated here |
-| On any example guard, press **Try a crash** | The guard's real rules on simulated prices: the rescue fires, the red line slides away, and the fall passes your old liquidation price |
-| Click **Hunter's view** | The same position as anyone sees it on Hyperliquid: liquidation price public, guarded "Can't tell", range and reserve `••••••` |
-| Press and hold **Hold to peek** | Your sealed rescue range, top-up and reserve, only while held |
-| `corepack pnpm testnet:registry account`, then `deploy`, then `e2e` (needs internet; testnet NEAR comes free from the faucet) | 13 ✓ lines on NEAR testnet and OutLayer's testnet: the registry becomes a guard wallet's controller, an unlisted recipient is refused, the owner freezes with one NEP-413 signature, a frozen wallet refuses everything, a replayed signature is refused, unfreeze, close |
-| _(fill in from Nov 6)_ **Guard a position** with the demo account | Set a range, seal it, fund the reserve |
-| _(fill in from Nov 9)_ **Try to hunt one** | Hunt simulator: push price at a guarded position and watch hidden rescues move the line |
-| Open http://localhost:3000/verify?example | The card's veil slides off and three checks land: the sealed settings give the guard's three fingerprints, every line the enclave drew sat inside the sealed range, and OutLayer runs the build `checker/build.sh` prints (read live from NEAR) |
-| Open http://localhost:3000/ledger | The registry's totals, read from NEAR in your browser; rescues appear to the hour and rounded, never with an account |
+| `bash scripts/demo.sh` (needs Node 22; Python 3 and Rust optional) | Every step ✓: Python, TypeScript and Rust agree on every hash and guard decision; the contract, enclave and poker tests; the Oct 10, 2025 crash replay; the sealed holdout rescored; the web tests and production build |
+| `corepack pnpm dev`, open http://localhost:3000 | The home page: the real Oct 10, 2025 ETH crash run through the guard's rules, a guarded and an unguarded 10× long; then **Try to hunt it** |
+| Open http://localhost:3000/guards and press **Try a simulation** | Example positions and guards with simulated prices and money, a banner on every screen |
+| Press **Guard** on SOL. Type a request in "What should this guard do?" (needs `NEARAI_API_KEY` in `apps/web/.env.local`), or use the form | The reserve, its amount and the timing fill in, with a read-back of what was understood |
+| Choose a passphrase, press **Seal guard**, save the seal file, approve, then **Send … from Hyperliquid** | The card prints its pattern, the values collapse to `••••••`, a fingerprint appears; after the simulated deposit: **Guarded** |
+| On an example guard press **Try a crash**, then **Hunter's view** and **Hold to peek** | The rescue fires and Hyperliquid's red line slides away; the hunter sees "Can't tell" and `••••••`; holding shows your sealed range |
+| Open http://localhost:3000/verify?example | A veil slides off the card and three checks land: the settings match their fingerprints, every drawn line sat inside the sealed range, and OutLayer runs the build `bash checker/build.sh mainnet` prints, read live from NEAR mainnet |
+| Open http://localhost:3000/ledger | The registry's totals read from `ripcord-registry.near` in your browser; rescues appear to the hour and rounded, never with an account |
+| Leave the simulation and paste any Hyperliquid address | That account's real positions, nearest to liquidation first, each with a **Guard** button (reading needs no signature) |
+| `corepack pnpm testnet:registry account`, then `deploy`, then `e2e` | 13 ✓ on NEAR and OutLayer testnet: the registry controls a guard wallet, an unlisted recipient is refused, the owner freezes with a NEP-413 signature, a frozen wallet refuses everything, a replayed signature is refused, unfreeze, close |
+| `corepack pnpm copilot:eval` (with a NEAR AI key) | 16 varied requests, slang, French, Pidgin and an injection attempt among them, through the app's own encrypted path: 64 of 64 fields right |
 
-## Mainnet proof _(fill in Nov 7)_
+## Live on NEAR mainnet
 
-| Step | Link |
-|---|---|
-| Reserve funded with BTC (confidential) | |
-| Breach → rescue intent signed in TEE | |
-| USDC credited to Hyperliquid perps balance | |
-
-Measured: breach → credited p50 ___ s, p95 ___ s · cost per check ___ · cost per rescue ___.
+| Piece | Where | Check it |
+|---|---|---|
+| Guard registry contract | [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) ([deployed](https://nearblocks.io/txns/Fpm7gnSSZz372vinZxVoryQucoR4W3fKa1WYuzn1nrsm) Nov 11) | Code hash `4KM6TWLYX2sEcPyjt4JNzoWFMi8oZ29KRXK1omBw6en2`, which `bash contracts/guard-registry/build.sh` prints |
+| Checker in OutLayer's TEE | `ripcord-registry.near/checker`, build `6b27ec16…` ([version](https://nearblocks.io/txns/APXN2DZbedwpdrggqPFcuhnadxyjVwRT6pqEp1Soaj4h)) | sha256 `6b27ec1648bbcec0b9a08362c56f47a49a342749fd97d3d319c43fa16bafba28`, which `bash checker/build.sh mainnet` prints; `outlayer.near get_project` → `active_version` |
+| The enclave's own NEAR account | [`d09e4db7…`](https://nearblocks.io/address/d09e4db7a197abc0a8126fdf694d3d556fa45f4154b3dc9a491afc6ea3fcfca6), a key only the enclave holds | [Named the registry's only checker](https://nearblocks.io/txns/4eA3AZBesupk9N4LK5Er7vZCCVsMVe4SRhVnxP78Bm8W) |
+| Ripcord's fee wallet | An OutLayer custody wallet, NEAR id `7b3d43bb…190f` | Compiled into the checker build, so the attested hash covers it |
 
 ## Built on NEAR
 
-Every row links the code that uses the piece and a test or transaction that proves it. Rows marked _(Day n)_ get their links on the day that code is written.
+Every row links the code that uses the piece and a test or transaction that proves it ([all evidence](docs/EVIDENCE.md)).
 
 | NEAR piece | What it does in Ripcord | Code | Proof |
 |---|---|---|---|
-| NEAR Intents · 1Click | Reserve deposits from 35+ chains; a rescue is a swap to USDC credited straight to a Hyperliquid perps balance | `checker/` rescue executor _(Day 5)_ | mainnet rescue tx _(Day 7)_ |
-| Confidential Intents | Private reserve; rescues can't be linked to it | `checker/` custody calls _(Day 3, 5)_ | "find the reserve" capture _(Day 7)_ |
-| OutLayer TEE (Intel TDX) | The checker: sealed settings, Hyperliquid reads, attested execution. Its keys (an ed25519 signing key that is its own NEAR account; encryption keys for sealing) exist only inside the TEE | [enclave host](checker/src/main.rs#L34) on OutLayer's signing-keys, encryption-keys and storage interfaces, [manifest](checker/manifest.json) (HTTPS callers only); [sealed vault](checker/src/vault.rs#L9); [signs its own NEAR transactions](checker/src/near_tx.rs#L132) | [47 checker tests](checker/tests), incl. [outputs never carry a setting](checker/tests/create.rs#L169); [byte-for-byte against near-api-js](checker/tests/near_tx.rs); `bash checker/build.sh` prints the wasm's sha256; live on mainnet as `ripcord-registry.near/checker` ([registered](https://nearblocks.io/txns/DSD4x4B1Xro6LhqFgF1CiggvQWyERWY8Sq5599YnKT2h) Nov 11; build `6b27ec16…` since [this version](https://nearblocks.io/txns/APXN2DZbedwpdrggqPFcuhnadxyjVwRT6pqEp1Soaj4h): it registers a guard only once its reserve arrives, and closes or freezes it on the owner's signature), its keystore-held account [`d09e4db7…`](https://nearblocks.io/address/d09e4db7a197abc0a8126fdf694d3d556fa45f4154b3dc9a491afc6ea3fcfca6) [named the registry's checker](https://nearblocks.io/txns/4eA3AZBesupk9N4LK5Er7vZCCVsMVe4SRhVnxP78Bm8W); on testnet as `ripcord-ops-57834db8.testnet/checker` (version `f0d13406…`), its keystore-held account [`ae2c8867…`](https://testnet.nearblocks.io/address/ae2c88678320a8fe1fba92ce7cf2f90d6076e7b7dd89f68930eabd24733ee0eb) is the registry's checker; [Verify](apps/web/lib/verify.ts) compares the build OutLayer runs with that hash, on the owner's device ([6 tests](apps/web/test/verify.test.ts)) |
-| OutLayer custody wallets + policy | One wallet per guard; its keystore pays only the owner's Hyperliquid address, capped at one rescue | [opens the guard's wallet](checker/src/custody.rs#L92) and [registers it with its policy](checker/src/actions.rs#L143) ([policy](checker/src/policy.rs)); [private funding address](checker/src/actions.rs#L186); [`register_guard`](contracts/guard-registry/src/lib.rs#L244) makes the registry the policy controller | [the registry transaction carries hashes only](checker/tests/create.rs#L270); on testnet the enclave opened guard `g-gmxqyoed6c`'s wallet and registered it, with the registry as the wallet's controller (`corepack pnpm testnet:checker create`); testnet `403 policy_denied` for an unlisted recipient (`docs/EVIDENCE.md`); mainnet refusals with the registry as controller _(Day 8)_ |
-| NEAR contract | Guard registry: hashes of the owner and the account, status, rounded receipts; controls each guard wallet's policy and the owner's freeze | [`register_guard`](contracts/guard-registry/src/lib.rs#L244), [`freeze_guard`](contracts/guard-registry/src/lib.rs#L469), [`record_rescue`](contracts/guard-registry/src/lib.rs#L383) | 27 [contract tests](contracts/guard-registry/src/tests.rs); live on mainnet at [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) ([deployed](https://nearblocks.io/txns/Fpm7gnSSZz372vinZxVoryQucoR4W3fKa1WYuzn1nrsm) Nov 11, code hash = `bash contracts/guard-registry/build.sh`); on testnet at [`ripcord-registry-db06d339.testnet`](https://testnet.nearblocks.io/address/ripcord-registry-db06d339.testnet); [registered a guard and became its wallet's controller on OutLayer](https://testnet.nearblocks.io/txns/8Mmt6DwnhkfoZsRqqUqrjn7sDgEhJCSmGE5aCZKcqkPo) |
-| NEP-413 signatures | NEAR wallets own guards and sign freezes, verified on chain (EIP-191 for EVM wallets too) | [`verify_nep413`](contracts/guard-registry/src/sig.rs#L18), [`nep413Hash`](packages/shared/src/owner.ts#L40) | [owner freeze with a NEP-413 signature on testnet](https://testnet.nearblocks.io/txns/J6N1R7VZhyZzJoS5fgn4WJ48XqkrQ2He1oFB1nV1qLi9); [replay, wrong key, wrong salt, wrong contract refused](contracts/guard-registry/src/tests.rs#L410) |
-| NEAR AI Cloud | Set a guard up in plain words ("keep my SOL long alive through a 25% drop, with BTC"). The words are encrypted in the browser to the model's attested key, so Ripcord's server only relays ciphertext; Qwen in NEAR AI's TEE returns intent, and Ripcord computes the amounts | [encrypts to the enclave key](apps/web/lib/copilot.ts#L16), [asks with a fresh attestation nonce](apps/web/lib/copilot.ts#L100), [the relay](apps/web/app/api/copilot/route.ts#L60) | [only the enclave key opens a request](apps/web/test/copilot.test.ts#L26); [the model's answer can't set an address or a cap](apps/web/test/copilot.test.ts#L35); [the reserve for a drop is computed, not taken from the model](apps/web/test/copilot.test.ts#L54) |
-| NEAR AI Agent Market | Agents hire and fund a guard through the MCP tool | MCP tool _(Day 11)_ | sample agent run _(Day 11)_ |
-| Trezu | The make-good fund is a public 2-of-3 multisig treasury: every payout is a voted payment request anyone can see (three founder-held keys on separate devices for now) | ledger fund line _(Day 8)_ | the treasury's members, votes and payouts _(Day 8)_ |
-| Rhea Lending | The fund's USDC earns between claims, supplied through Trezu's Earn section | ledger's Rhea views _(Day 8)_ | Rhea `get_account` of the treasury _(Day 8)_ |
-| Chain signatures _(P2)_ | One reserve also defending Aave positions on Base/Arbitrum | — | — |
+| OutLayer TEE (Intel TDX) | The checker: opens sealed settings, reads Hyperliquid itself, decides and pays. Its keys (an ed25519 key that is its own NEAR account, and sealing keys) exist only inside the TEE | [enclave host](checker/src/main.rs#L34), [sealed vault](checker/src/vault.rs#L9), [signs its own NEAR transactions](checker/src/near_tx.rs#L132), [manifest](checker/manifest.json) | [53 enclave tests](checker/tests), incl. [outputs never carry a setting](checker/tests/create.rs#L169); mainnet build hash above |
+| OutLayer custody wallets and policy | One wallet per guard; OutLayer's keystore lets it pay only the owner's Hyperliquid address, capped at one rescue, even if the checker were compromised | [opens the wallet](checker/src/custody.rs#L92), [its policy](checker/src/policy.rs#L15), [registered once the reserve lands](checker/src/actions.rs#L186) | [registered only once funded](checker/tests/create.rs#L257); [the registry transaction carries hashes only](checker/tests/create.rs#L302); [pays only the owner](checker/tests/check.rs#L165); an unlisted recipient refused `403 policy_denied` (EVIDENCE) |
+| NEAR Intents · 1Click | Reserve deposits from Hyperliquid or other chains; a rescue is a private withdrawal credited to the Hyperliquid perps balance | [deposit address](checker/src/custody.rs#L147), [withdraw to Hyperliquid](checker/src/custody.rs#L258), [fund from Hyperliquid in one signature](apps/web/lib/wallet.ts#L185) | Mainnet: 4.79 USDC landed 33.6 s after the call ([ARCHITECTURE §2](docs/ARCHITECTURE.md)); [the send matches Hyperliquid's SDK](apps/web/test/wallet.test.ts#L9) |
+| Confidential Intents | The reserve is a private balance: its size can't be read and rescues can't be linked to it | the same custody calls, all on `/confidential/*` routes | [an outage pauses and never falls back to a public route](checker/tests/check.rs#L217) |
+| NEAR contract | Guard registry: hashes of the owner and the account, status, rounded receipts; controller of every guard wallet's policy, and the owner's freeze | [`register_guard`](contracts/guard-registry/src/lib.rs#L244), [`record_rescue`](contracts/guard-registry/src/lib.rs#L383), [`freeze_guard`](contracts/guard-registry/src/lib.rs#L469), [`close`](contracts/guard-registry/src/lib.rs#L446) | [27 contract tests](contracts/guard-registry/src/tests.rs); live at `ripcord-registry.near` |
+| NEP-413 signatures | The owner key in the seal file signs freezes and closes; the contract and the enclave check them | [contract](contracts/guard-registry/src/sig.rs#L18), [enclave](checker/src/owner.rs#L28), [browser](apps/web/lib/ownerActions.ts#L46) | [a signature works once](contracts/guard-registry/src/tests.rs#L410); [only the owner's key can close](checker/tests/owner.rs#L113); [a close pays the rest to the owner and closes on chain](checker/tests/owner.rs#L122); [a testnet freeze](https://testnet.nearblocks.io/txns/J6N1R7VZhyZzJoS5fgn4WJ48XqkrQ2He1oFB1nV1qLi9) |
+| NEAR AI Cloud | Plain-words set-up: words encrypted in the browser to the model's attested key (E2EE), so Ripcord's server relays only ciphertext; Qwen in NEAR AI's TEE returns intent, Ripcord computes the amounts | [encrypts to the enclave key](apps/web/lib/copilot.ts#L25), [accepts only a report that answers a fresh nonce](apps/web/lib/copilot.ts#L113), [the relay](apps/web/app/api/copilot/route.ts#L60) | [only the enclave key opens a request](apps/web/test/copilot.test.ts#L26); [its answer can't set an address or a cap](apps/web/test/copilot.test.ts#L35); [the reserve is computed, not taken from the model](apps/web/test/copilot.test.ts#L54); 64 of 64 in the [eval](scripts/copilot-eval.ts) |
+| FastFS | Hosts the checker's binary; OutLayer pins it by sha256 | [upload](scripts/near/lib.ts) | The mainnet build at its FastFS URL (EVIDENCE) |
 
 ## Trust model and honest limits
 
 See `docs/ARCHITECTURE.md` §2. In short:
-- **The AI never touches money:** it proposes settings; sealed code decides and can pay only you. A test proves no AI output can change where a rescue goes.
-- **Guaranteed:** nobody can read your defence line or reserve size. A rescue can only pay your own Hyperliquid account, and a close only pays an address you signed for. You can freeze your reserve with one signature, even if Ripcord disappears.
-- **Not hidden:** your Hyperliquid positions and liquidation price, which are public by design, and the fact that USDC arrived. Which accounts are guarded isn't public: the registry stores only hashes, and receipts show the hour and a rounded amount.
-- **Early rescues:** about 2 in 3 rescues end with the price bouncing. Your position is never touched, the USDC stays yours as margin, and you pay only the network fee.
-- **Speed:** a rescue takes about 45 s end to end, so a move that crosses your buffer faster than that can still liquidate you. MVP protects cross-margin positions.
-- **Third parties:** OutLayer (keys, one custody wallet per guard, liveness), Confidential Intents validators and TEE bridge, and 1Click solvers for price.
-- **Isolated positions:** need one approval of a Hyperliquid agent held in your guard's wallet. It can't transfer or withdraw your money; on Hyperliquid an agent could trade or deposit into vaults, so Ripcord's code only ever signs "add margin". Revoke it any time.
-- **Pasted addresses:** a guard pays only the account it was set up for, so pasting someone else's address can only add margin to their account, at your cost; the app asks you to confirm the account is yours. An isolated guard also needs the account owner's own approval on Hyperliquid.
-- **Unfunded guards:** registering a guard costs Ripcord about 0.015 NEAR of storage before its reserve arrives. Requests are rate-limited per visitor; registering a guard only once its reserve lands is the planned fix.
-- **Our promise:** if a guard fails because of us, we pay back what the liquidation took (up to the reserve at the time or $10,000) from a public make-good fund fed by 10 % of every save fee: a Trezu multisig treasury where every payout needs 2 of 3 keys. For the hackathon all three keys belong to the founder, on three separate devices: a stolen or lost key can't pay out, but this doesn't yet protect the fund from us. Independent key-holders come next that earns on Rhea Lending between claims. Eligibility is checked from your seal file and public prices; see `docs/ARCHITECTURE.md` §9.
+- **It can only pay you.** A rescue and a close pay only your own Hyperliquid account: the guard wallet's policy on OutLayer refuses anything else, and the attested code never asks. You can freeze the reserve with one signature.
+- **The AI never touches money.** It fills in a form you confirm; the amounts are computed by code, and nothing it says can set an address or a cap ([test](apps/web/test/copilot.test.ts#L35)).
+- **Hidden:** your trigger line and your reserve's size; which accounts are guarded (the registry stores only hashes, and receipts show the hour and a rounded amount).
+- **Not hidden:** your positions and liquidation price (public on Hyperliquid), and the fact that USDC arrived. A reserve sent from Hyperliquid itself is visible there; send it from another chain to keep its size private.
+- **Speed:** a rescue lands in under a minute, so a move that crosses your buffer faster than that can still liquidate you. Most rescues end as close calls (77 % on the default setting in the October 2026 replay): the USDC stays yours as margin and you pay only the network fee (about $0.32).
+- **When a guard goes on chain:** once its reserve lands, so an unfunded guard costs nothing on NEAR. In the seconds before that, only the attested code can move the money.
+- **Isolated positions** need one approval of an agent key held in the guard's wallet. On Hyperliquid an agent can trade but not withdraw or send; Ripcord's code only ever signs "add margin". Revoke it any time.
+- **Pasted addresses:** a guard pays only the account it was set up for, so the app asks you to confirm the account is yours.
+- **Small remainders:** less than $2 can't be sent back to Hyperliquid (the route's minimum) and stays in the guard's wallet.
+- **Third parties:** OutLayer (TEE, keystore, liveness), Confidential Intents operators, 1Click solvers, and Hyperliquid.
 
 | Who | Can see | Can't see |
 |---|---|---|
 | Public and hunters | Positions and liquidation prices (public on Hyperliquid), and that USDC arrived | Your line, your reserve, what's left, or whether you're guarded |
-| Ripcord's team | Which accounts are guarded (the pokers need them) | Your line, target or reserve |
-| OutLayer's operator | Your reserve's balance, and each rescue's amount and destination | Your line and target (sealed in the enclave) |
+| Ripcord's team | Which accounts are guarded (the pokers need them) | Your line, your target or your reserve |
+| OutLayer's operator | Your reserve's balance, and each rescue's amount and destination | Your line and target, sealed in the enclave |
 | 1Click | Each swap's amount and destination | Your line, or the rest of the reserve |
-| Confidential Intents' operators | To confirm | — |
 
-## What we hit _(Day 12)_
+## What we hit
 
-Real problems from building on mainnet and how we fixed them, e.g. OutLayer's storage estimate running short, NEAR Intents' private route going down for minutes during its confidential rollout, and the guard pausing rather than rescuing publicly.
+Real problems from building on mainnet, and what we did:
+- **OutLayer changed its wallet-policy format mid-hackathon** (a version, lock flag and deadline became required). A rerun of our testnet end-to-end test caught every guard registration failing; the contract and enclave now pass both formats.
+- **NEAR holds a call's attached gas up front at about 10× the gas price.** Our first mainnet project registration was refused for dipping into the contract's storage deposit, and guard registration attached 200 Tgas against a float of 0.078 NEAR. A registration burns about 11 Tgas, so it now attaches 70.
+- **Storage costs 1 NEAR per 100 KB.** NEAR's own sha256 and Binaryen's `wasm-opt` packed the registry 21 % smaller, to 282 KB (2.8 NEAR), with no feature cut; remapped paths make it rebuild byte for byte.
+- **The route has a floor.** NEAR Intents carries a rescue to Hyperliquid from $2 ($1 is refused), so a guard tops up at least $2 instead of never firing on a small position.
+- **A send from Hyperliquid needs $1 more** than the amount it funds; the app adds it and says so.
+- **Testnet has no private route**, so private funding and rescues are tested on mainnet with small real amounts, and the enclave's mock-host tests cover every branch.
+- **The enclave declares its network hosts in an attested manifest**, so its NEAR RPC is one the manifest already lists rather than the fastest one.
 
 ## Prior art
 
 | Project | Difference |
 |---|---|
 | Chainlink CRE liquidation-protection challenge (Sept 2026) | Private rules for a testnet loan, but each public action reveals the strategy; Ripcord's reserve is unlinkable and its line is redrawn per rescue |
-| Synthetix Wick Insurance | Grace period inside one venue; needs the venue to build it |
-| DeFi Saver Liquidation Protection | Lending positions, one chain at a time, public; nothing for perps |
+| Synthetix Wick Insurance | A grace period inside one venue; needs the venue to build it |
+| DeFi Saver Liquidation Protection | Lending positions, one chain at a time, in public; nothing for perps |
 | Liquidation heatmaps (OpenMarket, MMT, Hyperdash) | The hunter's tools; Ripcord is the counter |
 | near.com confidential perps | Hide who trades; positions and liquidation prices stay public |
 
 ## Business model
 
-Ripcord is paid only when it saves you: 3 % of the rescued amount (0.5 % above $50K) when the price later crosses your old liquidation price, proven on a public receipt, plus $1 a month per guard. An early rescue costs only the network fee (~$0.32).
+Ripcord is paid when it saves you: 3 % of the rescued amount (0.5 % above $50K) when the price later crosses your old liquidation price, recorded on chain, plus $1 a month per guard. A close call costs only the network fee.
 
-Priced on live Hyperliquid positions (Oct 22 2026, $12.0B open interest; method in `docs/EVIDENCE.md`): if every position within 60 % of liquidation were guarded, save fees would be about $11M a year, or $17M with 2× reserves. 70 % comes from $100K–$10M positions, mostly in accounts outside the 1,500 largest; positions under $100K are 62 % of guards but 7 % of fees. Guarding 5 % of those positions is about $0.5–0.8M a year.
-
-Beyond save fees:
-- **Order flow:** hidden stops and the fast lane place orders, which can carry a Hyperliquid builder fee (up to 0.1 %, approved once by the user). Third-party apps earn about $100M a year this way.
-- **Distribution:** front ends earn on every trade, and a liquidated trader often stops trading. They embed the guard and share the save fee.
+Priced on live Hyperliquid positions ($12.0B open interest; method in `docs/EVIDENCE.md`): if every position within 60 % of liquidation were guarded, save fees would be about $11M a year, or $17M with 2× reserves; guarding 5 % of them is about $0.5–0.8M a year. Front ends that embed the guard can share the save fee.
 
 ## What's next
 
-- **Fast lane:** opt-in reduce-only orders from the attested code when a move is faster than a rescue can land.
-- **Hidden stops:** stop-loss and take-profit sealed in the enclave, never resting on Hyperliquid's public book.
-- **Self-firing ladder for shorts:** confidential limit orders that pre-place rescues and fire even while Ripcord is offline. Designed, and tested up to funding; it switches on when 1Click limit orders can pay Hyperliquid (today they pay Arbitrum, Ethereum or a confidential balance).
-- **Lending positions:** the same hidden reserve adding collateral to an Aave position (`supply(onBehalfOf)`) or a Rhea Lending position instead of selling it. Rhea credits every deposit to its sender today; the change it needs is small: a deposit that names the account it credits.
-- **near.com perps:** near.com gives each user a dedicated Hyperliquid account with cross margin, so a guard can defend it unchanged: EVM users trade from their own address, others from a trading-signer key they can export.
+- **near.com perps traders.** near.com runs perps on Hyperliquid, so its traders' accounts can be guarded unchanged; a guard owned by a NEAR wallet (the contract already checks NEP-413 owners) and funded in NEAR fits them.
+- **Rhea Lending borrowers.** Rhea credits every deposit to its sender today; one small change (a deposit that names the account it credits) lets the same hidden reserve add collateral before a liquidation.
+- **A make-good fund:** 10 % of every save fee in a public multisig treasury that pays back a liquidation the guard should have prevented.
+- **Hidden stops and a fast lane:** stop-loss sealed in the enclave, never on the public book, and opt-in reduce-only orders for moves faster than a rescue.
+- **Agents:** an MCP tool so a trading agent can hire a guard for its own positions without seeing or changing it.
+- **Mobile wallets** through WalletConnect, and top-up and range changes for real guards (they work in the simulation today).
 
 ## Repository layout
 
 ```
-apps/web                 Next.js app (App Router, Tailwind v4)
-packages/shared          Types, JSON schemas, commitment + guard logic (shared by web and poker)
-services/poker           Watches public Hyperliquid state; asks the checker to check guards near liquidation
-crates/rules             Rust rules shared by the checker and the contract (tested against the same vectors)
-contracts/guard-registry NEAR contract: guard registry and wallet-policy controller (Rust)
-checker                  OutLayer TEE program: sealed guards, Hyperliquid reads, rescues (Rust → WASI P2)
-docs                     Architecture and trust model, interfaces (SPEC), design, evidence
+apps/web                  Next.js app: set-up, guard, simulation, Verify, Ledger, and the NEAR AI relay
+packages/shared           Types, commitments, guard rules, sealing, owner messages (shared by web and poker)
+services/poker            Watches public Hyperliquid prices; wakes the checker near a guard's line
+crates/rules              Rust rules shared by the checker and the contract (same vectors as TypeScript)
+crates/replay             The crash replay harness and the sealed holdout
+contracts/guard-registry  NEAR contract: guard registry and wallet-policy controller
+checker                   The program in OutLayer's TEE: sealed guards, Hyperliquid reads, rescues, close
+scripts                   Reference implementation, testnet and mainnet deploys, replay data, the AI eval
+docs                      Architecture and trust model, interfaces (SPEC), design, evidence
 ```
 
 ## Built with
 
-Libraries and tools, as the hackathon rules ask (Q-005). All code in this repository is written for Ripcord from Oct 30; nothing is copied from earlier projects.
+Libraries and tools, as the hackathon rules ask (Q-005). All code in this repository was written for Ripcord from Oct 30; nothing is copied from earlier projects.
 
-- TypeScript 6, pnpm 12, Node 22; Next.js 16, React 19, Tailwind CSS 4 (web)
-- `@noble/hashes`, `@noble/curves`, `@noble/ciphers` (SHA-256, X25519, ChaCha20-Poly1305 in the browser and Node); `near-api-js` (testnet script and reference transactions)
-- Rust: `serde`, `serde_json`, `sha2`, `hex`, `base64`; `x25519-dalek`, `hkdf`, `chacha20poly1305` (sealing); `near-sdk` (registry contract); `wit-bindgen`, `wasi-http-client`, `wasi` (checker on OutLayer)
-- vitest, ESLint, Prettier, tsx; Python 3 standard library for the reference implementation (`scripts/vectors.py`)
-- Fonts: Geist, Geist Mono (Google Fonts)
+- TypeScript 6, pnpm 12, Node 22; Next.js 16, React 19, Tailwind CSS 4
+- `@noble/hashes`, `@noble/curves`, `@noble/ciphers` (SHA-256, ed25519, X25519, ChaCha20 and XChaCha20-Poly1305 in the browser); `near-api-js` (scripts)
+- Rust: `serde`, `serde_json`, `sha2`, `hex`, `base64`, `bs58`; `x25519-dalek`, `hkdf`, `chacha20poly1305`, `ed25519-dalek`; `near-sdk` (contract); `wit-bindgen`, `wasi-http-client`, `wasi` (checker on OutLayer); Binaryen `wasm-opt`
+- vitest, ESLint, Prettier, tsx; Python 3 standard library for the reference implementation (`scripts/vectors.py`) and the replay scoring
+- Fonts: Geist, Geist Mono
 
 ## License
 
