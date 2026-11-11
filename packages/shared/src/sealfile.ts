@@ -16,6 +16,14 @@ export interface SealContents {
   receipt_secret: string;
   /** An isolated guard's agent name on Hyperliquid; random, so it can't announce the guard. */
   agent_name: string | null;
+  /** Ranges the owner changed away from, each with the epoch its successor's first line was drawn in. */
+  earlier?: EarlierRange[];
+}
+
+export interface EarlierRange {
+  until_epoch: number;
+  line_range_pct: [number, number];
+  target_range_pct: [number, number];
 }
 
 export interface SealFile {
@@ -49,9 +57,31 @@ export async function writeSealFile(
   random: (n: number) => Uint8Array,
   n = SCRYPT_N,
 ): Promise<SealFile> {
+  return (await writeSealFileKeyed(contents, commitment, passphrase, random, n)).file;
+}
+
+/** Writes a seal file and returns its key too, so the page can rewrite it after a change without the passphrase. */
+export async function writeSealFileKeyed(
+  contents: SealContents,
+  commitment: string,
+  passphrase: string,
+  random: (n: number) => Uint8Array,
+  n = SCRYPT_N,
+): Promise<{ file: SealFile; key: Uint8Array }> {
   const kdf = { n, r: 8, p: 1, salt: bytesToHex(random(16)) };
-  const nonce = random(12);
   const key = await fileKey(passphrase, kdf);
+  return { file: rewriteSealFile(contents, commitment, key, kdf, random), key };
+}
+
+/** The same file under the same passphrase, with new contents (a new range) and a fresh nonce. */
+export function rewriteSealFile(
+  contents: SealContents,
+  commitment: string,
+  key: Uint8Array,
+  kdf: SealFile['kdf'],
+  random: (n: number) => Uint8Array,
+): SealFile {
+  const nonce = random(12);
   const ciphertext = chacha20poly1305(key, nonce, aad(contents.guard_id)).encrypt(
     utf8ToBytes(JSON.stringify(contents)),
   );
@@ -67,9 +97,17 @@ export async function writeSealFile(
 
 /** Opens a seal file; throws on a wrong passphrase or an altered file, which look the same on purpose. */
 export async function readSealFile(file: SealFile, passphrase: string): Promise<SealContents> {
+  return (await openSealFile(file, passphrase)).contents;
+}
+
+/** Opens a seal file and returns its key too (see `rewriteSealFile`). */
+export async function openSealFile(
+  file: SealFile,
+  passphrase: string,
+): Promise<{ contents: SealContents; key: Uint8Array }> {
   const key = await fileKey(passphrase, file.kdf);
   const plain = chacha20poly1305(key, hexToBytes(file.nonce), aad(file.guard_id)).decrypt(hexToBytes(file.ciphertext));
-  return JSON.parse(new TextDecoder().decode(plain)) as SealContents;
+  return { contents: JSON.parse(new TextDecoder().decode(plain)) as SealContents, key };
 }
 
 export function isSealFile(v: unknown): v is SealFile {

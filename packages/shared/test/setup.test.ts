@@ -13,8 +13,10 @@ import {
   isSealFile,
   open,
   ownerCommitment,
+  openSealFile,
   prepareGuard,
   readSealFile,
+  rewriteSealFile,
   writeSealFile,
   type GuardDraft,
 } from '../src/index';
@@ -113,6 +115,22 @@ describe('seal file', () => {
     expect(text).not.toContain(HL.toLowerCase());
     expect(await readSealFile(file, 'correct horse')).toEqual(p.contents);
     await expect(readSealFile(file, 'wrong horse')).rejects.toThrow();
+  });
+
+  it('is rewritten after a change under the same passphrase, without asking for it again', async () => {
+    const file = await writeSealFile(p.contents, p.commitment, 'correct horse', random, LOW_N);
+    const { contents, key } = await openSealFile(file, 'correct horse');
+    const changed = {
+      ...contents,
+      earlier: [
+        { until_epoch: 3, line_range_pct: [1, 2] as [number, number], target_range_pct: [3, 4] as [number, number] },
+      ],
+    };
+    const again = rewriteSealFile(changed, 'f'.repeat(64), key, file.kdf, random);
+    expect(again.nonce).not.toBe(file.nonce);
+    expect(again.commitment).toBe('f'.repeat(64));
+    expect(await readSealFile(again, 'correct horse')).toEqual(changed);
+    await expect(readSealFile(again, 'wrong horse')).rejects.toThrow();
   });
 
   it('refuses an altered file, and one moved to another guard', async () => {
