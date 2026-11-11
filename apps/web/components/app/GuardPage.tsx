@@ -48,6 +48,7 @@ import { pct, price, usd } from '../format';
 import { GuardCard, type CardState } from '../GuardCard';
 import { rangeOf, RescueChart } from '../RescueChart';
 import { Ticker } from '../Ticker';
+import { Now, QuietLink } from '../Now';
 import { Card3D } from '../site/Card3D';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
@@ -485,53 +486,6 @@ function GuardTabs({
   );
 }
 
-/** Where the guard stands, in one sentence, and the one thing to do next (if any). */
-function Now({
-  title,
-  children,
-  action,
-  facts,
-}: {
-  title: string;
-  children?: React.ReactNode;
-  action?: React.ReactNode;
-  facts?: [string, React.ReactNode][];
-}) {
-  return (
-    <section
-      aria-label="Now"
-      className="flex min-w-0 flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
-    >
-      <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">{title}</h2>
-      {children && <div className="max-w-[36rem] text-[15px] text-text-2">{children}</div>}
-      {action && <div className="flex flex-wrap items-center gap-3">{action}</div>}
-      {facts && facts.length > 0 && (
-        <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-3">
-          {facts.map(([label, value]) => (
-            <div key={label} className="flex min-w-0 flex-col gap-0.5">
-              <dt className="text-[13px] text-muted">{label}</dt>
-              <dd className="text-[15px] font-medium tabular-nums">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </section>
-  );
-}
-
-/** The quiet link that sends someone to a tab. */
-function ToTab({ children, onClick }: { children: React.ReactNode; onClick(): void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex min-h-11 items-center text-[15px] underline decoration-line-3 underline-offset-4 hover:text-text"
-    >
-      {children}
-    </button>
-  );
-}
-
 interface Phase {
   state: CardState;
   status: string;
@@ -711,24 +665,24 @@ function ExampleGuard({
   const action = control.closed ? null : !crashing && leftUsd < MIN_RESCUE_USD ? (
     <>
       <p className="text-[15px] text-text-2">The reserve is spent.</p>
-      <ToTab onClick={() => setTab('manage')}>Top it up in Manage</ToTab>
+      <QuietLink onClick={() => setTab('manage')}>Top it up in Manage</QuietLink>
     </>
   ) : control.frozen && !crashing ? (
-    <ToTab onClick={() => setTab('manage')}>Unfreeze it in Manage</ToTab>
+    <QuietLink onClick={() => setTab('manage')}>Unfreeze it in Manage</QuietLink>
   ) : !crashing ? (
     <>
       <button type="button" className={`${primaryBtn} w-full sm:w-fit`} onClick={run1}>
         Try a crash
       </button>
       {shownSettings && (
-        <ToTab
+        <QuietLink
           onClick={() => {
             setMine(true);
             setTab('price');
           }}
         >
           Show my band on the chart
-        </ToTab>
+        </QuietLink>
       )}
     </>
   ) : run.over ? (
@@ -1062,9 +1016,9 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
         title={paused ? 'Guard paused.' : control.frozen ? 'Reserve frozen.' : 'You’re guarded.'}
         action={
           control.frozen ? (
-            <ToTab onClick={() => setTab('manage')}>Unfreeze it in Manage</ToTab>
+            <QuietLink onClick={() => setTab('manage')}>Unfreeze it in Manage</QuietLink>
           ) : !opened ? (
-            <ToTab onClick={() => setTab('manage')}>Open your seal file to make changes</ToTab>
+            <QuietLink onClick={() => setTab('manage')}>Open your seal file to make changes</QuietLink>
           ) : null
         }
         facts={[

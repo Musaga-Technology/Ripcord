@@ -9,7 +9,7 @@ import { Dashboard } from '../Dashboard';
 import { GuardCard } from '../GuardCard';
 
 // "This is the app.": the real app's own components on the example account, framed the way they appear on a desktop
-// and a phone. Not a screenshot: the same Dashboard and card the app renders, made inert here, with one focus move as
+// and a phone. Not a screenshot: the same Guards home and card the app renders, made inert here, with one focus move as
 // they arrive (blur and drift settle in 600 ms). Content is visible as rendered; only a frame that starts below the
 // fold waits to arrive.
 
@@ -55,7 +55,7 @@ export function AppPreview() {
         </div>
         {/* Laid out at the app's own width and drawn smaller, so the table reads as it does in the app. */}
         <div inert className="pointer-events-none p-5 lg:[zoom:0.86] [&_*]:!transition-none">
-          <Dashboard holdings={account.holdings} guards={guards} />
+          <Dashboard holdings={account.holdings} guards={guards} value={account.value} rescues="2 · 1 saved" />
         </div>
       </div>
       <div

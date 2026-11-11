@@ -80,7 +80,7 @@ Done. Try it:
   corepack pnpm dev          → open http://localhost:3000
   · the home page: a live rescue under the card, then "Try to hunt it": sell into the book and see if you can liquidate it
   · open http://localhost:3000/guards, press "Try a simulation" → example positions and their guards
-  · click "Hunter's view"    → the same position as anyone sees it: liquidation price public, guard "Can't tell"
+  · switch to "Hunter's view" → your positions as anyone sees them: liquidation prices public, guard "Can't tell"
   · press "Guard" on SOL, then "Seal guard" → sealed in your browser: the card prints itself; save the seal file, approve, fund
   · on a guard, "Try a crash" → the real rules on simulated prices: the rescue lands and the red line slides away
   · hold "Hold to peek"      → your sealed rescue range, top-up and reserve appear while held
