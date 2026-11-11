@@ -1,7 +1,8 @@
 'use client';
 
-// Guard (docs/DESIGN.md §4.3): what a hunter sees beside the card and its sealed settings, the health line, and the
-// rescue history. An example guard can be run through a simulated crash; a real one reads Hyperliquid and the registry.
+// Guard (docs/DESIGN.md §4.3): where the guard stands and the one next step, beside its card; then one tab at a time:
+// Price (what a hunter sees), Manage (sealed settings and the owner's actions), History, On NEAR. An example guard can
+// be run through a simulated crash; a real one reads Hyperliquid and the registry.
 import { DEMO_GUARDS } from '@ripcord/shared/mock';
 import {
   fingerprint as fingerprintOf,
@@ -424,13 +425,133 @@ function Header({
   );
 }
 
+// ---------- the page's frame: where you stand and the one next step, then everything else one tab at a time ----------
+
+type TabId = 'price' | 'manage' | 'history' | 'near';
+const TABS: [TabId, string][] = [
+  ['price', 'Price'],
+  ['manage', 'Manage'],
+  ['history', 'History'],
+  ['near', 'On NEAR'],
+];
+
+function tabKeys(e: React.KeyboardEvent<HTMLElement>) {
+  const dir = ({ ArrowRight: 1, ArrowLeft: -1 } as Record<string, number>)[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  const items = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
+  const next = items[(items.indexOf(e.currentTarget) + dir + items.length) % items.length];
+  next?.focus();
+  next?.click();
+}
+
+function GuardTabs({
+  tab,
+  onTab,
+  panels,
+}: {
+  tab: TabId;
+  onTab(t: TabId): void;
+  panels: Record<TabId, React.ReactNode>;
+}) {
+  return (
+    <section className="flex min-w-0 flex-col gap-4">
+      <div
+        role="tablist"
+        aria-label="This guard"
+        className="flex w-full gap-1 overflow-x-auto rounded-full border border-line p-1 sm:w-fit"
+      >
+        {TABS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls={`panel-${id}`}
+            tabIndex={tab === id ? 0 : -1}
+            onKeyDown={tabKeys}
+            onClick={() => onTab(id)}
+            className={`min-h-10 flex-1 whitespace-nowrap rounded-full px-4 text-[15px] transition-colors duration-[120ms] sm:flex-none ${tab === id ? 'bg-text font-medium text-ground' : 'text-text-2 hover:text-text'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="step-in min-w-0">
+        {panels[tab]}
+      </div>
+    </section>
+  );
+}
+
+/** Where the guard stands, in one sentence, and the one thing to do next (if any). */
+function Now({
+  title,
+  children,
+  action,
+  facts,
+}: {
+  title: string;
+  children?: React.ReactNode;
+  action?: React.ReactNode;
+  facts?: [string, React.ReactNode][];
+}) {
+  return (
+    <section
+      aria-label="Now"
+      className="flex min-w-0 flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
+    >
+      <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">{title}</h2>
+      {children && <div className="max-w-[36rem] text-[15px] text-text-2">{children}</div>}
+      {action && <div className="flex flex-wrap items-center gap-3">{action}</div>}
+      {facts && facts.length > 0 && (
+        <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-3">
+          {facts.map(([label, value]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-0.5">
+              <dt className="text-[13px] text-muted">{label}</dt>
+              <dd className="text-[15px] font-medium tabular-nums">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+/** The quiet link that sends someone to a tab. */
+function ToTab({ children, onClick }: { children: React.ReactNode; onClick(): void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-11 items-center text-[15px] underline decoration-line-3 underline-offset-4 hover:text-text"
+    >
+      {children}
+    </button>
+  );
+}
+
 interface Phase {
   state: CardState;
   status: string;
   health: string;
+  /** The same moment in one plain sentence, for the Now panel. */
+  say: string;
   sub: string;
   dot?: 'bg-green' | 'bg-red';
 }
+
+const NOW_TITLE: Record<string, string> = {
+  Guarded: 'You’re guarded.',
+  'Rescuing…': 'A rescue is on its way.',
+  Rescued: 'Rescued.',
+  Saved: 'Saved.',
+  Settling: 'Rescued. Now settling.',
+  Liquidated: 'Liquidated.',
+  Frozen: 'Reserve frozen.',
+  Closed: 'Closed.',
+};
 
 /** One state for the card's chip, its line, and the health line above the chart (DESIGN §5's words). */
 function phaseOf(run: CrashRun, coin: string): Phase {
@@ -445,6 +566,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       status: 'Liquidated',
       health:
         'Liquidated. The price fell past the margin this rescue added. Verify says whether our promise covers it.',
+      say: 'The price fell past the margin this rescue added. Verify says whether our promise covers it.',
       sub: 'liquidated',
       dot: 'bg-red',
     };
@@ -455,6 +577,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       state: 'rescuing',
       status: 'Rescuing…',
       health: `Rescuing… ${mmss(run.t - f.firedAt)} · ${amount} on its way to your margin`,
+      say: `${amount} of your hidden reserve is crossing into your margin through NEAR Intents. Watch the red line move away when it lands.`,
       sub: `rescue on its way · ${mmss(run.t - f.firedAt)}`,
     };
   }
@@ -468,6 +591,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       state: 'rescued',
       status: 'Rescued',
       health: `Rescued · landed in ${landedIn} s · Liq ${price(last.liqBefore)} → ${price(after(G.rescues.length - 1))}`,
+      say: `It landed in ${landedIn} s, and your liquidation price moved from ${price(last.liqBefore)} to ${price(after(G.rescues.length - 1))}.`,
       sub: `landed in ${landedIn} s`,
       dot: 'bg-green',
     };
@@ -479,6 +603,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       state: 'rescued',
       status: 'Saved',
       health: `Saved. ${coin} ${moved} past your old liquidation price (${price(r.liqBefore)}). Your reserve had moved it to ${price(after(saveIx))}, ${lead} s earlier.`,
+      say: `${coin} ${moved} past your old liquidation price (${price(r.liqBefore)}). Your reserve had moved it to ${price(after(saveIx))}, ${lead} s earlier.`,
       sub: 'from liquidation',
       dot: 'bg-green',
     };
@@ -489,6 +614,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
       state: 'guarded',
       status: 'Settling',
       health: `Settling · it counts as a save if ${coin} ${moved === 'fell' ? 'falls' : 'rises'} past ${price(landed[0]!.liqBefore)} in the next 24 h`,
+      say: `It counts as a save if ${coin} ${moved === 'fell' ? 'falls' : 'rises'} past ${price(landed[0]!.liqBefore)} in the next 24 hours. If not, it’s a close call: the USDC stays as your margin and costs only the network fee.`,
       sub: 'from liquidation',
     };
   }
@@ -496,6 +622,7 @@ function phaseOf(run: CrashRun, coin: string): Phase {
     state: 'guarded',
     status: 'Guarded',
     health: `Guarded · checked ${run.t % 3 || 3} s ago`,
+    say: `If ${coin} ${moved === 'fell' ? 'falls' : 'rises'} toward ${price(G.liq)}, your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.`,
     sub: 'from liquidation',
   };
 }
@@ -542,6 +669,7 @@ function ExampleGuard({
         : baseReserve;
   const [openedAt] = useState(() => Date.now());
   const [mine, setMine] = useState(false);
+  const [tab, setTab] = useState<TabId>('price');
   const G = run.guard;
   const crashing = run.crashing;
   const shownSettings = g.example ? ruled : (opened?.settings ?? null);
@@ -550,6 +678,7 @@ function ExampleGuard({
         state: 'draft',
         status: 'Closed',
         health: `Closed. ${reserveText || 'The reserve'} is on its way back to your Hyperliquid account.`,
+        say: `${reserveText || 'The reserve'} is on its way back to your Hyperliquid account.`,
         sub: 'closed',
       } satisfies Phase)
     : control.frozen && !crashing
@@ -558,6 +687,7 @@ function ExampleGuard({
           status: 'Frozen',
           health:
             'Reserve frozen. Nothing can leave it, rescues included, until you unfreeze it. Its balance shows again when you do.',
+          say: 'Nothing can leave the reserve, rescues included, until you unfreeze it.',
           sub: 'reserve frozen',
           dot: 'bg-red',
         } satisfies Phase)
@@ -573,68 +703,60 @@ function ExampleGuard({
   const d = distanceOf(G.liq, run.price);
   const simClock = (t: number) => hhmm(openedAt + (t - run.windowS) * 1000);
 
+  const landedCount = G.rescues.filter((r) => r.landedAt !== null).length;
+  const run1 = () => {
+    setTab('price');
+    start();
+  };
+  const action = control.closed ? null : !crashing && leftUsd < MIN_RESCUE_USD ? (
+    <>
+      <p className="text-[15px] text-text-2">The reserve is spent.</p>
+      <ToTab onClick={() => setTab('manage')}>Top it up in Manage</ToTab>
+    </>
+  ) : control.frozen && !crashing ? (
+    <ToTab onClick={() => setTab('manage')}>Unfreeze it in Manage</ToTab>
+  ) : !crashing ? (
+    <>
+      <button type="button" className={`${primaryBtn} w-full sm:w-fit`} onClick={run1}>
+        Try a crash
+      </button>
+      {shownSettings && (
+        <ToTab
+          onClick={() => {
+            setMine(true);
+            setTab('price');
+          }}
+        >
+          Show my band on the chart
+        </ToTab>
+      )}
+    </>
+  ) : run.over ? (
+    <button type="button" className={`${ghostBtn} w-full sm:w-fit`} onClick={again}>
+      Run it again
+    </button>
+  ) : (
+    <p className="text-[13px] text-muted">Prices are simulated. The decisions are the guard&apos;s real rules.</p>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <Header g={g} health={p.health} paused={null} dot={p.dot} />
-      <GuardActions
-        example
-        control={control}
-        onChange={setControl}
-        reserve={reserveText || 'your reserve'}
-        asset={asset}
-        distance={d0}
-        current={control.preset ?? shownSettings?.preset ?? null}
-        priceAt={(pct) => (h.liquidation ?? h.mark) / (1 + (run.pos.side > 0 ? -1 : 1) * (pct / 100))}
-        busy={G.inFlight ? 'A rescue is on its way. Changes to the reserve wait until it lands.' : null}
-      />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
-          <Hunter
-            h={h}
-            mark={run.price}
-            liq={G.liq}
-            note={`simulated${crashing && !run.over ? ` · ${G.inFlight ? FLIGHT_SPEED : CALM_SPEED}× speed` : ''}`}
-            mine={mine && !!shownSettings}
-            onMine={shownSettings ? () => setMine((v) => !v) : undefined}
+        <div className="order-2 min-w-0 lg:order-1">
+          <Now
+            title={NOW_TITLE[p.status] ?? p.status}
+            action={action}
+            facts={[
+              ['Liquidation price, public', <span className="text-red">{price(G.liq)}</span>],
+              ['Rescues', String(landedCount)],
+              ['Reserve', <span className="font-mono tracking-[0.2em]">{DOTS}</span>],
+            ]}
           >
-            <RescueChart
-              pts={run.pts}
-              t0={run.t - run.windowS}
-              t1={run.t}
-              lo={range[0]}
-              hi={range[1]}
-              liq={G.liq}
-              oldLiq={run.landedAt !== null ? run.openLiq : null}
-              landed={G.rescues
-                .filter((r) => r.landedAt !== null)
-                .map((r): [number, number] => [r.landedAt!, run.pts.find(([t]) => t >= r.landedAt!)?.[1] ?? run.price])}
-              timeLabel={simClock}
-              band={mine && shownSettings ? bandOf(run.pos.side, G.liq, shownSettings.line_range_pct) : null}
-              label="The position's price and its public liquidation price."
-            />
-          </Hunter>
-          {control.closed ? null : !crashing && leftUsd < MIN_RESCUE_USD ? (
-            <p className="text-[15px] text-text-2">The reserve is spent. Top it up to guard this position again.</p>
-          ) : control.frozen && !crashing ? (
-            <p className="text-[15px] text-text-2">
-              Frozen, so a crash would liquidate this position: nothing can leave the reserve, rescues included.
-            </p>
-          ) : !crashing ? (
-            <button type="button" className={`${primaryBtn} w-full sm:w-fit`} onClick={start}>
-              Try a crash
-            </button>
-          ) : run.over ? (
-            <button type="button" className={`${ghostBtn} w-full sm:w-fit`} onClick={again}>
-              Run it again
-            </button>
-          ) : (
-            <p className="text-[13px] text-muted">
-              Prices are simulated. The decisions are the guard&apos;s real rules.
-            </p>
-          )}
-          <OnNear guardId={g.id} example={!!g.example} />
+            {p.say}
+          </Now>
         </div>
-        <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
+        <div className="order-1 lg:order-2">
           <Card3D>
             <GuardCard
               label={g.cardLabel ?? g.label}
@@ -648,15 +770,68 @@ function ExampleGuard({
               depth
             />
           </Card3D>
-          <Sealed g={g} settings={shownSettings} reserveText={reserveText || DOTS} onOpen={setOpened} />
-          {g.local && (
-            <button type="button" className={ghostBtn} onClick={() => downloadSealFile(g.local!)}>
-              Save seal file
-            </button>
-          )}
-        </aside>
+        </div>
       </div>
-      <History rows={rows} />
+      <GuardTabs
+        tab={tab}
+        onTab={setTab}
+        panels={{
+          price: (
+            <Hunter
+              h={h}
+              mark={run.price}
+              liq={G.liq}
+              note={`simulated${crashing && !run.over ? ` · ${G.inFlight ? FLIGHT_SPEED : CALM_SPEED}× speed` : ''}`}
+              mine={mine && !!shownSettings}
+              onMine={shownSettings ? () => setMine((v) => !v) : undefined}
+            >
+              <RescueChart
+                pts={run.pts}
+                t0={run.t - run.windowS}
+                t1={run.t}
+                lo={range[0]}
+                hi={range[1]}
+                liq={G.liq}
+                oldLiq={run.landedAt !== null ? run.openLiq : null}
+                landed={G.rescues
+                  .filter((r) => r.landedAt !== null)
+                  .map((r): [number, number] => [
+                    r.landedAt!,
+                    run.pts.find(([t]) => t >= r.landedAt!)?.[1] ?? run.price,
+                  ])}
+                timeLabel={simClock}
+                band={mine && shownSettings ? bandOf(run.pos.side, G.liq, shownSettings.line_range_pct) : null}
+                label="The position's price and its public liquidation price."
+              />
+            </Hunter>
+          ),
+          manage: (
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+              <GuardActions
+                example
+                control={control}
+                onChange={setControl}
+                reserve={reserveText || 'your reserve'}
+                asset={asset}
+                distance={d0}
+                current={control.preset ?? shownSettings?.preset ?? null}
+                priceAt={(pct) => (h.liquidation ?? h.mark) / (1 + (run.pos.side > 0 ? -1 : 1) * (pct / 100))}
+                busy={G.inFlight ? 'A rescue is on its way. Changes to the reserve wait until it lands.' : null}
+              />
+              <div className="flex flex-col gap-4">
+                <Sealed g={g} settings={shownSettings} reserveText={reserveText || DOTS} onOpen={setOpened} />
+                {g.local && (
+                  <button type="button" className={ghostBtn} onClick={() => downloadSealFile(g.local!)}>
+                    Save seal file
+                  </button>
+                )}
+              </div>
+            </div>
+          ),
+          history: <History rows={rows} />,
+          near: <OnNear guardId={g.id} example={!!g.example} />,
+        }}
+      />
     </div>
   );
 }
@@ -700,6 +875,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const [seal, setSeal] = useState({ file: local.file, commitment: local.commitment, fingerprint: local.fingerprint });
   const [added, setAdded] = useState(local.added_usd ?? 0);
   const [topping, setTopping] = useState<{ input: TopupInput; usd: number } | null>(null);
+  const [tab, setTab] = useState<TabId>('price');
 
   useEffect(() => {
     const read = () => {
@@ -795,81 +971,151 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
     };
   });
 
-  return (
-    <div className="flex flex-col gap-6">
-      <Header g={{ ...g, state }} health={health} paused={paused} />
-      {state === 'guarded' && h && (
-        <GuardActions
-          example={false}
-          owner={owner}
-          control={control}
-          onChange={setControl}
-          reserve={opened ? reserveWords(opened.settings, added) : 'your reserve'}
-          asset={opened ? assetOf(opened.settings.reserve_asset).symbol : ''}
-          distance={h.distance ?? 10}
-          current={opened?.settings.preset ?? null}
-        />
+  const moving = h && h.szi < 0 ? 'rises' : 'falls';
+  const sealedPanel = (
+    <div className="flex flex-col gap-4">
+      <Sealed
+        g={g}
+        settings={opened?.settings ?? null}
+        reserveText={opened ? reserveWords(opened.settings, added) : DOTS}
+        onOpen={setOpened}
+        askElsewhere={state !== 'guarded'}
+      />
+      <button type="button" className={ghostBtn} onClick={() => downloadSealFile(seal)}>
+        Save seal file
+      </button>
+      {opened?.owner_account && (
+        <p className="text-[13px] text-muted">
+          Signs with your NEAR wallet, <span className="font-mono text-text-2">{opened.owner_account}</span>.{' '}
+          <Link href="/freeze" className="underline decoration-line-3 underline-offset-4 hover:text-text">
+            Freeze it from any device
+          </Link>
+        </p>
       )}
-      {state === 'guarded' && topping && opened && (
-        <section
-          aria-label="Top up"
-          className="flex flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
-        >
+    </div>
+  );
+
+  // The one thing that matters now: finishing set-up, a top-up under way, or where the guard stands.
+  const nowPanel =
+    state !== 'guarded' ? (
+      <section aria-label="Finish setting up" className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
+        {!opened ? (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">
+              Open your seal file to finish.
+            </h2>
+            <p className="text-[15px] text-text-2">
+              This guard isn&apos;t guarding yet. Your passphrase opens its seal file here, and the next step follows.
+            </p>
+            <Unlock g={local} onOpen={setOpened} />
+          </div>
+        ) : state === 'approval' && session ? (
+          <Approve
+            contents={opened}
+            backend={backend}
+            isDemo={false}
+            owner={session.address}
+            onDone={() => {
+              patchGuard(g.id, { approved: true });
+              setState(local.funded ? 'guarded' : 'waiting');
+            }}
+          />
+        ) : (
           <Fund
             contents={opened}
             backend={backend}
-            isDemo={session?.kind === 'demo'}
+            isDemo={false}
             wallet={session?.kind === 'wallet' ? session.address : null}
-            fallback={String(topping.usd)}
-            topup={topping.input}
+            fallback={reserveWords(opened.settings)}
             onFunded={() => {
-              const total = added + topping.usd;
-              patchGuard(g.id, { added_usd: total });
-              setAdded(total);
-              setTopping(null);
+              patchGuard(g.id, { funded: true });
+              setState('guarded');
             }}
           />
-          <button type="button" className={`${ghostBtn} w-fit`} onClick={() => setTopping(null)}>
-            Not now
-          </button>
-        </section>
-      )}
-      {state !== 'guarded' && (
-        <section aria-label="Finish setting up" className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
-          {!opened ? (
-            <div className="flex flex-col gap-3">
-              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">Open your seal file to finish.</h2>
-              <Unlock g={local} onOpen={setOpened} />
-            </div>
-          ) : state === 'approval' && session ? (
-            <Approve
-              contents={opened}
-              backend={backend}
-              isDemo={false}
-              owner={session.address}
-              onDone={() => {
-                patchGuard(g.id, { approved: true });
-                setState(local.funded ? 'guarded' : 'waiting');
-              }}
-            />
-          ) : (
-            <Fund
-              contents={opened}
-              backend={backend}
-              isDemo={false}
-              wallet={session?.kind === 'wallet' ? session.address : null}
-              fallback={reserveWords(opened.settings)}
-              onFunded={() => {
-                patchGuard(g.id, { funded: true });
-                setState('guarded');
-              }}
-            />
-          )}
-        </section>
-      )}
+        )}
+      </section>
+    ) : topping && opened ? (
+      <section
+        aria-label="Top up"
+        className="flex flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
+      >
+        <Fund
+          contents={opened}
+          backend={backend}
+          isDemo={session?.kind === 'demo'}
+          wallet={session?.kind === 'wallet' ? session.address : null}
+          fallback={String(topping.usd)}
+          topup={topping.input}
+          onFunded={() => {
+            const total = added + topping.usd;
+            patchGuard(g.id, { added_usd: total });
+            setAdded(total);
+            setTopping(null);
+          }}
+        />
+        <button type="button" className={`${ghostBtn} w-fit`} onClick={() => setTopping(null)}>
+          Not now
+        </button>
+      </section>
+    ) : (
+      <Now
+        title={paused ? 'Guard paused.' : control.frozen ? 'Reserve frozen.' : 'You’re guarded.'}
+        action={
+          control.frozen ? (
+            <ToTab onClick={() => setTab('manage')}>Unfreeze it in Manage</ToTab>
+          ) : !opened ? (
+            <ToTab onClick={() => setTab('manage')}>Open your seal file to make changes</ToTab>
+          ) : null
+        }
+        facts={[
+          ['Liquidation price, public', <span className="text-red">{liq === null ? '—' : price(liq)}</span>],
+          [
+            'Last check',
+            checkedAt !== null
+              ? `${Math.max(1, Math.round((now - checkedAt) / 1000))} s ago`
+              : onChain === 'Pending'
+                ? 'Coming'
+                : '—',
+          ],
+          ['Rescues', String(receipts.length)],
+        ]}
+      >
+        {paused
+          ? paused
+          : control.frozen
+            ? 'Nothing can leave the reserve, rescues included, until you unfreeze it.'
+            : liq !== null
+              ? `If ${g.coin} ${moving} toward ${price(liq)}, your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.`
+              : 'Your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.'}
+      </Now>
+    );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Header g={{ ...g, state }} health={health} paused={paused} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-1">
-          {h ? (
+        <div className="order-2 min-w-0 lg:order-1">{nowPanel}</div>
+        <div className="order-1 lg:order-2">
+          <Card3D>
+            <GuardCard
+              label={g.cardLabel ?? g.label}
+              distance={d === null ? '—' : pct(d)}
+              sub="from liquidation"
+              fingerprint={seal.fingerprint}
+              commitment={seal.commitment}
+              state={shownState}
+              status={status}
+              reserve={DOTS}
+              depth
+            />
+          </Card3D>
+        </div>
+      </div>
+      <GuardTabs
+        tab={tab}
+        onTab={setTab}
+        panels={{
+          price: h ? (
             <Hunter h={h} mark={mark} liq={liq} note="live from Hyperliquid">
               <RescueChart
                 pts={pts}
@@ -885,44 +1131,29 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
             <p className="rounded-[20px] border border-line bg-panel px-5 py-6 text-text-2">
               This position isn&apos;t open on the connected account.
             </p>
-          )}
-          <OnNear guardId={g.id} example={false} />
-        </div>
-        <aside aria-label="Your guard" className="order-1 flex flex-col gap-4 lg:order-2">
-          <Card3D>
-            <GuardCard
-              label={g.cardLabel ?? g.label}
-              distance={d === null ? '—' : pct(d)}
-              sub="from liquidation"
-              fingerprint={seal.fingerprint}
-              commitment={seal.commitment}
-              state={shownState}
-              status={status}
-              reserve={DOTS}
-              depth
-            />
-          </Card3D>
-          <Sealed
-            g={g}
-            settings={opened?.settings ?? null}
-            reserveText={opened ? reserveWords(opened.settings, added) : DOTS}
-            onOpen={setOpened}
-            askElsewhere={state !== 'guarded'}
-          />
-          <button type="button" className={ghostBtn} onClick={() => downloadSealFile(seal)}>
-            Save seal file
-          </button>
-          {opened?.owner_account && (
-            <p className="text-[13px] text-muted">
-              Signs with your NEAR wallet, <span className="font-mono text-text-2">{opened.owner_account}</span>.{' '}
-              <Link href="/freeze" className="underline decoration-line-3 underline-offset-4 hover:text-text">
-                Freeze it from any device
-              </Link>
-            </p>
-          )}
-        </aside>
-      </div>
-      <History rows={rows} />
+          ),
+          manage:
+            state === 'guarded' && h ? (
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+                <GuardActions
+                  example={false}
+                  owner={owner}
+                  control={control}
+                  onChange={setControl}
+                  reserve={opened ? reserveWords(opened.settings, added) : 'your reserve'}
+                  asset={opened ? assetOf(opened.settings.reserve_asset).symbol : ''}
+                  distance={h.distance ?? 10}
+                  current={opened?.settings.preset ?? null}
+                />
+                {sealedPanel}
+              </div>
+            ) : (
+              sealedPanel
+            ),
+          history: <History rows={rows} />,
+          near: <OnNear guardId={g.id} example={false} />,
+        }}
+      />
     </div>
   );
 }

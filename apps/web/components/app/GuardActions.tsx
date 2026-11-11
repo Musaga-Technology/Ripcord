@@ -122,29 +122,186 @@ export function GuardActions({
       </p>
     ) : null;
 
-  const buttons: { id: Panel; label: string }[] = [
-    { id: 'topup', label: 'Top up reserve' },
-    { id: 'range', label: 'Change range' },
-    { id: 'freeze', label: control.frozen ? 'Unfreeze reserve' : 'Freeze reserve' },
-    { id: 'close', label: 'Close guard' },
+  const buttons: { id: Panel; label: string; verb: string; note: string }[] = [
+    { id: 'topup', label: 'Top up the reserve', verb: 'Top up', note: 'A bigger rescue, or a second one.' },
+    { id: 'range', label: 'Change when it steps in', verb: 'Change', note: 'Earlier or later than now.' },
+    control.frozen
+      ? { id: 'freeze', label: 'Unfreeze the reserve', verb: 'Unfreeze', note: 'Let rescues through again.' }
+      : { id: 'freeze', label: 'Freeze the reserve', verb: 'Freeze', note: 'Stop anything leaving it, at once.' },
+    { id: 'close', label: 'Close the guard', verb: 'Close', note: 'Get what is left back in your margin account.' },
   ];
+
+  const panelBody = panel && (
+    <>
+      {!example && !owner ? (
+        <p className="text-[15px] text-text-2">
+          Enter your passphrase under Sealed settings first: {VERB[panel]} is signed with the owner key your seal file
+          holds.
+        </p>
+      ) : panel === 'topup' ? (
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const n = Number(amount);
+            if (example) {
+              if (n > 0)
+                finish(
+                  { ...control, added: [...control.added, n] },
+                  `Added ${amount} ${asset}. Its size stays private.`,
+                );
+            } else if (owner && n >= MIN_RESCUE_USD) void act(() => owner.topup(n), control, '');
+          }}
+        >
+          <p className="text-[15px] text-text-2">
+            More reserve means a bigger rescue, or a second one. It goes to a new private deposit address, like the
+            first{example ? '' : ', and only the enclave learns the amount'}.
+          </p>
+          <label className="flex max-w-[240px] flex-col gap-1.5 text-[13px] text-muted">
+            {example ? `Amount in ${asset}` : 'Amount in US dollars'}
+            <input
+              inputMode="decimal"
+              className={fieldCls}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+            />
+          </label>
+          <button
+            type="submit"
+            className={`${primaryBtn} w-fit`}
+            disabled={working || !(Number(amount) >= (example ? Number.MIN_VALUE : MIN_RESCUE_USD))}
+          >
+            {working ? 'Signing…' : 'Top up reserve'}
+          </button>
+          {!example && <p className="text-[13px] text-muted">$2 or more, the smallest rescue the route carries.</p>}
+          {failed && (
+            <p role="alert" className="text-[15px] text-red">
+              {failed}
+            </p>
+          )}
+        </form>
+      ) : panel === 'range' ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-[15px] text-text-2">
+            The new range is sealed like the first. Every line drawn after it falls inside the new range.
+          </p>
+          <div role="radiogroup" aria-label="When to step in" className="flex flex-wrap gap-2">
+            {PRESETS.map((p) => {
+              const r = presetRanges(p.id, distance);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={preset === p.id}
+                  tabIndex={preset === p.id ? 0 : -1}
+                  onKeyDown={radioKeys}
+                  disabled={!r}
+                  onClick={() => setPreset(p.id)}
+                  className={`flex min-h-11 flex-col rounded-[16px] border px-4 py-2 text-left text-[14px] transition-colors duration-[120ms] ${preset === p.id ? 'border-text' : 'border-line hover:border-line-3'}`}
+                >
+                  <span className="flex items-center gap-2 font-semibold">
+                    {p.name}
+                    {p.id === current && <span className="text-[12px] font-medium text-muted">Current</span>}
+                  </span>
+                  <span className="tabular-nums text-text-2">
+                    {r
+                      ? priceAt
+                        ? `Near ${price(priceAt((r.line_range_pct[0] + r.line_range_pct[1]) / 2))} · ${pctRange(r.line_range_pct)} away`
+                        : `${pctRange(r.line_range_pct)} away`
+                      : 'Too close'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className={`${primaryBtn} w-fit`}
+            disabled={working || preset === current}
+            onClick={() => {
+              const name = PRESETS.find((p) => p.id === preset)!.name;
+              if (example || !owner) finish({ ...control, preset }, `Resealed: ${name}.`);
+              else
+                void act(
+                  () => owner.reseal(preset),
+                  { ...control, preset },
+                  `Resealed: ${name}. Your seal file changed with it, so save the new one below.`,
+                );
+            }}
+          >
+            {working ? 'Sealing…' : 'Reseal range'}
+          </button>
+          {failed && (
+            <p role="alert" className="text-[15px] text-red">
+              {failed}
+            </p>
+          )}
+        </div>
+      ) : panel === 'freeze' ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-[15px] text-text-2">
+            {control.frozen
+              ? 'Unfreezing lets rescues reach your margin again.'
+              : 'Nothing can leave the reserve, rescues included, until you unfreeze it. It takes one signature with your owner key, and works even if Ripcord is down.'}
+          </p>
+          <button
+            type="button"
+            className={`${primaryBtn} w-fit`}
+            disabled={working}
+            onClick={() => {
+              const next = { ...control, frozen: !control.frozen };
+              const said = control.frozen
+                ? 'Unfrozen. Rescues can reach your margin again.'
+                : example
+                  ? ''
+                  : 'Frozen. Nothing can leave the reserve until you unfreeze it.';
+              if (example || !owner) finish(next, said);
+              else void act(() => owner.freeze(!control.frozen), next, said);
+            }}
+          >
+            {working ? 'Signing…' : control.frozen ? 'Unfreeze reserve' : 'Freeze reserve'}
+          </button>
+          {failed && (
+            <p role="alert" className="text-[15px] text-red">
+              {failed}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-[15px] text-text-2">
+            The guard stops, and what is left of the reserve goes back to your own Hyperliquid account.
+          </p>
+          <button
+            type="button"
+            className={`${primaryBtn} w-fit`}
+            disabled={working}
+            onClick={() => {
+              const next = { ...control, closed: true };
+              if (example || !owner) finish(next, '');
+              else
+                void act(
+                  () => owner.close(),
+                  next,
+                  'Closed. What was left of the reserve is on its way to your Hyperliquid account.',
+                );
+            }}
+          >
+            {working ? 'Closing…' : `Close and return ${reserve}`}
+          </button>
+          {failed && (
+            <p role="alert" className="text-[15px] text-red">
+              {failed}
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-3">
-      <div role="group" aria-label="Guard actions" className="flex flex-wrap gap-2">
-        {buttons.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            aria-expanded={panel === b.id}
-            onClick={() => open(b.id)}
-            disabled={(control.frozen || !!busy) && (b.id === 'topup' || b.id === 'range' || b.id === 'close')}
-            className={`${ghostBtn} min-h-11 px-4 text-[14px] ${panel === b.id ? 'border-text' : ''}`}
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
       {(busy || control.frozen) && (
         <p className="text-[13px] text-muted">
           {busy ?? 'Top up, change range and close wait until you unfreeze the reserve.'}
@@ -156,174 +313,31 @@ export function GuardActions({
           {done}
         </p>
       )}
-      {panel && (
-        <div className="step-in flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-5">
-          {!example && !owner ? (
-            <p className="text-[15px] text-text-2">
-              Enter your passphrase under Sealed settings first: {VERB[panel]} is signed with the owner key your seal
-              file holds.
-            </p>
-          ) : panel === 'topup' ? (
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const n = Number(amount);
-                if (example) {
-                  if (n > 0)
-                    finish(
-                      { ...control, added: [...control.added, n] },
-                      `Added ${amount} ${asset}. Its size stays private.`,
-                    );
-                } else if (owner && n >= MIN_RESCUE_USD) void act(() => owner.topup(n), control, '');
-              }}
-            >
-              <p className="text-[15px] text-text-2">
-                More reserve means a bigger rescue, or a second one. It goes to a new private deposit address, like the
-                first{example ? '' : ', and only the enclave learns the amount'}.
-              </p>
-              <label className="flex max-w-[240px] flex-col gap-1.5 text-[13px] text-muted">
-                {example ? `Amount in ${asset}` : 'Amount in US dollars'}
-                <input
-                  inputMode="decimal"
-                  className={fieldCls}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                />
-              </label>
-              <button
-                type="submit"
-                className={`${primaryBtn} w-fit`}
-                disabled={working || !(Number(amount) >= (example ? Number.MIN_VALUE : MIN_RESCUE_USD))}
-              >
-                {working ? 'Signing…' : 'Top up reserve'}
-              </button>
-              {!example && <p className="text-[13px] text-muted">$2 or more, the smallest rescue the route carries.</p>}
-              {failed && (
-                <p role="alert" className="text-[15px] text-red">
-                  {failed}
-                </p>
-              )}
-            </form>
-          ) : panel === 'range' ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[15px] text-text-2">
-                The new range is sealed like the first. Every line drawn after it falls inside the new range.
-              </p>
-              <div role="radiogroup" aria-label="When to step in" className="flex flex-wrap gap-2">
-                {PRESETS.map((p) => {
-                  const r = presetRanges(p.id, distance);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={preset === p.id}
-                      tabIndex={preset === p.id ? 0 : -1}
-                      onKeyDown={radioKeys}
-                      disabled={!r}
-                      onClick={() => setPreset(p.id)}
-                      className={`flex min-h-11 flex-col rounded-[16px] border px-4 py-2 text-left text-[14px] transition-colors duration-[120ms] ${preset === p.id ? 'border-text' : 'border-line hover:border-line-3'}`}
-                    >
-                      <span className="flex items-center gap-2 font-semibold">
-                        {p.name}
-                        {p.id === current && <span className="text-[12px] font-medium text-muted">Current</span>}
-                      </span>
-                      <span className="tabular-nums text-text-2">
-                        {r
-                          ? priceAt
-                            ? `Near ${price(priceAt((r.line_range_pct[0] + r.line_range_pct[1]) / 2))} · ${pctRange(r.line_range_pct)} away`
-                            : `${pctRange(r.line_range_pct)} away`
-                          : 'Too close'}
-                      </span>
-                    </button>
-                  );
-                })}
+      <ul aria-label="Guard actions" className="flex flex-col rounded-[20px] border border-line bg-panel">
+        {buttons.map((b) => {
+          const off = (control.frozen || !!busy) && (b.id === 'topup' || b.id === 'range' || b.id === 'close');
+          return (
+            <li key={b.id} className="flex flex-col border-t border-line first:border-t-0">
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold">{b.label}</span>
+                  <span className="text-[13px] text-muted">{b.note}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-expanded={panel === b.id}
+                  onClick={() => open(b.id)}
+                  disabled={off}
+                  className={`${ghostBtn} min-h-11 shrink-0 px-4 text-[14px] ${panel === b.id ? 'border-text' : ''}`}
+                >
+                  {panel === b.id ? 'Cancel' : b.verb}
+                </button>
               </div>
-              <button
-                type="button"
-                className={`${primaryBtn} w-fit`}
-                disabled={working || preset === current}
-                onClick={() => {
-                  const name = PRESETS.find((p) => p.id === preset)!.name;
-                  if (example || !owner) finish({ ...control, preset }, `Resealed: ${name}.`);
-                  else
-                    void act(
-                      () => owner.reseal(preset),
-                      { ...control, preset },
-                      `Resealed: ${name}. Your seal file changed with it, so save the new one below.`,
-                    );
-                }}
-              >
-                {working ? 'Sealing…' : 'Reseal range'}
-              </button>
-              {failed && (
-                <p role="alert" className="text-[15px] text-red">
-                  {failed}
-                </p>
-              )}
-            </div>
-          ) : panel === 'freeze' ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[15px] text-text-2">
-                {control.frozen
-                  ? 'Unfreezing lets rescues reach your margin again.'
-                  : 'Nothing can leave the reserve, rescues included, until you unfreeze it. It takes one signature with your owner key, and works even if Ripcord is down.'}
-              </p>
-              <button
-                type="button"
-                className={`${primaryBtn} w-fit`}
-                disabled={working}
-                onClick={() => {
-                  const next = { ...control, frozen: !control.frozen };
-                  const said = control.frozen
-                    ? 'Unfrozen. Rescues can reach your margin again.'
-                    : example
-                      ? ''
-                      : 'Frozen. Nothing can leave the reserve until you unfreeze it.';
-                  if (example || !owner) finish(next, said);
-                  else void act(() => owner.freeze(!control.frozen), next, said);
-                }}
-              >
-                {working ? 'Signing…' : control.frozen ? 'Unfreeze reserve' : 'Freeze reserve'}
-              </button>
-              {failed && (
-                <p role="alert" className="text-[15px] text-red">
-                  {failed}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-[15px] text-text-2">
-                The guard stops, and what is left of the reserve goes back to your own Hyperliquid account.
-              </p>
-              <button
-                type="button"
-                className={`${primaryBtn} w-fit`}
-                disabled={working}
-                onClick={() => {
-                  const next = { ...control, closed: true };
-                  if (example || !owner) finish(next, '');
-                  else
-                    void act(
-                      () => owner.close(),
-                      next,
-                      'Closed. What was left of the reserve is on its way to your Hyperliquid account.',
-                    );
-                }}
-              >
-                {working ? 'Closing…' : `Close and return ${reserve}`}
-              </button>
-              {failed && (
-                <p role="alert" className="text-[15px] text-red">
-                  {failed}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+              {panel === b.id && <div className="step-in flex flex-col gap-3 px-5 pb-5">{panelBody}</div>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
