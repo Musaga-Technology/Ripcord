@@ -8,3 +8,4 @@ export * from './seal';
 export * from './base58';
 export * from './sealfile';
 export * from './setup';
+export * from './hyperliquid';

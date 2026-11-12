@@ -1,27 +1,10 @@
 // Hyperliquid's public info API, read from the owner's browser, so Ripcord's servers never learn which account is
-// behind a session. Numbers arrive as strings, `liquidationPx` can be null.
+// behind a session. Parsing lives in @ripcord/shared, which the agent tools use too.
+import { parseAccount, type Account } from '@ripcord/shared';
+
+export { parseAccount, type Account, type Holding } from '@ripcord/shared';
+
 const API = 'https://api.hyperliquid.xyz';
-
-export interface Holding {
-  coin: string;
-  szi: number;
-  size: number;
-  side: 'Long' | 'Short';
-  mark: number;
-  entry: number;
-  liquidation: number | null;
-  distance: number | null;
-  leverage: number;
-  margin: 'cross' | 'isolated';
-  marginUsed: number;
-  maxLeverage: number;
-  notional: number;
-}
-
-export interface Account {
-  value: number;
-  holdings: Holding[];
-}
 
 async function info<T>(body: unknown): Promise<T> {
   const r = await fetch(`${API}/info`, {
@@ -31,48 +14,6 @@ async function info<T>(body: unknown): Promise<T> {
   });
   if (!r.ok) throw new Error('hyperliquid');
   return (await r.json()) as T;
-}
-
-interface RawPosition {
-  coin: string;
-  szi: string;
-  entryPx: string;
-  positionValue: string;
-  liquidationPx: string | null;
-  marginUsed: string;
-  maxLeverage: number;
-  leverage: { type: 'cross' | 'isolated'; value: number };
-}
-
-export function parseAccount(state: {
-  assetPositions: { position: RawPosition }[];
-  marginSummary: { accountValue: string };
-}): Account {
-  const holdings = state.assetPositions
-    .map(({ position: p }): Holding => {
-      const szi = Number(p.szi);
-      const size = Math.abs(szi);
-      const notional = Number(p.positionValue);
-      const mark = size > 0 ? notional / size : 0;
-      const liquidation = p.liquidationPx === null ? null : Number(p.liquidationPx);
-      return {
-        coin: p.coin,
-        szi,
-        size,
-        side: szi > 0 ? 'Long' : 'Short',
-        mark,
-        entry: Number(p.entryPx),
-        liquidation,
-        distance: liquidation === null || mark === 0 ? null : (Math.abs(liquidation - mark) / mark) * 100,
-        leverage: p.leverage.value,
-        margin: p.leverage.type,
-        marginUsed: Number(p.marginUsed),
-        maxLeverage: p.maxLeverage,
-        notional,
-      };
-    })
-    .filter((h) => h.size > 0);
-  return { value: Number(state.marginSummary.accountValue), holdings };
 }
 
 export async function readAccount(user: string): Promise<Account> {
