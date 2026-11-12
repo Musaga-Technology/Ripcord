@@ -248,8 +248,8 @@ fn a_top_up_raises_the_budget_and_the_daily_cap_without_saying_how_much() {
         .find(|(p, _)| p.ends_with("encrypt-policy"))
         .unwrap();
     assert!(
-        policy.1.contains("4500000000"),
-        "the daily cap is the budget plus the top-up: {}",
+        policy.1.contains("4636000000"),
+        "the daily cap is the budget plus the top-up, with room for the fees: {}",
         policy.1
     );
     let tx = String::from_utf8_lossy(n.txs.last().unwrap()).into_owned();

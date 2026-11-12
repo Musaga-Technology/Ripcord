@@ -538,6 +538,29 @@ fn the_monthly_fee_is_charged_once_a_month_and_never_without_a_fee_wallet() {
 }
 
 #[test]
+fn the_monthly_fee_waits_while_it_would_leave_the_reserve_unable_to_rescue() {
+    let (mut host, net) = common::host(1);
+    net.borrow_mut().hl_state = btc(70_000.0); // far: no rescue
+    let mut s = settings();
+    s.expires_at = "1830297600000000000".into();
+    create(&host, &s);
+    // $2.10 landed: paying $1 would leave less than the smallest rescue ($2).
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "2100000" }]));
+    check_fees(&host);
+    host.now_ms += 3_600_000;
+    check_fees(&host);
+    assert!(
+        net.borrow().transfers.is_empty(),
+        "no fee while it would block a rescue"
+    );
+    // A top-up later: the month's fee is taken then.
+    net.borrow_mut().balances = Some(json!([{ "token": policy::USDC, "balance": "5100000" }]));
+    host.now_ms += 3_600_000;
+    check_fees(&host);
+    assert_eq!(net.borrow().transfers.len(), 1);
+}
+
+#[test]
 fn months_follow_the_calendar() {
     use ripcord_checker::check::month_of;
     assert_eq!(month_of(1_793_491_140_000), "2026-10"); // Oct 31 2026 23:59 UTC

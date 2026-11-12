@@ -199,7 +199,11 @@ fn the_policy_pays_only_the_owner_capped_at_one_rescue() {
     assert_eq!(p["rules"]["transaction_types"], json!(["confidential"]));
     assert_eq!(p["rules"]["addresses"]["list"], json!([HL.to_lowercase(), FEE_WALLET]));
     assert_eq!(p["rules"]["limits"]["per_transaction"][policy::USDC], "1500000000");
-    assert_eq!(p["rules"]["limits"]["daily"][policy::USDC], "4000000000");
+    assert_eq!(
+        p["rules"]["limits"]["daily"][policy::USDC],
+        "4121000000",
+        "the budget, plus the month's $1 and 3 %"
+    );
     assert_eq!(p["capabilities"]["evm_sign"]["allowed"], false);
 }
 

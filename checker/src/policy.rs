@@ -1,6 +1,7 @@
 //! The guard wallet's policy (docs/SPEC.md §3), enforced by OutLayer's keystore whatever this code does: only
 //! confidential operations, only to the owner's Hyperliquid address, the close address and Ripcord's fee wallet,
-//! at most one rescue per transaction and the budget per day.
+//! at most one rescue per transaction, and per day the budget plus Ripcord's own fees (the month's $1 and the 3 % of a
+//! save), so a fee can never use up room a rescue needs.
 use ripcord_rules::types::GuardSettings;
 use serde_json::{json, Value};
 
@@ -10,6 +11,11 @@ pub const USDC: &str = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd
 pub struct ReserveUnits {
     /// Smallest units of the reserve asset per USD, from the price at creation.
     pub per_usd: f64,
+}
+
+/// A day's outflow: the whole budget as rescues, plus the month's $1 and a 3 % save fee on top of it.
+pub fn daily_cap(budget_usd: f64) -> f64 {
+    (budget_usd * 1.03 + 1.0).ceil()
 }
 
 pub fn build(s: &GuardSettings, fee_wallet: &str, reserve: Option<ReserveUnits>) -> Result<Value, &'static str> {
@@ -38,7 +44,7 @@ pub fn build(s: &GuardSettings, fee_wallet: &str, reserve: Option<ReserveUnits>)
             "addresses": { "mode": "whitelist", "list": list },
             "limits": {
                 "per_transaction": per_tx,
-                "daily": { USDC: usd(s.budget_usd) },
+                "daily": { USDC: usd(daily_cap(s.budget_usd)) },
             },
         },
         "capabilities": {

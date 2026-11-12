@@ -16,7 +16,7 @@ use crate::{hl, oneclick, policy, settings, vault};
 use ripcord_rules::commitment::is_guard_id;
 use ripcord_rules::guard::{
     at_hour, distance_pct, draw, fall_rate, latency_s, mark_of, rescue_size, round_credit, save_fee, settle,
-    should_fire, speed_target, SizeInput,
+    should_fire, speed_target, SizeInput, MIN_RESCUE_USD,
 };
 use ripcord_rules::seal;
 use ripcord_rules::types::{CheckStatus, LeverageType, Outcome};
@@ -160,6 +160,16 @@ fn payable_usd(balances: &[(String, String)], asset: &str, tok: Option<&oneclick
         None => units / 1e6,
         Some(t) => units / t.per_usd() / 1.03,
     }
+}
+
+/// True when the reserve's USDC covers the monthly fee and still the smallest rescue.
+fn spares_fee(balances: &[(String, String)]) -> bool {
+    let usdc = balances
+        .iter()
+        .find(|(t, _)| t == policy::USDC)
+        .and_then(|(_, b)| b.parse::<u128>().ok())
+        .unwrap_or(0);
+    usdc >= MONTHLY_FEE_UNITS + (MIN_RESCUE_USD * 1e6) as u128
 }
 
 /// Sends the rescue's current leg under its current key.
@@ -468,9 +478,13 @@ pub fn check_with(host: &dyn Host, guard_id: &str, o: &Opts) -> Result<CheckStat
     settle_and_record(host, &custody, guard_id, &g, &mut t, &positions, fee_wallet)?;
     vault::put(host, &key, &t)?;
 
-    // The $1 guard fee, once each month.
+    // The $1 guard fee, once each month, and only when the reserve can spare it: a fee never leaves it unable to pay
+    // the smallest rescue. Until it can (a top-up), the month waits.
     let month = month_of(now);
-    if fees_on(fee_wallet) && t.fee_month.as_deref() != Some(&month) {
+    if fees_on(fee_wallet)
+        && t.fee_month.as_deref() != Some(&month)
+        && custody.balances(guard_id)?.is_some_and(|b| spares_fee(&b))
+    {
         let units = MONTHLY_FEE_UNITS.to_string();
         if let Op::Accepted(_) = custody.transfer(
             guard_id,
