@@ -4,7 +4,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { HeroLive } from '../components/site/HeroLive';
 import { HuntGame } from '../components/site/HuntGame';
 import { Levels } from '../components/site/Levels';
-import { Count, Reveal } from '../components/site/Reveal';
+import { Reveal } from '../components/site/Reveal';
 import { Edge } from '../components/site/Edge';
 import { AppPreview } from '../components/site/AppPreview';
 import { NearPath } from '../components/site/NearPath';
@@ -28,16 +28,6 @@ const ghost =
 /** The public repository; every proof link opens the file that backs the claim. */
 const REPO = 'https://github.com/Musaga-Technology/Ripcord';
 const src = (path: string) => `${REPO}/blob/main/${path}`;
-
-const STATS: { to?: number; prefix?: string; suffix?: string; text?: string; src: string }[] = [
-  {
-    text: '27–46 s',
-    src: 'Mainnet test rescues from a hidden reserve into Hyperliquid margin, Oct 21.',
-  },
-  { text: '0 of 53', src: 'BTC 10× longs liquidated in a replay of the Oct 10, 2025 crash. 53 of 53 without Ripcord.' },
-  { to: 35, suffix: '+', src: 'Chains your reserve can come from, through NEAR Intents.' },
-  { text: '$0', src: "Ripcord's fee when a rescue doesn't save you. 3% of it when it does." },
-];
 
 const STEPS = [
   [
@@ -193,17 +183,6 @@ export default function Home() {
           <HeroLive />
         </section>
 
-        <section className={`${wrap} grid grid-cols-2 gap-x-6 gap-y-10 border-t border-line py-16 lg:grid-cols-4`}>
-          {STATS.map((s) => (
-            <Reveal key={s.src} className="flex flex-col gap-2">
-              <span className="text-[36px] font-semibold leading-none tracking-[-0.04em] sm:text-[48px]">
-                {s.to !== undefined ? <Count to={s.to} prefix={s.prefix ?? ''} suffix={s.suffix ?? ''} /> : s.text}
-              </span>
-              <span className="max-w-[17rem] text-[13px] leading-[1.5] text-muted">{s.src}</span>
-            </Reveal>
-          ))}
-        </section>
-
         <section id="app" className={`${wrap} scroll-mt-20 py-24`}>
           <div className="flex max-w-[36rem] flex-col gap-5">
             <h2 className={h2}>
@@ -279,6 +258,48 @@ export default function Home() {
           <div className="mt-12">
             <HuntGame />
           </div>
+        </section>
+
+        <section className={`${wrap} py-24`}>
+          <Reveal className="flex max-w-[44rem] flex-col gap-5">
+            <h2 className={h2}>
+              It held through a <span className={turn}>real</span> crash.
+            </h2>
+            <p className="text-[17px] text-text-2">
+              October 10, 2025, replayed on real one-minute prices: a BTC 10× long opened every 10 minutes from noon to
+              20:40 UTC and held for a day, each with a hidden reserve the size of its margin.
+            </p>
+          </Reveal>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2">
+            {[
+              ['53', 'text-red', 'Liquidated without a guard'],
+              ['0', 'text-amber', 'Liquidated with Ripcord'],
+            ].map(([n, tone, label]) => (
+              <Reveal key={label} className="flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-7">
+                <span className={`font-display text-[96px] leading-none tracking-[-0.02em] sm:text-[128px] ${tone}`}>
+                  {n}
+                  <span className="text-muted">/53</span>
+                </span>
+                <span className="text-[17px] font-semibold">{label}</span>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal className="mt-8 flex max-w-[44rem] flex-col gap-3">
+            <p className="text-[15px] text-text-2">
+              On a month of prices it had never seen, with its predictions sealed before the run, the guard cut
+              liquidations by 96%.
+            </p>
+            <div className="flex flex-wrap gap-x-6">
+              <a href={src('crates/replay/tests/crash.rs')} className={proof}>
+                The crash replay
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a href={src('crates/replay/holdout/predictions.md')} className={proof}>
+                The sealed predictions
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </Reveal>
         </section>
 
         <section id="pricing" className={`${wrap} scroll-mt-20 py-24`}>
