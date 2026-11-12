@@ -13,6 +13,7 @@ import {
   type SealContents,
 } from '@ripcord/shared';
 import { encode } from 'uqr';
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ASSETS, sourcesFor } from '../../lib/assets';
 import { DEMO_ARRIVES_MS, random, Refused, type Backend, type Deposit } from '../../lib/backend';
@@ -21,6 +22,14 @@ import type { TopupInput } from '../../lib/ownerActions';
 import { approveAgent, sendFromHyperliquid } from '../../lib/wallet';
 import { ghostBtn, primaryBtn } from './AppShell';
 import { Turned, display } from '../Display';
+
+// Aurora's widget is large: it loads only when a person chooses to pay from any wallet.
+const PayAnyWallet = dynamic(() => import('./PayAnyWallet'), {
+  ssr: false,
+  loading: () => (
+    <div aria-busy="true" className="h-[360px] animate-pulse rounded-[20px] border border-line bg-panel" />
+  ),
+});
 
 export const assetOf = (reserve: string) => ASSETS.find((a) => a.reserve === reserve) ?? ASSETS[ASSETS.length - 1]!;
 
@@ -266,9 +275,11 @@ export function Fund({
           <Turned>{topup ? 'Top up the reserve.' : 'Fund the reserve.'}</Turned>
         </h2>
         <p className="max-w-[34rem] text-[15px] text-text-2">
-          {asset.extra
-            ? `Send ${amount} ${asset.symbol} from ${asset.chain}: ${reserveAmount} for the reserve and $${asset.extra} for the transfer.`
-            : `Send ${amount} ${asset.symbol} from ${asset.chain}.`}{' '}
+          {asset.widget
+            ? `Pay ${amount} ${asset.symbol} from any wallet, in any token it holds: Aurora's widget swaps it on the way.`
+            : asset.extra
+              ? `Send ${amount} ${asset.symbol} from ${asset.chain}: ${reserveAmount} for the reserve and $${asset.extra} for the transfer.`
+              : `Send ${amount} ${asset.symbol} from ${asset.chain}.`}{' '}
           NEAR Intents carries it into a private balance held by this guard&apos;s own wallet, which can pay only your
           Hyperliquid account.
         </p>
@@ -284,7 +295,7 @@ export function Fund({
               onClick={() => setSrcIx(i)}
               className={`min-h-10 rounded-full px-4 text-[15px] transition-colors duration-[120ms] ${i === srcIx ? 'bg-text font-medium text-ground' : 'text-text-2 hover:text-text'}`}
             >
-              From {s.chain}
+              From {s.label ?? s.chain}
             </button>
           ))}
         </div>
@@ -302,6 +313,16 @@ export function Fund({
         <div aria-busy="true" className="h-[208px] animate-pulse rounded-[20px] border border-line bg-panel" />
       ) : (
         <>
+          {asset.widget && !isDemo && (
+            <div className="overflow-hidden rounded-[20px] border border-line bg-panel">
+              <PayAnyWallet
+                address={deposit.address}
+                amount={exact}
+                wallet={wallet}
+                onSent={() => setSending('sent')}
+              />
+            </div>
+          )}
           {inApp && (
             <div className="flex flex-col items-start gap-2">
               <button type="button" className={primaryBtn} disabled={sending !== 'idle' || arrived} onClick={send}>
@@ -332,7 +353,9 @@ export function Fund({
                   ? 'Example address, no funds needed'
                   : inApp
                     ? `Goes to this address on ${asset.chain}`
-                    : `Send to this address on ${asset.chain}`}
+                    : asset.widget
+                      ? `Or send ${asset.symbol} on ${asset.chain} to this address yourself`
+                      : `Send to this address on ${asset.chain}`}
               </span>
               <code className="break-all font-mono text-[15px] leading-relaxed text-text">{deposit.address}</code>
               <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] tabular-nums">

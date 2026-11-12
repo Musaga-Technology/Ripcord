@@ -4,3 +4,11 @@ packages:
   - services/*
 allowBuilds:
   esbuild: true
+  # Pulled in by the Aurora funding widget. Native speed-ups and install notices, each with a pure-JS fallback, so
+  # none of their install scripts run.
+  bigint-buffer: false
+  bufferutil: false
+  core-js-pure: false
+  protobufjs: false
+  secp256k1: false
+  utf-8-validate: false

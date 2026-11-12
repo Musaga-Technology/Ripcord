@@ -58,6 +58,9 @@ async function injected(): Promise<Provider | null> {
 
 export const hasWallet = async () => (await injected()) !== null;
 
+/** The picked wallet's provider, for another component that signs with it (the funding widget). */
+export const walletProvider = injected;
+
 /** Connects the chosen wallet and remembers it, so every later signature goes to the same one. */
 export async function connectWallet(choice?: WalletChoice): Promise<string | null> {
   const p = choice?.provider ?? (await injected());

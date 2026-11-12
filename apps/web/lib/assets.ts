@@ -1,5 +1,7 @@
 // What a reserve can be: each asset funds from its own chain and stays in that asset until a rescue swaps it to USDC.
 // Ids are 1Click's (`GET /v0/tokens`). USDC can come from any chain and arrives as NEAR USDC.
+import { AURORA_KEY } from './aurora';
+
 export interface ReserveAsset {
   symbol: string;
   name: string;
@@ -20,6 +22,10 @@ export interface ReserveAsset {
   how?: string;
   /** Said under the address when the send itself is public. */
   note?: string;
+  /** What the "Send from" choice says, when not the chain. */
+  label?: string;
+  /** Paid through Aurora's widget, from any wallet and token, into this source's deposit address. */
+  widget?: boolean;
 }
 
 export const USDC_NEAR = 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
@@ -96,8 +102,27 @@ export const FROM_HYPERLIQUID: ReserveAsset = {
   note: 'This send shows on Hyperliquid, so anyone can see its size. To keep the reserve unsized, fund from Arbitrum.',
 };
 
-/** Where a reserve can be sent from: USDC also from Hyperliquid itself, offered first. */
-export const sourcesFor = (a: ReserveAsset): ReserveAsset[] => (a.reserve === USDC_NEAR ? [FROM_HYPERLIQUID, a] : [a]);
+/**
+ * A USDC reserve paid from any wallet, in any token, on any chain Aurora's widget reaches: the widget swaps it through
+ * NEAR Intents into exactly the USDC this guard's Arbitrum deposit address waits for. The deposit address stays the
+ * fallback for sending it by hand.
+ */
+export const FROM_ANY_WALLET: ReserveAsset = {
+  ...ASSETS.find((a) => a.symbol === 'USDC')!,
+  name: 'USDC from any wallet',
+  label: 'any wallet',
+  digits: 2,
+  wait: 'From another chain, a reserve usually arrives in a few minutes.',
+  widget: true,
+  note: "The amount shows leaving your wallet on its own chain. Pay from a wallet that isn't your Hyperliquid account's to keep the reserve unsized.",
+};
+
+/**
+ * Where a reserve can be sent from: USDC from Hyperliquid itself first, then from any wallet once Aurora's widget is
+ * configured (until then, USDC on Arbitrum sent by hand).
+ */
+export const sourcesFor = (a: ReserveAsset, anyWallet = AURORA_KEY !== ''): ReserveAsset[] =>
+  a.reserve === USDC_NEAR ? [FROM_HYPERLIQUID, anyWallet ? FROM_ANY_WALLET : a] : [a];
 
 export type Prices = Record<string, number>;
 
