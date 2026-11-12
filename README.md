@@ -53,7 +53,7 @@ Design notes, research and feasibility tests were prepared from Oct 20, inside t
 | Piece | Where | Check it |
 |---|---|---|
 | Guard registry contract | [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) ([deployed](https://nearblocks.io/txns/Fpm7gnSSZz372vinZxVoryQucoR4W3fKa1WYuzn1nrsm), [upgraded](https://nearblocks.io/txns/3VJK3fShUHikWXPnaoKtbzsoLaNzqgUqjth8ievR5nQK) with top-up and new range, Nov 11) | Code hash `Ep5CwN8XxzQSwiN8mizcYachLyMRhQboCQFjVyPiYnFL`, which `bash contracts/guard-registry/build.sh` prints |
-| Checker in OutLayer's TEE | `ripcord-registry.near/checker`, build `87feddc8…` ([version](https://nearblocks.io/txns/7sXBmrEsPipi69BdaptnTWDHPzEVeqfJU5Gy1kDtM9Ga)) | sha256 `87feddc8a328f6f23d3776154beef88b191efafa5c203a00c060755fa0b2eb2a`, which `bash checker/build.sh mainnet` prints; `outlayer.near get_project` → `active_version` |
+| Checker in OutLayer's TEE | `ripcord-registry.near/checker`, build `8d2812d7…` ([version](https://nearblocks.io/txns/9RKh1L2KYZtPu1zLBPEhSPFhKjQKsVgrrT4MJdBErf3E)) | sha256 `8d2812d7a16b53c8530df004bced560f7d4291fd765a6b627fd1087a619268bc`, which `bash checker/build.sh mainnet` prints; `outlayer.near get_project` → `active_version` |
 | The enclave's own NEAR account | [`d09e4db7…`](https://nearblocks.io/address/d09e4db7a197abc0a8126fdf694d3d556fa45f4154b3dc9a491afc6ea3fcfca6), a key only the enclave holds | [Named the registry's only checker](https://nearblocks.io/txns/4eA3AZBesupk9N4LK5Er7vZCCVsMVe4SRhVnxP78Bm8W) |
 | Ripcord's fee wallet | An OutLayer custody wallet, NEAR id `7b3d43bb…190f` | Compiled into the checker build, so the attested hash covers it |
 
