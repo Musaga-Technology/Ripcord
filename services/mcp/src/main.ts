@@ -3,6 +3,7 @@
 //   RIPCORD_POKERS      the pokers that watch a funded guard, comma-separated
 //   RIPCORD_PASSPHRASE  locks the seal files this server writes (the model never sees it)
 //   RIPCORD_HOME        where seal files live, ~/.ripcord by default
+//   AURORA_KEY          Aurora's Intents API key (public by design), for funding a guard in any token
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -26,6 +27,12 @@ const server = ripcordServer({
     passphrase: env.RIPCORD_PASSPHRASE || null,
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     now: Date.now,
+    aurora: {
+      api: env.AURORA_API || 'https://intents-api.aurora.dev',
+      key: env.AURORA_KEY || env.NEXT_PUBLIC_AURORA_KEY || null,
+      // NEAR Intents' public token list: ids, chains and decimals.
+      tokens: 'https://1click.chaindefuser.com/v0/tokens',
+    },
   },
 });
 await server.connect(new StdioServerTransport());

@@ -5,7 +5,15 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openSealFile } from '@ripcord/shared';
-import { createGuard, finishGuard, freezeGuard, fundGuard, sealPath, type OwnerDeps } from '../src/owner';
+import {
+  createGuard,
+  finishGuard,
+  freezeGuard,
+  fundGuard,
+  fundGuardWithAnyToken,
+  sealPath,
+  type OwnerDeps,
+} from '../src/owner';
 import { ripcordServer } from '../src/tools';
 import { AGENT, fakeChecker, POKER, RELAY } from './checker';
 import { ADDRESS, publicApis, SOURCES } from './fixtures';
@@ -15,8 +23,23 @@ const PASS = 'correct horse battery staple';
 async function setup(passphrase: string | null = PASS) {
   const checker = fakeChecker();
   const hl = publicApis();
-  const fetchFn = (async (url: string | URL | Request, init?: RequestInit) =>
-    (await checker.fetchFn(url, init)) ?? hl(url, init)) as typeof fetch;
+  // Aurora's quote endpoint and NEAR Intents' token list, as they answer.
+  const quotes: { url: string; body: Record<string, unknown> }[] = [];
+  const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+    const u = String(url);
+    if (u === TOKENS)
+      return Response.json([
+        { assetId: 'nep141:base.omft.near', symbol: 'ETH', blockchain: 'base', decimals: 18 },
+        { assetId: ARB_USDC, symbol: 'USDC', blockchain: 'arb', decimals: 6 },
+      ]);
+    if (u.startsWith(`${AURORA}/api/quote/`)) {
+      quotes.push({ url: u, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+      return Response.json({
+        quote: { depositAddress: ONE_TIME, amountInFormatted: '0.012345', deadline: '2026-11-12T14:50:00.000Z' },
+      });
+    }
+    return (await checker.fetchFn(url, init)) ?? hl(url, init);
+  }) as typeof fetch;
   const d: OwnerDeps = {
     sources: { ...SOURCES, fetch: fetchFn },
     relay: RELAY,
@@ -26,9 +49,16 @@ async function setup(passphrase: string | null = PASS) {
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     now: () => Date.parse('2026-11-12T13:50:00Z'),
     scryptN: 2 ** 10,
+    aurora: { api: AURORA, key: 'test-key', tokens: TOKENS },
   };
-  return { d, checker };
+  return { d, checker, quotes };
 }
+
+const AURORA = 'https://aurora.test';
+const TOKENS = 'https://tokens.test/v0/tokens';
+const ARB_USDC = 'nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near';
+const ONE_TIME = `0x${'a1'.repeat(20)}`;
+const AGENT_WALLET = `0x${'5e'.repeat(20)}`;
 
 describe("an agent's own guard", () => {
   it('is sealed on this machine: the seal file stays here, locked, and only hashes and an envelope leave', async () => {
@@ -70,6 +100,42 @@ describe("an agent's own guard", () => {
       chain: 'Hyperliquid',
       amount: '26.00',
     });
+  });
+
+  it("is paid in any token through Aurora: exact output, routed privately, to the guard's own deposit address", async () => {
+    const { d, quotes } = await setup();
+    const g = await createGuard(d, { address: ADDRESS, coin: 'ETH', reserveUsd: 25 });
+    const f = await fundGuardWithAnyToken(d, {
+      guardId: g.guardId,
+      token: 'eth',
+      chain: 'BASE',
+      refundTo: AGENT_WALLET,
+    });
+    expect(f).toMatchObject({ address: ONE_TIME, amount: '0.012345', token: 'ETH', chain: 'base', reserve: '25' });
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]!.url).toBe(`${AURORA}/api/quote/test-key`);
+    expect(quotes[0]!.body).toMatchObject({
+      dry: false,
+      swapType: 'EXACT_OUTPUT',
+      confidentiality: 'basic',
+      originAsset: 'nep141:base.omft.near',
+      destinationAsset: ARB_USDC,
+      amount: '25000000',
+      recipient: 'deposit-nep141:arb',
+      refundTo: AGENT_WALLET,
+    });
+    // Nothing about the guarded account goes to Aurora.
+    expect(JSON.stringify(quotes[0]!.body).toLowerCase()).not.toContain(ADDRESS.slice(2));
+  });
+
+  it('pays in any token only with an Aurora key and a token NEAR Intents lists', async () => {
+    const { d } = await setup();
+    const g = await createGuard(d, { address: ADDRESS, coin: 'ETH', reserveUsd: 25 });
+    const pay = { guardId: g.guardId, token: 'ETH', chain: 'base', refundTo: AGENT_WALLET };
+    await expect(
+      fundGuardWithAnyToken({ ...d, aurora: { api: AURORA, key: null, tokens: TOKENS } }, pay),
+    ).rejects.toThrow('AURORA_KEY');
+    await expect(fundGuardWithAnyToken(d, { ...pay, token: 'DOGE' })).rejects.toThrow("doesn't list DOGE on base");
   });
 
   it('waits for the reserve, then hands the guard to the pokers with the proof only its owner has', async () => {
@@ -135,6 +201,16 @@ describe('the owner tools over MCP', () => {
     expect(await say('fund_guard', { guard_id: guardId, from: 'arbitrum' })).toContain(
       'Send exactly 25 USDC on Arbitrum',
     );
+    const anyToken = await say('fund_guard', {
+      guard_id: guardId,
+      from: 'any',
+      token: 'ETH',
+      chain: 'base',
+      refund_to: AGENT_WALLET,
+    });
+    expect(anyToken).toContain(`Send exactly 0.012345 ETH on base to ${ONE_TIME}`);
+    expect(anyToken).toContain('receives exactly 25 USDC');
+    expect(await say('fund_guard', { guard_id: guardId, from: 'any' })).toContain('needs token, chain and refund_to');
     expect(await say('finish_guard', { guard_id: guardId })).toContain('Not yet');
     checker.funded.add(guardId);
     expect(await say('finish_guard', { guard_id: guardId })).toContain('1 poker watch');

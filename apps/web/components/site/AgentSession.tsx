@@ -11,8 +11,11 @@ const STEPS: { call: string; answer: string[]; done?: boolean }[] = [
     ],
   },
   {
-    call: 'fund_guard({ from: "arbitrum" })',
-    answer: ['Send exactly 1500 USDC on Arbitrum to 0x3c41…a91f.'],
+    call: 'fund_guard({ from: "any", token: "ETH", chain: "base" })',
+    answer: [
+      'Send exactly 0.7502 ETH on base to 0x9e21…04b7.',
+      'Routed confidentially through NEAR Intents; the guard receives exactly 1500 USDC.',
+    ],
   },
   {
     call: 'finish_guard()',

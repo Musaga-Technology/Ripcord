@@ -60,6 +60,8 @@ export interface OwnerDeps {
   now: () => number;
   /** Lower only in tests: the seal file's scrypt cost. */
   scryptN?: number;
+  /** Aurora's Intents API, for paying a reserve in any token; its key is public by Aurora's design. */
+  aurora?: { api: string; key: string | null; tokens: string };
 }
 
 interface Answer {
@@ -208,6 +210,83 @@ export async function fundGuard(d: OwnerDeps, o: { guardId: string; from: FundFr
     ? (Math.ceil((reserve + src.extra) * 100 - 1e-6) / 100).toFixed(2)
     : String(Math.round(reserve * 1e6) / 1e6);
   return { address: dep.deposit_address, chain: src.chain, amount, how: src.how, note: src.note };
+}
+
+interface Token {
+  assetId: string;
+  symbol: string;
+  blockchain: string;
+  decimals: number;
+}
+
+export interface AnyTokenFunding {
+  /** A one-time address on the agent's own chain. */
+  address: string;
+  /** Exactly what to send there, in the agent's token. */
+  amount: string;
+  token: string;
+  chain: string;
+  /** What the guard's deposit address receives, in USDC. */
+  reserve: string;
+  deadline: string;
+}
+
+/**
+ * The reserve paid in whatever token the agent holds, on whatever chain: Aurora quotes for what arrives (exact
+ * output), routed confidentially through NEAR Intents, to the guard's own Arbitrum USDC deposit address. Refunds go
+ * back to the agent's address on its own chain. Nothing about the guarded account is sent.
+ */
+export async function fundGuardWithAnyToken(
+  d: OwnerDeps,
+  o: { guardId: string; token: string; chain: string; refundTo: string },
+): Promise<AnyTokenFunding> {
+  if (!d.aurora?.key) throw new Error("Set AURORA_KEY: paying in any token goes through Aurora's Intents API.");
+  const c = await openGuard(d, o.guardId);
+  const listed = (await (
+    await d.sources.fetch(d.aurora.tokens, { signal: AbortSignal.timeout(15_000) })
+  ).json()) as Token[];
+  const t = listed.find(
+    (x) => x.symbol.toUpperCase() === o.token.toUpperCase() && x.blockchain === o.chain.toLowerCase(),
+  );
+  if (!t) throw new Error(`NEAR Intents doesn't list ${o.token} on ${o.chain}.`);
+  const usdc = FUND_FROM.arbitrum;
+  const a = await relay(d, { action: 'fund', guard_id: c.guard_id, source_asset: usdc.id });
+  const dep = opened<{ deposit_address: string; amount: string; decimals: number }>(a.sealed ?? '', c);
+  const res = await d.sources.fetch(`${d.aurora.api}/api/quote/${d.aurora.key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dry: false,
+      swapType: 'EXACT_OUTPUT',
+      slippageTolerance: 100,
+      deadline: new Date(d.now() + 3_600_000).toISOString(),
+      // Hides the paying wallet and the route; checked to still deliver the exact amount to an outside address.
+      confidentiality: 'basic',
+      originAsset: t.assetId,
+      destinationAsset: usdc.id,
+      amount: dep.amount,
+      recipient: dep.deposit_address,
+      recipientType: 'DESTINATION_CHAIN',
+      depositType: 'ORIGIN_CHAIN',
+      refundTo: o.refundTo,
+      refundType: 'ORIGIN_CHAIN',
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const q = (await res.json()) as {
+    quote?: { depositAddress?: string; amountInFormatted?: string; deadline?: string };
+    message?: string;
+  };
+  if (!res.ok || !q.quote?.depositAddress || !q.quote.amountInFormatted)
+    throw new Error(`Aurora couldn't quote it: ${q.message ?? `HTTP ${res.status}`}.`);
+  return {
+    address: q.quote.depositAddress,
+    amount: q.quote.amountInFormatted,
+    token: t.symbol,
+    chain: t.blockchain,
+    reserve: String(Number(dep.amount) / 10 ** dep.decimals),
+    deadline: q.quote.deadline ?? '',
+  };
 }
 
 /**

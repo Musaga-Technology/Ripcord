@@ -5,7 +5,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { readAccount, shortAddress, view, type Sources } from './read';
 import type { Preset } from '@ripcord/shared';
-import { createGuard, finishGuard, freezeGuard, fundGuard, type FundFrom, type OwnerDeps } from './owner';
+import {
+  createGuard,
+  finishGuard,
+  freezeGuard,
+  fundGuard,
+  fundGuardWithAnyToken,
+  type FundFrom,
+  type OwnerDeps,
+} from './owner';
 import { assess, replayOdds, riskMarkdown } from './risk';
 
 export interface ToolDeps {
@@ -211,22 +219,61 @@ export function ripcordServer(d: ToolDeps): McpServer {
     {
       title: 'Fund a guard',
       description:
-        "Where to send a guard's USDC reserve: an address only this guard's private wallet receives at, and the exact amount. From Arbitrum the reserve's size stays private; from Hyperliquid the send is public. Then finish_guard.",
+        "Where to send a guard's reserve, and exactly how much. USDC from Arbitrum (size stays private) or Hyperliquid (the send is public), or 'any': pay in whatever token the agent holds on whatever chain, through Aurora's Intents API on NEAR Intents, routed confidentially so the paying wallet can't be traced to the guard, which still receives the exact reserve. Then finish_guard.",
       inputSchema: {
         guard_id: z.string().describe('The id create_guard gave'),
-        from: z.enum(['arbitrum', 'hyperliquid']).describe('Where the USDC comes from'),
+        from: z.enum(['arbitrum', 'hyperliquid', 'any']).describe('Where the reserve comes from'),
+        token: z.string().optional().describe("With 'any': the token to pay in, e.g. ETH, USDC, USDT, SOL"),
+        chain: z
+          .string()
+          .optional()
+          .describe("With 'any': its chain as NEAR Intents names it, e.g. eth, base, arb, op, pol, bsc, sol, near"),
+        refund_to: z
+          .string()
+          .optional()
+          .describe("With 'any': the agent's own address on that chain, where it goes back if the swap can't fill"),
       },
       annotations: OWNER,
     },
-    owned(async (o, a: { guard_id: string; from: FundFrom }) => {
-      const f = await fundGuard(o, { guardId: a.guard_id, from: a.from });
-      return [
-        `Send exactly ${f.amount} USDC on ${f.chain} to ${f.address}.`,
-        `${f.how} ${f.note}`,
-        'Then call finish_guard: it usually arrives in about a minute.',
-      ].join('\n');
-    }),
+    owned(
+      async (
+        o,
+        a: {
+          guard_id: string;
+          from: FundFrom | 'any';
+          token?: string | undefined;
+          chain?: string | undefined;
+          refund_to?: string | undefined;
+        },
+      ) => {
+        if (a.from === 'any') {
+          if (!a.token || !a.chain || !a.refund_to)
+            throw new Error("Paying in any token needs token, chain and refund_to (the agent's own address there).");
+          const f = await fundGuardWithAnyToken(o, {
+            guardId: a.guard_id,
+            token: a.token,
+            chain: a.chain,
+            refundTo: a.refund_to,
+          });
+          return [
+            `Send exactly ${f.amount} ${f.token} on ${f.chain} to ${f.address}${f.deadline ? ` before ${f.deadline}` : ''}.`,
+            `Aurora routes it confidentially through NEAR Intents, and the guard's deposit address receives exactly ${f.reserve} USDC. If it can't fill, it goes back to ${a.refund_to}.`,
+            'Then call finish_guard: it usually arrives in about a minute.',
+          ].join('\n');
+        }
+        return fundOne(o, a.guard_id, a.from);
+      },
+    ),
   );
+
+  async function fundOne(o: OwnerDeps, guardId: string, from: FundFrom): Promise<string> {
+    const f = await fundGuard(o, { guardId, from });
+    return [
+      `Send exactly ${f.amount} USDC on ${f.chain} to ${f.address}.`,
+      `${f.how} ${f.note}`,
+      'Then call finish_guard: it usually arrives in about a minute.',
+    ].join('\n');
+  }
 
   server.registerTool(
     'finish_guard',
