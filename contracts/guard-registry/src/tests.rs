@@ -498,7 +498,10 @@ fn a_top_up_stores_the_new_policy_without_its_amount() {
     let v = stored_policy_args();
     assert_eq!(v["encrypted_data"], "encrypted-policy-2");
     assert_eq!(v["version"], POLICY_VERSION + 1);
-    assert!(v.get("storage_refund_to").is_none(), "OutLayer takes it only when a policy is created");
+    assert!(
+        v.get("storage_refund_to").is_none(),
+        "OutLayer takes it only when a policy is created"
+    );
     let logs = get_logs().join("\n");
     assert!(logs.contains("\"event\":\"policy_updated\""), "{logs}");
     assert!(
