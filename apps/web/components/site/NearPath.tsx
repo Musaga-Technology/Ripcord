@@ -81,8 +81,8 @@ export function NearPath() {
   return (
     <div className="grid gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
       <div className="flex flex-col gap-5 lg:sticky lg:top-28 lg:self-start">
-        <h2 className="text-[36px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[56px]">
-          How NEAR keeps it hidden.
+        <h2 className="font-display text-[44px] font-normal leading-[1] tracking-[-0.02em] sm:text-[72px]">
+          How NEAR keeps it <span className="italic text-amber">hidden.</span>
         </h2>
         <p className="max-w-[30rem] text-[17px] text-text-2">
           Every part that has to stay private, and every part that has to move fast, runs on NEAR. Each step links the

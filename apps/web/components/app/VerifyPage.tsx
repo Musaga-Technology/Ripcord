@@ -11,6 +11,7 @@ import { usd } from '../format';
 import { GuardCard } from '../GuardCard';
 import { AppShell, fieldCls, ghostBtn, primaryBtn } from './AppShell';
 import { assetOf } from './steps';
+import { Turned, display } from '../Display';
 
 interface Opened {
   contents: SealContents;
@@ -285,7 +286,9 @@ function Verify() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[40px]">Verify a guard.</h1>
+        <h1 className={`${display} text-[40px] leading-[1.02] sm:text-[52px]`}>
+          <Turned>Verify a guard.</Turned>
+        </h1>
         <p className="max-w-[60ch] text-[17px] text-text-2">
           Open its seal file here to check that it did only what was sealed. Nothing leaves this device.
         </p>

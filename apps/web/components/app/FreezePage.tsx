@@ -13,6 +13,7 @@ import { connectNearOwner, freezeFromWallet, type NearOwner } from '../../lib/ne
 import { nonce } from '../../lib/ownerActions';
 import { SessionProvider } from '../../lib/session';
 import { AppShell, ghostBtn, primaryBtn } from './AppShell';
+import { Turned, display } from '../Display';
 
 interface Row {
   id: string;
@@ -67,8 +68,8 @@ function Freeze() {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-8 py-6">
       <header className="flex flex-col gap-3">
-        <h1 className="text-[36px] font-semibold leading-none tracking-[-0.04em] sm:text-[48px]">
-          Freeze with your NEAR wallet.
+        <h1 className={`${display} text-[40px] leading-[1.02] sm:text-[52px]`}>
+          <Turned>Freeze with your NEAR wallet.</Turned>
         </h1>
         <p className="max-w-[34rem] text-[17px] text-text-2">
           Lost your device or your seal file? If your NEAR wallet signs for a guard, it can freeze the reserve from

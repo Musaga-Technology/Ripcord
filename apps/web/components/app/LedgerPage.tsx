@@ -9,6 +9,7 @@ import { accountUrl, NETWORK_NAME, PUBLISHED_GUARDS, REGISTRY } from '../../lib/
 import { SessionProvider } from '../../lib/session';
 import { usd } from '../format';
 import { AppShell, ghostBtn } from './AppShell';
+import { Turned, display } from '../Display';
 
 type Read = { at: 'loading' } | { at: 'error' } | { at: 'ready'; stats: Stats; rows: LedgerRow[]; readAt: number };
 
@@ -63,7 +64,9 @@ function Ledger() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[40px]">Ledger.</h1>
+        <h1 className={`${display} text-[40px] leading-[1.02] sm:text-[52px]`}>
+          <Turned>Ledger.</Turned>
+        </h1>
         <p className="max-w-[60ch] text-[17px] text-text-2">
           Every rescue Ripcord makes is recorded on NEAR. Anyone can read it, and no one can tell whose it was.
         </p>

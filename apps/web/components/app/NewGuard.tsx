@@ -35,6 +35,7 @@ import { PlainWords } from './PlainWords';
 import { PriceLadder } from './PriceLadder';
 import { Connect } from './Connect';
 import { Approve, explain, Fund } from './steps';
+import { Turned, display } from '../Display';
 
 const PRESETS: { id: Preset; name: string; line: string }[] = [
   { id: 'safer', name: 'Safer', line: 'Steps in early: more close calls, fewer surprises.' },
@@ -71,7 +72,9 @@ function stepsInAt(h: Holding, line: [number, number]): number {
 function Chooser({ holdings }: { holdings: Holding[] }) {
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5">
-      <h1 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Which position?</h1>
+      <h1 className={`${display} text-[40px] leading-[1.02] sm:text-[52px]`}>
+        <Turned>Which position?</Turned>
+      </h1>
       <ul className="overflow-hidden rounded-[20px] border border-line bg-panel">
         {holdings.map((h) => (
           <li key={h.coin} className="border-t border-line first:border-t-0">
@@ -327,8 +330,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
         {phase === 'edit' || phase === 'sealing' ? (
           <>
             <div className="flex flex-col gap-2">
-              <h1 className="text-[36px] font-semibold leading-none tracking-[-0.04em] sm:text-[48px]">
-                Guard {holding.coin} {holding.side.toLowerCase()}.
+              <h1 className={`${display} text-[40px] leading-[1.02] sm:text-[52px]`}>
+                <Turned>{`Guard ${holding.coin} ${holding.side.toLowerCase()}.`}</Turned>
               </h1>
               <p className="text-[15px] text-text-2">
                 {holding.margin === 'cross'
@@ -626,8 +629,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           </>
         ) : phase === 'save' && local ? (
           <div className="step-in flex flex-col items-start gap-4">
-            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">
-              Sealed. Now save your seal file.
+            <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+              <Turned>Sealed. Now save your seal file.</Turned>
             </h2>
             <p className="max-w-[34rem] text-[15px] text-text-2">
               Your settings are in the enclave, where nobody can read them. The seal file is your own copy, locked with
@@ -681,7 +684,9 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
           />
         ) : (
           <div className="step-in flex flex-col items-start gap-4">
-            <h2 className="text-[36px] font-semibold leading-none tracking-[-0.04em]">Guarded.</h2>
+            <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+              <Turned>Guarded.</Turned>
+            </h2>
             <p className="max-w-[34rem] text-[15px] text-text-2">
               Near liquidation, part of your reserve lands in your Hyperliquid margin as USDC. Nobody sees it coming.
             </p>
@@ -826,10 +831,12 @@ function Page() {
   if (existing) {
     return (
       <div className="my-auto flex flex-col items-center gap-4 py-16 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">
-          {holding.margin === 'cross'
-            ? 'A guard already covers your cross positions.'
-            : 'This position already has a guard.'}
+        <h1 className={`${display} text-[34px] leading-[1.05] sm:text-[40px]`}>
+          <Turned>
+            {holding.margin === 'cross'
+              ? 'A guard already covers your cross positions.'
+              : 'This position already has a guard.'}
+          </Turned>
         </h1>
         <Link href={`/guards/${existing.id}`} className={primaryBtn}>
           Open guard

@@ -20,6 +20,7 @@ import { readAgents } from '../../lib/hl';
 import type { TopupInput } from '../../lib/ownerActions';
 import { approveAgent, sendFromHyperliquid } from '../../lib/wallet';
 import { ghostBtn, primaryBtn } from './AppShell';
+import { Turned, display } from '../Display';
 
 export const assetOf = (reserve: string) => ASSETS.find((a) => a.reserve === reserve) ?? ASSETS[ASSETS.length - 1]!;
 
@@ -84,7 +85,9 @@ export function Approve({
 
   return (
     <div className="step-in flex flex-col items-start gap-4">
-      <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">One approval on Hyperliquid.</h2>
+      <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+        <Turned>One approval on Hyperliquid.</Turned>
+      </h2>
       <p className="max-w-[34rem] text-[15px] text-text-2">
         A rescue reaches an isolated position through one key you approve. It can&apos;t withdraw or send your money,
         and the guard only uses it to add margin. Revoke it on Hyperliquid any time; it ends with the guard.
@@ -259,8 +262,8 @@ export function Fund({
   return (
     <div className="step-in flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-          {topup ? 'Top up the reserve.' : 'Fund the reserve.'}
+        <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+          <Turned>{topup ? 'Top up the reserve.' : 'Fund the reserve.'}</Turned>
         </h2>
         <p className="max-w-[34rem] text-[15px] text-text-2">
           {asset.extra

@@ -9,6 +9,7 @@ import { Edge } from '../components/site/Edge';
 import { AppPreview } from '../components/site/AppPreview';
 import { NearPath } from '../components/site/NearPath';
 import { SealMark } from '../components/SealMark';
+import { EngravedField } from '../components/site/EngravedField';
 
 // Home (docs/DESIGN.md §4.1): one bold object per section, few words, every public number with its source and date.
 
@@ -16,7 +17,9 @@ const wrap =
   'mx-auto w-full max-w-[1240px] pl-[max(16px,env(safe-area-inset-left))] pr-[max(16px,env(safe-area-inset-right))] sm:px-8';
 const proof =
   'inline-flex min-h-11 w-fit items-center gap-1.5 text-[14px] font-medium text-text underline decoration-line-3 underline-offset-4 transition-colors duration-[120ms] hover:decoration-text';
-const h2 = 'text-[36px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[56px]';
+const h2 = 'font-display text-[44px] font-normal leading-[1] tracking-[-0.02em] sm:text-[72px]';
+/** The one word a headline turns on, in italic amber. */
+const turn = 'italic text-amber';
 const primary =
   'inline-flex min-h-11 items-center rounded-full bg-text px-6 text-[15px] font-semibold text-ground transition-opacity duration-[120ms] hover:opacity-90 active:opacity-80';
 const ghost =
@@ -158,11 +161,12 @@ export default function Home() {
 
       <main>
         <section
-          className={`${wrap} grid items-center gap-14 pb-28 pt-14 sm:pt-20 lg:grid-cols-[1fr_1.12fr] lg:gap-10 lg:pb-36`}
+          className={`${wrap} relative grid items-center gap-14 pb-28 pt-14 sm:pt-20 lg:grid-cols-[1fr_1.12fr] lg:gap-10 lg:pb-36`}
         >
+          <EngravedField className="absolute -left-[22%] top-[-330px] -z-10 hidden w-[78%] max-w-[1100px] [mask-image:linear-gradient(to_bottom,black_60%,transparent_74%)] lg:block" />
           <div className="flex flex-col gap-7">
-            <h1 className="text-[60px] font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[88px] lg:text-[112px]">
-              Hidden margin.
+            <h1 className="font-display text-[76px] font-normal leading-[0.9] tracking-[-0.025em] sm:text-[112px] lg:text-[144px]">
+              Hidden <span className={turn}>margin.</span>
             </h1>
             <p className="max-w-[30rem] text-[17px] leading-[1.55] text-text-2 sm:text-[20px]">
               Everyone can see where your Hyperliquid position dies. Ripcord keeps a reserve nobody can see, and moves
@@ -202,7 +206,9 @@ export default function Home() {
 
         <section id="app" className={`${wrap} scroll-mt-20 py-24`}>
           <div className="flex max-w-[36rem] flex-col gap-5">
-            <h2 className={h2}>This is the app.</h2>
+            <h2 className={h2}>
+              This is the <span className={turn}>app.</span>
+            </h2>
             <p className="text-[17px] text-text-2">
               Your positions with their guards, each guard a card only you can open, and the view a hunter gets: the
               same position with nothing to aim at.
@@ -215,7 +221,9 @@ export default function Home() {
 
         <section className={`${wrap} grid items-center gap-12 py-24 lg:grid-cols-[1fr_1.1fr]`}>
           <Reveal className="flex flex-col gap-5">
-            <h2 className={h2}>Your liquidation price is public.</h2>
+            <h2 className={h2}>
+              Your liquidation price is <span className={turn}>public.</span>
+            </h2>
             <p className="max-w-[32rem] text-[17px] text-text-2">
               Hyperliquid puts every position on chain. Heatmap tools draw every trader&apos;s liquidation level in real
               time, and some traders push price straight into them.
@@ -238,7 +246,9 @@ export default function Home() {
 
         <section id="how" className={`${wrap} scroll-mt-20 py-24`}>
           <Reveal>
-            <h2 className={h2}>Three steps. Then it watches.</h2>
+            <h2 className={h2}>
+              Three steps. Then it <span className={turn}>watches.</span>
+            </h2>
           </Reveal>
           <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
             {STEPS.map(([title, body], i) => (
@@ -258,7 +268,9 @@ export default function Home() {
 
         <section id="hunt" className={`${wrap} scroll-mt-20 py-24`}>
           <Reveal className="flex max-w-[36rem] flex-col gap-5">
-            <h2 className={h2}>Try to hunt it.</h2>
+            <h2 className={h2}>
+              Try to <span className={turn}>hunt</span> it.
+            </h2>
             <p className="text-[17px] text-text-2">
               You can see where this position dies. Sell into the book and push the price there. The guard runs the same
               rules as the real one.
@@ -271,7 +283,9 @@ export default function Home() {
 
         <section id="pricing" className={`${wrap} scroll-mt-20 py-24`}>
           <Reveal className="flex max-w-[44rem] flex-col gap-5">
-            <h2 className={h2}>Pay for saves, not alarms.</h2>
+            <h2 className={h2}>
+              Pay for <span className={turn}>saves,</span> not alarms.
+            </h2>
             <p className="text-[17px] text-text-2">
               Most rescues end with the price bouncing. Those cost you nothing but the network fee, and the USDC stays
               yours. The only other charge is $1 a month for the checks.
@@ -292,7 +306,7 @@ export default function Home() {
               ['$1', 'A month, per guard', 'Pays for the enclave checks that watch your position, day and night.'],
             ].map(([n, t, b]) => (
               <Reveal key={t} className="flex flex-col gap-3 rounded-[20px] border border-line bg-panel p-7">
-                <span className="text-[56px] font-semibold leading-none tracking-[-0.04em]">{n}</span>
+                <span className="font-display text-[72px] leading-none tracking-[-0.02em]">{n}</span>
                 <span className="text-[17px] font-semibold">{t}</span>
                 <span className="text-[15px] text-text-2">{b}</span>
               </Reveal>
@@ -302,7 +316,9 @@ export default function Home() {
 
         <section className={`${wrap} py-24`}>
           <Reveal>
-            <h2 className={h2}>Built so you don&apos;t have to trust us.</h2>
+            <h2 className={h2}>
+              Built so you don’t have to <span className={turn}>trust</span> us.
+            </h2>
           </Reveal>
           <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
             {TRUST.map(([t, b, label, href]) => (
@@ -368,8 +384,8 @@ export default function Home() {
               />
             </svg>
             <div className="relative flex max-w-[40rem] flex-col items-start gap-8">
-              <h2 className="text-[40px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[64px]">
-                Your line is public. Your defence isn&apos;t.
+              <h2 className={h2}>
+                Your line is public. Your defence <span className={turn}>isn’t.</span>
               </h2>
               <Link
                 href="/guards"

@@ -10,6 +10,7 @@ import { AppShell, ghostBtn, primaryBtn } from './AppShell';
 import { Connect } from './Connect';
 import { OpenSeal } from './OpenSeal';
 import { accountUrl, REGISTRY } from '../../lib/near';
+import { Turned, display } from '../Display';
 
 function Home() {
   const { ready, session, enter } = useSession();
@@ -22,7 +23,7 @@ function Home() {
   if (error && !account) {
     return (
       <Notice
-        title="Hyperliquid can't be read right now."
+        title="Hyperliquid can’t be read right now."
         text="Your guards don't depend on this page. It tries again every 15 seconds."
       />
     );
@@ -85,7 +86,9 @@ const EXAMPLE_ACTIVITY: Activity[] = [
 function Notice({ title, text, children }: { title: string; text: string; children?: ReactNode }) {
   return (
     <div className="my-auto flex flex-col items-center gap-2 py-16 text-center">
-      <h1 className="text-[28px] font-semibold tracking-[-0.03em]">{title}</h1>
+      <h1 className={`${display} text-[34px] leading-[1.05] sm:text-[40px]`}>
+        <Turned>{title}</Turned>
+      </h1>
       <p className="max-w-[30rem] text-text-2">{text}</p>
       {children && <div className="mt-4 flex flex-wrap justify-center gap-3">{children}</div>}
     </div>

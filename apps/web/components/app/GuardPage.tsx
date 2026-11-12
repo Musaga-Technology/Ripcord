@@ -55,6 +55,7 @@ import { Connect } from './Connect';
 import { GuardActions, NO_CONTROL, type Control, type OwnerActions } from './GuardActions';
 import { OnNear } from './OnNear';
 import { Approve, assetOf, Fund } from './steps';
+import { Turned, display } from '../Display';
 
 const DOTS = '••••••';
 /** Calm stretches of a crash run at 10× speed; the rescue in flight at 3×, so its clock can be read. */
@@ -405,7 +406,7 @@ function Header({
             Guards
           </Link>
         </div>
-        <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">{g.label}</h1>
+        <h1 className="text-[20px] font-semibold leading-tight tracking-[-0.02em] sm:text-[22px]">{g.label}</h1>
       </div>
       {paused ? (
         <p role="alert" className="-mt-4 rounded-[12px] border border-red px-4 py-3 text-[15px] text-red">
@@ -1002,8 +1003,8 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
       <section aria-label="Finish setting up" className="rounded-[20px] border border-line bg-panel p-5 sm:p-6">
         {!opened ? (
           <div className="flex flex-col gap-3">
-            <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-              Open your seal file to finish.
+            <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+              <Turned>Open your seal file to finish.</Turned>
             </h2>
             <p className="text-[15px] text-text-2">
               This guard isn&apos;t guarding yet. Your passphrase opens its seal file here, and the next step follows.
@@ -1187,7 +1188,9 @@ function Page({ id }: { id: string }) {
   if (!g) {
     return (
       <div className="my-auto flex flex-col items-center gap-3 py-16 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">This guard isn&apos;t on this account here.</h1>
+        <h1 className={`${display} text-[34px] leading-[1.05] sm:text-[40px]`}>
+          <Turned>This guard isn’t on this account here.</Turned>
+        </h1>
         <p className="max-w-[28rem] text-text-2">Connect the account it guards, or open its seal file from Guards.</p>
         <Link href="/guards" className={primaryBtn}>
           Back to guards

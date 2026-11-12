@@ -1,5 +1,6 @@
 import edge from '../../data/edge.json';
 import { Reveal } from './Reveal';
+import { Turned, display } from '../Display';
 
 // "The edge, right now.": the largest positions near liquidation in a scan of public Hyperliquid data
 // (scripts/scan/edge.py: the 1,500 largest accounts, addresses never written). Re-run before the video and the
@@ -32,8 +33,8 @@ export function Edge() {
   return (
     <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-end">
       <Reveal className="flex min-w-0 flex-col gap-5">
-        <h2 className="text-[36px] font-semibold leading-[1] tracking-[-0.04em] sm:text-[56px]">
-          The edge, right now.
+        <h2 className={`${display} text-[44px] leading-[1] sm:text-[72px]`}>
+          <Turned>The edge, right now.</Turned>
         </h2>
         <p className="max-w-[30rem] text-[17px] text-text-2">
           On {when}, {money(edge.within_10_usd)} in the {edge.accounts.toLocaleString('en-US')} largest Hyperliquid

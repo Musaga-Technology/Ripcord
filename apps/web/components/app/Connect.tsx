@@ -6,6 +6,7 @@ import { connectWallet, isAddress, wallets, type WalletChoice } from '../../lib/
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
 import { fieldCls, ghostBtn, primaryBtn } from './AppShell';
+import { Turned, display } from '../Display';
 
 /** The way in. Connecting gives the app an address and nothing else: no signature, and positions are public anyway. */
 export function Connect() {
@@ -53,8 +54,8 @@ export function Connect() {
   return (
     <div className="my-auto grid items-center gap-12 py-6 lg:grid-cols-[1fr_1fr] lg:gap-20">
       <div className="flex max-w-[30rem] flex-col gap-6">
-        <h1 className="text-[48px] font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[76px]">
-          Guard a position.
+        <h1 className={`${display} text-[56px] leading-[0.95] sm:text-[88px]`}>
+          <Turned>Guard a position.</Turned>
         </h1>
         <p className="text-[17px] text-text-2">
           Ripcord reads your positions from Hyperliquid. Connecting signs nothing and moves nothing. Your guard then

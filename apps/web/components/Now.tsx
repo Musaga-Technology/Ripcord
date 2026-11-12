@@ -1,6 +1,7 @@
 // "Now": where something stands in one plain sentence, the one next step, and a few facts. The Guards home and each
 // Guard page open with it, so a person always knows what to do next before the details.
 import type { ReactNode } from 'react';
+import { Turned, display } from './Display';
 
 export function Now({
   title,
@@ -18,7 +19,9 @@ export function Now({
       aria-label="Now"
       className="flex min-w-0 flex-col gap-4 rounded-[20px] border border-line bg-panel p-5 sm:p-6"
     >
-      <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] [text-wrap:balance]">{title}</h2>
+      <h2 className={`${display} text-[36px] leading-[1.05] sm:text-[42px]`}>
+        <Turned>{title}</Turned>
+      </h2>
       {children && <div className="max-w-[36rem] text-[15px] text-text-2">{children}</div>}
       {action && <div className="flex flex-wrap items-center gap-x-5 gap-y-3">{action}</div>}
       {facts && facts.length > 0 && (
