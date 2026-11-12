@@ -11,27 +11,65 @@ interface Provider {
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 export const isAddress = (s: string) => ADDRESS.test(s.trim());
 
-function injected(): Promise<Provider | null> {
+/** A wallet the browser offers (EIP-6963): several can be installed at once, and not every one signs for Ethereum. */
+export interface WalletChoice {
+  id: string;
+  name: string;
+  icon: string;
+  provider: Provider;
+}
+
+const CHOSEN = 'ripcord-wallet';
+const remembered = () => {
+  try {
+    return localStorage.getItem(CHOSEN);
+  } catch {
+    return null;
+  }
+};
+
+/** Every wallet that answers within a moment, then `window.ethereum` if none does. */
+export function wallets(): Promise<WalletChoice[]> {
   return new Promise((resolve) => {
-    let found: Provider | null = null;
+    const found = new Map<string, WalletChoice>();
     const on = (e: Event) => {
-      found ??= (e as CustomEvent<{ provider: Provider }>).detail.provider;
+      const d = (e as CustomEvent<{ info: { rdns: string; name: string; icon: string }; provider: Provider }>).detail;
+      if (d?.info?.rdns && !found.has(d.info.rdns))
+        found.set(d.info.rdns, { id: d.info.rdns, name: d.info.name, icon: d.info.icon, provider: d.provider });
     };
     window.addEventListener('eip6963:announceProvider', on);
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     setTimeout(() => {
       window.removeEventListener('eip6963:announceProvider', on);
-      resolve(found ?? (window as unknown as { ethereum?: Provider }).ethereum ?? null);
-    }, 120);
+      const list = [...found.values()];
+      const legacy = (window as unknown as { ethereum?: Provider }).ethereum;
+      resolve(
+        list.length ? list : legacy ? [{ id: 'injected', name: 'Browser wallet', icon: '', provider: legacy }] : [],
+      );
+    }, 150);
   });
+}
+
+/** The wallet this person picked (remembered), else the only one there is. */
+async function injected(): Promise<Provider | null> {
+  const list = await wallets();
+  return (list.find((w) => w.id === remembered()) ?? list[0])?.provider ?? null;
 }
 
 export const hasWallet = async () => (await injected()) !== null;
 
-export async function connectWallet(): Promise<string | null> {
-  const p = await injected();
+/** Connects the chosen wallet and remembers it, so every later signature goes to the same one. */
+export async function connectWallet(choice?: WalletChoice): Promise<string | null> {
+  const p = choice?.provider ?? (await injected());
   if (!p) return null;
   const accounts = (await p.request({ method: 'eth_requestAccounts' })) as string[];
+  if (choice) {
+    try {
+      localStorage.setItem(CHOSEN, choice.id);
+    } catch {
+      // Not remembered: the next signature asks the first wallet again.
+    }
+  }
   return accounts[0]?.toLowerCase() ?? null;
 }
 

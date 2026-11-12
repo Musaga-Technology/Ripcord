@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { demoSession, useSession } from '../../lib/session';
-import { connectWallet, isAddress } from '../../lib/wallet';
+import { connectWallet, isAddress, wallets, type WalletChoice } from '../../lib/wallet';
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
 import { fieldCls, ghostBtn, primaryBtn } from './AppShell';
@@ -13,15 +13,34 @@ export function Connect() {
   const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const [choices, setChoices] = useState<WalletChoice[] | null>(null);
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
+
+  const use = async (w: WalletChoice) => {
+    setError(null);
+    setWaiting(w.name);
+    setSlow(false);
+    const t = setTimeout(() => setSlow(true), 8000);
+    try {
+      const a = await connectWallet(w);
+      if (a) enter({ kind: 'wallet', address: a });
+      else setError("That wallet didn't share an account. Try another, or paste your address.");
+    } catch {
+      setError("Your wallet didn't connect. Try again, pick another, or paste your address.");
+    } finally {
+      clearTimeout(t);
+      setWaiting(null);
+    }
+  };
+
+  // Several wallets can be installed, and not every one signs for Ethereum: with more than one, the person picks.
   const wallet = async () => {
     setError(null);
-    try {
-      const a = await connectWallet();
-      if (a) enter({ kind: 'wallet', address: a });
-      else setError('No wallet found in this browser. Paste your address instead.');
-    } catch {
-      setError("Your wallet didn't connect. Try again, or paste your address.");
-    }
+    const list = await wallets();
+    if (list.length === 0) setError('No wallet found in this browser. Paste your address instead.');
+    else if (list.length === 1) void use(list[0]!);
+    else setChoices(list);
   };
 
   const paste = (e: React.FormEvent) => {
@@ -41,10 +60,34 @@ export function Connect() {
           Ripcord reads your positions from Hyperliquid. Connecting signs nothing and moves nothing. Your guard then
           runs on NEAR: its line sealed in an enclave, its reserve in a balance nobody can see.
         </p>
-        <div className="flex flex-wrap gap-3">
-          <button type="button" className={primaryBtn} onClick={wallet}>
-            Connect wallet
+        <div className="flex flex-col items-start gap-3">
+          <button type="button" className={primaryBtn} onClick={() => void wallet()} disabled={waiting !== null}>
+            {waiting ? `Waiting for ${waiting}…` : 'Connect wallet'}
           </button>
+          {choices && !waiting && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] text-muted">Pick the wallet that holds your Hyperliquid account</span>
+              <div className="flex flex-wrap gap-2">
+                {choices.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => void use(w)}
+                    className={`${ghostBtn} min-h-11 gap-2 px-4 text-[14px]`}
+                  >
+                    {w.icon && <img src={w.icon} alt="" width={20} height={20} className="rounded-[5px]" />}
+                    {w.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {waiting && slow && (
+            <p className="max-w-[30rem] text-[13px] text-muted">
+              Look for {waiting}&apos;s window; it may be behind this one. If nothing opened, reload and pick another
+              wallet.
+            </p>
+          )}
         </div>
         <form onSubmit={paste} className="flex flex-col gap-2 border-t border-line pt-5">
           <label htmlFor="address" className="text-[13px] text-muted">
