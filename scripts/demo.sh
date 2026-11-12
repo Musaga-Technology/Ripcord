@@ -66,6 +66,9 @@ fi
 step "Pokers decide when to wake the checker (docs/SPEC.md §4)"
 run $PNPM --filter @ripcord/poker test && ok "band, cadence, rate limit, settlement watch; an address is watched only with the owner's salt; encrypted at rest"
 
+step "Agents can call it: MCP tools and a risk desk on NEAR's Agent Market (services/mcp)"
+run $PNPM --filter @ripcord/mcp test && ok "four read-only tools over MCP · the desk starts, delivers, declines without an address and never logs one"
+
 step "A rescue is never paid twice (T-SEC-09, proven by packages/shared/test/executor.test.ts above)"
 ok "502 retried with the same key · 503 pauses with no public fallback · busy waits · refund re-fires · slow credit waits"
 ok "two pokers firing the same rescue pay once · 300 random fault mixes pay at most once"

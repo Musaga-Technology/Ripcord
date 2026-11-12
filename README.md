@@ -4,7 +4,7 @@
 
 On Hyperliquid every position's liquidation price is public, and traders push the price to those lines. Ripcord guards a position with a reserve whose size and trigger point are hidden: the trigger is sealed in a TEE on NEAR, the reserve sits in a private NEAR Intents balance, and when the price crosses your hidden line the reserve is moved into your Hyperliquid margin in under a minute. It can only ever pay your own account.
 
-Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`. Live on NEAR mainnet.
+Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`, `agents`. Live on NEAR mainnet.
 
 Design notes, research and feasibility tests were prepared from Oct 20, inside the hackathon window that opened with the Oct 19 announcement; their results are in `docs/EVIDENCE.md` and `docs/ARCHITECTURE.md`. All code in this repository was written from Oct 30 to Nov 14. Libraries are listed under "Built with".
 
@@ -13,7 +13,7 @@ Design notes, research and feasibility tests were prepared from Oct 20, inside t
 - **Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data, and committed only their hash. All six held: of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin, the same 20 as posting that reserve openly on the exchange. `bash scripts/demo.sh` checks the hash and rescores the result ([evidence](docs/EVIDENCE.md)).
 - **Live on NEAR mainnet.** The guard registry [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) and the checker `ripcord-registry.near/checker` on OutLayer run exactly the code in this repo: rebuild them and compare the hashes (table below), or open `/verify?example` and watch the app check the running build live.
 - **The money route is real.** In October we sent 4.79 USDC from a guard-style custody wallet into a Hyperliquid account's margin on mainnet; it landed 33.6 s after the call ([ARCHITECTURE §2](docs/ARCHITECTURE.md)).
-- **Tested.** 308 tests: 33 for the contract, 64 for the enclave, 14 for the Rust rules and replays, 124 shared, 51 web and 22 for the poker. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
+- **Tested.** 330 tests: 33 for the contract, 64 for the enclave, 14 for the Rust rules and replays, 124 shared, 51 web, 22 for the poker and 22 for the agent tools. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
 
 ## The problem
 
@@ -46,6 +46,7 @@ Design notes, research and feasibility tests were prepared from Oct 20, inside t
 | Leave the simulation and paste any Hyperliquid address | That account's real positions, nearest to liquidation first, each with a **Guard** button (reading needs no signature) |
 | Open http://localhost:3000/freeze and connect a NEAR wallet (HOT, Meteor, Intear, MyNearWallet, Ledger…) | The wallet signs one message that is the same on every device; the guards it owns are found by their hashes alone, and **Freeze** sends `freeze_guard` from your own wallet, with no seal file and no Ripcord server |
 | `corepack pnpm testnet:registry account`, then `deploy`, then `e2e` | 18 ✓ on NEAR and OutLayer testnet: the registry controls a guard wallet, an unlisted recipient is refused, the owner freezes with a NEP-413 signature, a frozen wallet refuses everything, a replayed signature is refused, unfreeze, a top-up raises the wallet's cap with no amount on chain, a new range swaps the fingerprint, close |
+| Point any MCP client at `corepack pnpm --filter @ripcord/mcp start` and ask about a Hyperliquid address | Four read-only tools, live on mainnet: `liquidation_risk` (positions nearest to liquidation first, and what the replays say about guarding the nearest), `replay_odds`, `guard_status` and `ripcord_ledger`, read from `ripcord-registry.near` |
 | `corepack pnpm copilot:eval` (with a NEAR AI key) | 16 varied requests, slang, French, Pidgin and an injection attempt among them, through the app's own encrypted path: 64 of 64 fields right |
 
 ## Live on NEAR mainnet
@@ -71,6 +72,7 @@ Every row links the code that uses the piece and a test or transaction that prov
 | NEP-413 signatures | The owner key in the seal file signs freezes, top-ups, new ranges and closes; the contract and the enclave check them | [contract](contracts/guard-registry/src/sig.rs#L18), [enclave](checker/src/owner.rs#L45), [top-up and new range in the enclave](checker/src/change.rs#L78), [browser](apps/web/lib/ownerActions.ts#L84) | [a signature works once](contracts/guard-registry/src/tests.rs#L410); [only the owner's key can close](checker/tests/owner.rs#L134); [a close pays the rest to the owner and closes on chain](checker/tests/owner.rs#L143); [a top-up raises the budget and the cap without saying how much](checker/tests/owner.rs#L227); [a new range waits for a landing rescue](checker/tests/owner.rs#L362); [testnet top-up](https://testnet.nearblocks.io/txns/Cy3e59eR5gisyKR5MiR6ZqJyLE4YkR4Va2DV61bEUmKL) and [new range](https://testnet.nearblocks.io/txns/HL4Vp9NwEKjqQQcRhc8baAC9eciqMdhVhP8RUvxjWkv3); [a testnet freeze](https://testnet.nearblocks.io/txns/J6N1R7VZhyZzJoS5fgn4WJ48XqkrQ2He1oFB1nV1qLi9) |
 | NEAR AI Cloud | Plain-words set-up: words encrypted in the browser to the model's attested key (E2EE), so Ripcord's server relays only ciphertext; Qwen in NEAR AI's TEE returns intent, Ripcord computes the amounts | [encrypts to the enclave key](apps/web/lib/copilot.ts#L25), [accepts only a report that answers a fresh nonce](apps/web/lib/copilot.ts#L113), [the relay](apps/web/app/api/copilot/route.ts#L60) | [only the enclave key opens a request](apps/web/test/copilot.test.ts#L26); [its answer can't set an address or a cap](apps/web/test/copilot.test.ts#L35); [the reserve is computed, not taken from the model](apps/web/test/copilot.test.ts#L54); 64 of 64 in the [eval](scripts/copilot-eval.ts) |
 | NEAR accounts (NEAR Connect) | A NEAR wallet can own a guard: it signs every owner action as NEP-413, makes the owner's salt again on any device, and freezes from `/freeze` with a transaction it sends itself | [the wallet signs and is checked on the device](apps/web/lib/nearWallet.ts#L55), [the salt again on any device](apps/web/lib/nearWallet.ts#L76), [freeze straight to the registry](apps/web/lib/nearWallet.ts#L88), [guards found by owner hash](contracts/guard-registry/src/lib.rs#L675) | [a wallet's signature checks however it is written, only for this registry](apps/web/test/near-wallet.test.ts#L29); [a wallet-owned guard keeps no key in its seal file](apps/web/test/near-wallet.test.ts#L47) |
+| Agent Market (market.near.ai) | The risk desk: a worker any person or agent can hire, or call over A2A and pay per call with x402; it answers with the liquidation risk report for the account in the brief, and declines (so the buyer is refunded) when there is none. Its token can't move funds, and it never logs an address | [the work loop](services/mcp/src/desk.ts#L48), [the report](services/mcp/src/risk.ts#L119), [the same report as an MCP tool](services/mcp/src/tools.ts#L45) | [starts, reads the account and delivers](services/mcp/test/desk.test.ts#L50); [never writes an address to its log](services/mcp/test/desk.test.ts#L80); [the MCP tools over a real client](services/mcp/test/tools.test.ts); the listing opens with the public launch |
 | FastFS | Hosts the checker's binary; OutLayer pins it by sha256 | [upload](scripts/near/lib.ts) | The mainnet build at its FastFS URL (EVIDENCE) |
 
 ## Trust model and honest limits
@@ -127,7 +129,7 @@ Priced on live Hyperliquid positions ($12.0B open interest; method in `docs/EVID
 - **Rhea Lending borrowers.** Rhea credits every deposit to its sender today; one small change (a deposit that names the account it credits) lets the same hidden reserve add collateral before a liquidation.
 - **A make-good fund:** 10 % of every save fee in a public multisig treasury that pays back a liquidation the guard should have prevented.
 - **Hidden stops and a fast lane:** stop-loss sealed in the enclave, never on the public book, and opt-in reduce-only orders for moves faster than a rescue.
-- **Agents:** an MCP tool so a trading agent can hire a guard for its own positions without seeing or changing it.
+- **Agents that guard themselves:** the MCP tools read today; next, a tool for a trading agent to seal and fund a guard for its own positions, so it is protected by a line it can't see or move.
 - **Mobile wallets** through WalletConnect.
 
 ## Repository layout
@@ -136,6 +138,7 @@ Priced on live Hyperliquid positions ($12.0B open interest; method in `docs/EVID
 apps/web                  Next.js app: set-up, guard, simulation, Verify, Ledger, and the NEAR AI relay
 packages/shared           Types, commitments, guard rules, sealing, owner messages (shared by web and poker)
 services/poker            Watches public Hyperliquid prices; wakes the checker near a guard's line
+services/mcp              For agents: read-only MCP tools, and the risk desk worker for NEAR's Agent Market
 crates/rules              Rust rules shared by the checker and the contract (same vectors as TypeScript)
 crates/replay             The crash replay harness and the sealed holdout
 contracts/guard-registry  NEAR contract: guard registry and wallet-policy controller
@@ -152,6 +155,7 @@ Libraries and tools, as the hackathon rules ask (Q-005). All code in this reposi
 - `@hot-labs/near-connect` (NEAR Connect: the wallet picker and NEP-413 signing)
 - `@noble/hashes`, `@noble/curves`, `@noble/ciphers` (SHA-256, ed25519, X25519, ChaCha20 and XChaCha20-Poly1305 in the browser); `near-api-js` (scripts)
 - Rust: `serde`, `serde_json`, `sha2`, `hex`, `base64`, `bs58`; `x25519-dalek`, `hkdf`, `chacha20poly1305`, `ed25519-dalek`; `near-sdk` (contract); `wit-bindgen`, `wasi-http-client`, `wasi` (checker on OutLayer); Binaryen `wasm-opt`
+- `@modelcontextprotocol/sdk` and `zod` (the agent tools)
 - vitest, ESLint, Prettier, tsx; Python 3 standard library for the reference implementation (`scripts/vectors.py`) and the replay scoring
 - Fonts: Geist, Geist Mono
 
