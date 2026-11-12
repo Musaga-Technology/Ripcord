@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ripcord for agents: an MCP server any agent can call, and a risk desk that takes paid calls on NEAR's Agent Market",
+  "description": "Ripcord for agents: an MCP server that reads risk and lets an agent guard its own positions, and a risk desk that takes paid calls on NEAR's Agent Market",
   "scripts": {
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@ripcord/shared": "workspace:*",
     "zod": "3.25.76"
   }

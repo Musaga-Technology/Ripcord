@@ -20,15 +20,27 @@ const textOf = (r: Awaited<ReturnType<Client['callTool']>>) =>
   (r.content as { type: string; text: string }[]).map((c) => c.text).join('\n');
 
 describe('the MCP server', () => {
-  it('offers four read-only tools', async () => {
+  it('offers four tools that read and four that act for an agent on its own guard', async () => {
     const { tools } = await (await connect()).listTools();
+    const readOnly = (n: string) => tools.find((t) => t.name === n)!.annotations?.readOnlyHint;
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'create_guard',
+      'finish_guard',
+      'freeze_guard',
+      'fund_guard',
       'guard_status',
       'liquidation_risk',
       'replay_odds',
       'ripcord_ledger',
     ]);
-    expect(tools.every((t) => t.annotations?.readOnlyHint)).toBe(true);
+    expect(['liquidation_risk', 'replay_odds', 'guard_status', 'ripcord_ledger'].every(readOnly)).toBe(true);
+    expect(['create_guard', 'fund_guard', 'finish_guard', 'freeze_guard'].some(readOnly)).toBe(false);
+  });
+
+  it('acts on a guard only when the server has an owner side', async () => {
+    const r = await (await connect()).callTool({ name: 'finish_guard', arguments: { guard_id: 'g1' } });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain('without an owner side');
   });
 
   it('reports liquidation risk from public Hyperliquid data', async () => {

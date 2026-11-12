@@ -95,6 +95,28 @@ export function replayOdds(coin: string, leverage: number): ReplayOdds {
   };
 }
 
+type Preset = 'safer' | 'balanced' | 'lean';
+
+/**
+ * The choice the set-up screen marks: the preset with the fewest liquidations in the replays at this reserve, then
+ * the fewest early rescues. Balanced below the smallest reserve the replays ran.
+ */
+export function markedPreset(coin: string, leverage: number, reserveX: number): Preset {
+  const band = [2, 1, 0.5].find((b) => reserveX >= b);
+  if (band === undefined) return 'balanced';
+  const d = replay();
+  const asset = d.figures[coin.toUpperCase()] ? coin.toUpperCase() : 'ETH';
+  const levs = Object.keys(d.figures[asset]!).map(Number);
+  const lev = levs.reduce((a, b) => (Math.abs(b - leverage) < Math.abs(a - leverage) ? b : a));
+  const cell = d.figures[asset]![String(lev)]![band.toFixed(1)]! as unknown as Record<
+    Preset,
+    { liquidated: number; early_month: number }
+  >;
+  return (['safer', 'balanced', 'lean'] as const)
+    .slice()
+    .sort((a, b) => cell[a].liquidated - cell[b].liquidated || cell[a].early_month - cell[b].early_month)[0]!;
+}
+
 export function assess(account: Account, now: Date): Risk {
   const positions = account.holdings
     .map(positionRisk)

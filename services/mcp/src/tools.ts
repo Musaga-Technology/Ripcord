@@ -1,9 +1,11 @@
-// Ripcord's MCP server: tools any agent can call to see a Hyperliquid account's liquidation risk, what the crash
-// replays say about guarding it, and what any guard on NEAR is doing. Read-only: no tool signs, moves money or
-// learns a guard's settings.
+// Ripcord's MCP server. Read: a Hyperliquid account's liquidation risk, what the crash replays say about guarding it,
+// and what any guard on NEAR is doing. Own: an agent seals, funds and can freeze a guard for its own account, with the
+// seal file kept on its machine; no tool moves money, and none returns a guard's settings.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { readAccount, shortAddress, view, type Sources } from './read';
+import type { Preset } from '@ripcord/shared';
+import { createGuard, finishGuard, freezeGuard, fundGuard, type FundFrom, type OwnerDeps } from './owner';
 import { assess, replayOdds, riskMarkdown } from './risk';
 
 export interface ToolDeps {
@@ -11,6 +13,8 @@ export interface ToolDeps {
   /** Where people set up a guard, without a trailing slash; null until the app is hosted. */
   appUrl: string | null;
   now?: () => Date;
+  /** The owner side: where seal files live and how the checker is reached. */
+  owner?: OwnerDeps;
 }
 
 interface Guard {
@@ -137,6 +141,131 @@ export function ripcordServer(d: ToolDeps): McpServer {
         return failed(e);
       }
     },
+  );
+
+  const owned =
+    <A>(run: (o: OwnerDeps, args: A) => Promise<string>) =>
+    async (args: A) => {
+      try {
+        if (!d.owner) throw new Error('This server was started without an owner side.');
+        return text(await run(d.owner, args));
+      } catch (e) {
+        return failed(e);
+      }
+    };
+  const OWNER = { readOnlyHint: false, destructiveHint: false, openWorldHint: true } as const;
+
+  server.registerTool(
+    'create_guard',
+    {
+      title: 'Create a guard',
+      description:
+        "Seal a Ripcord guard for a position on the agent's own Hyperliquid account: a hidden USDC reserve that lands in its margin before the liquidator gets there, at a line nobody can see, the agent included. The settings are sealed on this machine for the enclave on NEAR; the seal file stays here. A cross guard covers every cross position. Next: fund_guard.",
+      inputSchema: {
+        address: z.string().describe('The Hyperliquid account the agent trades from, 0x…'),
+        coin: z.string().describe('The position to guard, e.g. ETH; for cross margin, any cross position'),
+        reserve_usd: z
+          .number()
+          .min(2)
+          .optional()
+          .describe("The reserve in USD, $2 or more; by default the position's margin"),
+        preset: z
+          .enum(['safer', 'balanced', 'lean'])
+          .optional()
+          .describe('When to step in; by default the one the replays liquidated least at this reserve'),
+        days: z.number().int().min(1).max(365).optional().describe('How long the guard runs; 90 by default'),
+      },
+      annotations: OWNER,
+    },
+    owned(
+      async (
+        o,
+        a: {
+          address: string;
+          coin: string;
+          reserve_usd?: number | undefined;
+          preset?: Preset | undefined;
+          days?: number | undefined;
+        },
+      ) => {
+        const g = await createGuard(o, {
+          address: a.address,
+          coin: a.coin,
+          reserveUsd: a.reserve_usd,
+          preset: a.preset,
+          days: a.days,
+        });
+        return [
+          `Sealed guard ${g.guardId} for the ${g.position} (${g.margin} margin). Fingerprint ${g.fingerprint}.`,
+          `Its settings are in the seal file ${g.file}, locked with this server's passphrase; only three hashes and a sealed envelope left this machine.`,
+          g.approval
+            ? `Next: approve the agent key ${g.approval.agent} on Hyperliquid, named "${g.approval.name}", with the account's own signer (approveAgent). It can add margin to this position and can't withdraw or send. Then fund_guard.`
+            : 'Next: fund_guard.',
+        ].join('\n');
+      },
+    ),
+  );
+
+  server.registerTool(
+    'fund_guard',
+    {
+      title: 'Fund a guard',
+      description:
+        "Where to send a guard's USDC reserve: an address only this guard's private wallet receives at, and the exact amount. From Arbitrum the reserve's size stays private; from Hyperliquid the send is public. Then finish_guard.",
+      inputSchema: {
+        guard_id: z.string().describe('The id create_guard gave'),
+        from: z.enum(['arbitrum', 'hyperliquid']).describe('Where the USDC comes from'),
+      },
+      annotations: OWNER,
+    },
+    owned(async (o, a: { guard_id: string; from: FundFrom }) => {
+      const f = await fundGuard(o, { guardId: a.guard_id, from: a.from });
+      return [
+        `Send exactly ${f.amount} USDC on ${f.chain} to ${f.address}.`,
+        `${f.how} ${f.note}`,
+        'Then call finish_guard: it usually arrives in about a minute.',
+      ].join('\n');
+    }),
+  );
+
+  server.registerTool(
+    'finish_guard',
+    {
+      title: 'Finish a guard',
+      description:
+        "Checks whether a guard's reserve has landed. Once it has, the guard goes on NEAR and the pokers start watching its account. Safe to call again.",
+      inputSchema: { guard_id: z.string().describe('The id create_guard gave') },
+      annotations: { ...OWNER, idempotentHint: true },
+    },
+    owned(async (o, a: { guard_id: string }) => {
+      const r = await finishGuard(o, { guardId: a.guard_id });
+      if (r.state === 'waiting') return "Not yet: the reserve hasn't landed. Try again in a minute.";
+      return `Guarding: the reserve landed and guard ${a.guard_id} is on NEAR. ${
+        r.watchers
+          ? `${r.watchers} poker${r.watchers === 1 ? '' : 's'} watch it.`
+          : 'No poker took it: set RIPCORD_POKERS.'
+      }`;
+    }),
+  );
+
+  server.registerTool(
+    'freeze_guard',
+    {
+      title: 'Freeze or unfreeze a guard',
+      description:
+        "The owner's brake: while a guard is frozen nothing leaves its reserve, rescues included. Signed on this machine with the seal file's owner key and checked by the registry on NEAR.",
+      inputSchema: {
+        guard_id: z.string().describe('The id create_guard gave'),
+        frozen: z.boolean().describe('true to freeze, false to unfreeze'),
+      },
+      annotations: { ...OWNER, idempotentHint: true },
+    },
+    owned(async (o, a: { guard_id: string; frozen: boolean }) => {
+      await freezeGuard(o, { guardId: a.guard_id, frozen: a.frozen });
+      return a.frozen
+        ? `Frozen: nothing leaves guard ${a.guard_id}'s reserve until it is unfrozen.`
+        : `Unfrozen: guard ${a.guard_id} is guarding again.`;
+    }),
   );
 
   return server;
