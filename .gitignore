@@ -72,3 +72,6 @@ apps/web/AGENTS.md
 
 # Design-review snapshots (Impeccable critique runs): working notes, kept private like the scorecard
 .impeccable/
+
+# Vercel project link and pulled env files
+.vercel
