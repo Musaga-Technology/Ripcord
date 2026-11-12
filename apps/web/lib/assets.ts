@@ -112,9 +112,9 @@ export const FROM_ANY_WALLET: ReserveAsset = {
   name: 'USDC from any wallet',
   label: 'any wallet',
   digits: 2,
-  wait: 'From another chain, a reserve usually arrives in a few minutes.',
+  wait: 'From another chain, a reserve usually arrives in about a minute.',
   widget: true,
-  note: "The amount shows leaving your wallet on its own chain. Pay from a wallet that isn't your Hyperliquid account's to keep the reserve unsized.",
+  note: "Aurora routes it confidentially, so the wallet it came from can't be traced to this guard. The amount still shows leaving that wallet on its own chain: pay from one that isn't your Hyperliquid account's to keep the reserve unsized.",
 };
 
 /**

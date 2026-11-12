@@ -3,8 +3,8 @@
 // through NEAR Intents, into exactly the USDC this guard's deposit address waits for on Arbitrum. It sends only to that
 // address; the guard's wallet then credits its private balance as for any other deposit. Loaded only when chosen.
 import '@aurora-is-near/intents-swap-widget/styles.css';
-import { useEffect, useState } from 'react';
-import { fireEvent, WidgetConfigProvider, WidgetDepositMode } from '@aurora-is-near/intents-swap-widget';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useUnsafeSnapshot, WidgetConfigProvider, WidgetSwap } from '@aurora-is-near/intents-swap-widget';
 import { evm } from '@aurora-is-near/intents-swap-widget-evm';
 import { ARBITRUM_USDC, AURORA_KEY } from '../../lib/aurora';
 import { connectWallet, walletProvider } from '../../lib/wallet';
@@ -13,26 +13,20 @@ interface Eip1193 {
   request(request: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
 }
 
-function isDark(): boolean {
-  const t = document.documentElement.dataset.theme;
-  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-/** Follows the page's theme: the toggle's choice, else the system's. */
-function useDark(): boolean {
-  const [dark, setDark] = useState(isDark);
+/**
+ * Keeps "Buy" at exactly the reserve. The widget quotes for what arrives (exact output) only after the Buy box is
+ * typed in, which no setting reaches, so the box is filled the way a person fills it, and again if it ever drifts.
+ */
+function HoldAmount({ amount, root }: { amount: string; root: RefObject<HTMLDivElement | null> }) {
+  const { ctx } = useUnsafeSnapshot();
   useEffect(() => {
-    const on = () => setDark(isDark());
-    const mq = matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', on);
-    const mo = new MutationObserver(on);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => {
-      mq.removeEventListener('change', on);
-      mo.disconnect();
-    };
-  }, []);
-  return dark;
+    if (!ctx.targetToken || Number(ctx.targetTokenAmount) === Number(amount)) return;
+    const buy = root.current?.querySelectorAll('input')[1];
+    if (!buy) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(buy, amount);
+    buy.dispatchEvent(new Event('input', { bubbles: true }));
+  }, [ctx.targetToken, ctx.targetTokenAmount, amount, root]);
+  return null;
 }
 
 export default function PayAnyWallet({
@@ -49,49 +43,49 @@ export default function PayAnyWallet({
   wallet: string | null;
   onSent(): void;
 }) {
-  const dark = useDark();
   const [who, setWho] = useState(wallet);
-
-  // The widget quotes for what arrives (exact output), so the person pays whatever their token costs and the guard's
-  // address receives exactly the reserve.
-  useEffect(() => {
-    const t = setTimeout(() => fireEvent('tokenSetAmount', { variant: 'target', amount }), 300);
-    return () => clearTimeout(t);
-  }, [amount, address]);
+  const root = useRef<HTMLDivElement>(null);
 
   return (
-    <WidgetConfigProvider
-      config={{
-        apiKey: AURORA_KEY,
-        connectedWallets: { default: who },
-        providers: {
-          evm: async () => {
-            const p = await walletProvider();
-            if (!p) throw new Error('no wallet');
-            // The same EIP-1193 provider; the widget types its params more loosely.
-            return p as unknown as Eip1193;
+    // Dark in both themes, like the guard's card: a payment, held apart from the page around it.
+    <div ref={root} className="bg-[#111114] p-2">
+      <WidgetConfigProvider
+        config={{
+          apiKey: AURORA_KEY,
+          connectedWallets: { default: who },
+          providers: {
+            evm: async () => {
+              const p = await walletProvider();
+              if (!p) throw new Error('no wallet');
+              // The same EIP-1193 provider; the widget types its params more loosely.
+              return p as unknown as Eip1193;
+            },
           },
-        },
-        plugins: { evm },
-        onWalletSignin: () => void connectWallet().then(setWho),
-        sendAddress: address,
-        hideSendAddress: true,
-        defaultTargetToken: { symbol: 'USDC', blockchain: 'arb' },
-        allowedTargetTokensList: [ARBITRUM_USDC],
-        lockSwapDirection: true,
-        slippageTolerance: 100,
-        confidentialMode: 'public',
-      }}
-      theme={{
-        colorScheme: dark ? 'dark' : 'light',
-        accentColor: dark ? '#e8a33d' : '#9a5b00',
-        backgroundColor: dark ? '#111114' : '#ffffff',
-        borderRadius: 'lg',
-        stylePreset: 'clean',
-        showContainer: false,
-      }}
-    >
-      <WidgetDepositMode onMsg={(m) => m.type === 'on_transfer_success' && onSent()} />
-    </WidgetConfigProvider>
+          plugins: { evm },
+          onWalletSignin: () => void connectWallet().then(setWho),
+          sendAddress: address,
+          hideSendAddress: true,
+          defaultTargetToken: { symbol: 'USDC', blockchain: 'arb' },
+          allowedTargetTokensList: [ARBITRUM_USDC],
+          lockSwapDirection: true,
+          slippageTolerance: 100,
+          // Routed through NEAR's private shard: the paying wallet and the route can't be traced to this guard.
+          // Checked with dry quotes to an outside address: it still delivers the exact amount, for 0.05% more on
+          // stablecoins.
+          confidentialMode: 'confidential',
+        }}
+        theme={{
+          colorScheme: 'dark',
+          accentColor: '#e8a33d',
+          backgroundColor: '#111114',
+          borderRadius: 'lg',
+          stylePreset: 'clean',
+          showContainer: false,
+        }}
+      >
+        <HoldAmount amount={amount} root={root} />
+        <WidgetSwap onMsg={(m) => m.type === 'on_transfer_success' && onSent()} />
+      </WidgetConfigProvider>
+    </div>
   );
 }
