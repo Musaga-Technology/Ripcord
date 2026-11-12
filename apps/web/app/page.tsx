@@ -10,6 +10,7 @@ import { AppPreview } from '../components/site/AppPreview';
 import { NearPath } from '../components/site/NearPath';
 import { SealMark } from '../components/SealMark';
 import { EngravedField } from '../components/site/EngravedField';
+import { AgentSession } from '../components/site/AgentSession';
 
 // Home (docs/DESIGN.md §4.1): one bold object per section, few words, every public number with its source and date.
 
@@ -132,6 +133,9 @@ export default function Home() {
             </a>
             <a href="#near" className="hover:text-text">
               On NEAR
+            </a>
+            <a href="#agents" className="hover:text-text">
+              Agents
             </a>
             <a href="#hunt" className="hover:text-text">
               Try to hunt it
@@ -300,6 +304,45 @@ export default function Home() {
               </a>
             </div>
           </Reveal>
+        </section>
+
+        <section id="agents" className={`${wrap} scroll-mt-20 grid items-start gap-12 py-24 lg:grid-cols-[1fr_1.1fr]`}>
+          <Reveal className="flex flex-col gap-5">
+            <h2 className={h2}>
+              Agents get hunted <span className={turn}>too.</span>
+            </h2>
+            <p className="max-w-[32rem] text-[17px] text-text-2">
+              A trading agent&apos;s positions sit on the same public book. Through Ripcord&apos;s tools it guards
+              itself: the line is sealed on its own machine, and the reserve&apos;s wallet can only ever pay its own
+              account. It hands over no keys.
+            </p>
+            <div className="mt-4 grid gap-8 sm:grid-cols-2">
+              {[
+                [
+                  'Guard itself.',
+                  'Seal, fund and finish a guard, and freeze it to stop everything. No answer carries the line or the reserve.',
+                  'The agent tools',
+                  src('services/mcp/src/owner.ts'),
+                ],
+                [
+                  'Sell what it sees.',
+                  "Ripcord's risk desk on NEAR's Agent Market reports any account's liquidation risk, to people or other agents, for $1 a call.",
+                  'The risk desk',
+                  src('services/mcp/src/desk.ts'),
+                ],
+              ].map(([t, b, label, href]) => (
+                <div key={t} className="flex flex-col gap-2 border-t border-line pt-5">
+                  <h3 className="text-[17px] font-semibold">{t}</h3>
+                  <p className="text-[15px] text-text-2">{b}</p>
+                  <a href={href} className={proof}>
+                    {label}
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+          <AgentSession />
         </section>
 
         <section id="pricing" className={`${wrap} scroll-mt-20 py-24`}>
