@@ -291,7 +291,6 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
       };
       saveGuard(g);
       setLocal(g);
-      void watch(p.contents);
       setPhase('save');
     } catch (e) {
       setError(explain(e, 'the seal'));
@@ -675,6 +674,8 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
             fallback={amountStr}
             onFunded={() => {
               saveGuard({ ...local, funded: true });
+              // The pokers take a guard once it is on chain, which is when its reserve arrives.
+              void watch(prepared.contents);
               setPhase('guarded');
             }}
           />

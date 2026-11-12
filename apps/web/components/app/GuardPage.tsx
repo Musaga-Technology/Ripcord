@@ -17,7 +17,7 @@ import {
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { lastCheck, random, readFrozen, readGuard, readReceipts, type OnChainReceipt } from '../../lib/backend';
+import { lastCheck, random, readFrozen, readGuard, readReceipts, watch, type OnChainReceipt } from '../../lib/backend';
 import {
   resealed,
   signClose,
@@ -831,6 +831,12 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const [topping, setTopping] = useState<{ input: TopupInput; usd: number } | null>(null);
   const [tab, setTab] = useState<TabId>('price');
 
+  // A guarded guard's pokers are told again whenever its seal file is open here: a poker that restarted, or missed
+  // the hand-off after funding, picks it up. Telling one twice changes nothing.
+  useEffect(() => {
+    if (opened && state === 'guarded') void watch(opened);
+  }, [opened, state]);
+
   useEffect(() => {
     const read = () => {
       lastCheck(g.id)
@@ -983,6 +989,7 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
             fallback={reserveWords(opened.settings)}
             onFunded={() => {
               patchGuard(g.id, { funded: true });
+              void watch(opened);
               setState('guarded');
             }}
           />
