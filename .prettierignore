@@ -6,3 +6,4 @@ contracts/
 **/.next/
 **/node_modules/
 packages/shared/vectors/
+**/.vercel/
