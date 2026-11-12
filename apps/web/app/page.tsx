@@ -128,7 +128,7 @@ export default function Home() {
               Pricing
             </a>
             <a href="#app" className="hover:text-text">
-              The app
+              Preview
             </a>
             <a href="#near" className="hover:text-text">
               On NEAR
