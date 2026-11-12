@@ -6,15 +6,7 @@ import type { ReactNode } from 'react';
 import { useSession } from '../../lib/session';
 import { ThemeToggle } from '../ThemeToggle';
 import { AccountMenu } from './AccountMenu';
-
-function Logo() {
-  return (
-    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="11" r="9.5" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="11" cy="11" r="5.5" stroke="var(--amber)" strokeWidth="1.4" />
-    </svg>
-  );
-}
+import { SealMark } from '../SealMark';
 
 const TABS = [
   { href: '/guards', label: 'Guards' },
@@ -54,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className={`${appWrap} flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3`}>
           <div className="flex items-center gap-4 sm:gap-9">
             <Link href="/" className="flex min-h-10 items-center gap-2.5 text-[17px] font-semibold tracking-[-0.02em]">
-              <Logo />
+              <SealMark size={20} />
               Ripcord
             </Link>
             <nav aria-label="App" className="hidden gap-1 text-[15px] sm:flex">

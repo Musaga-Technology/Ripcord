@@ -8,17 +8,9 @@ import { Count, Reveal } from '../components/site/Reveal';
 import { Edge } from '../components/site/Edge';
 import { AppPreview } from '../components/site/AppPreview';
 import { NearPath } from '../components/site/NearPath';
+import { SealMark } from '../components/SealMark';
 
 // Home (docs/DESIGN.md §4.1): one bold object per section, few words, every public number with its source and date.
-
-function Logo() {
-  return (
-    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="11" r="9.5" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="11" cy="11" r="5.5" stroke="var(--amber)" strokeWidth="1.4" />
-    </svg>
-  );
-}
 
 const wrap =
   'mx-auto w-full max-w-[1240px] pl-[max(16px,env(safe-area-inset-left))] pr-[max(16px,env(safe-area-inset-right))] sm:px-8';
@@ -132,7 +124,7 @@ export default function Home() {
       <header className="sticky top-0 z-40 border-b border-line bg-ground">
         <div className={`${wrap} flex h-16 items-center justify-between gap-6`}>
           <Link href="/" className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.02em]">
-            <Logo />
+            <SealMark />
             Ripcord
           </Link>
           <nav aria-label="Site" className="hidden items-center gap-7 text-[15px] text-muted lg:flex">
@@ -395,7 +387,7 @@ export default function Home() {
         <div className={`${wrap} grid gap-10 py-12 text-[15px] sm:grid-cols-[1.4fr_1fr_1fr]`}>
           <div className="flex flex-col gap-3">
             <span className="flex items-center gap-2 font-semibold">
-              <Logo /> Ripcord
+              <SealMark /> Ripcord
             </span>
             <span className="max-w-[22rem] text-[13px] text-muted">
               Hidden margin for Hyperliquid. Built at NEAR HACKATHON, 2026.
