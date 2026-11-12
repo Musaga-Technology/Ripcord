@@ -913,6 +913,47 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
   const liq = h?.liquidation ?? null;
   const d = liq === null || !mark ? null : distanceOf(liq, mark);
 
+  // A rescue, seen privately: with the seal file open, the reserve's balance is read sealed to the owner. A drop of at
+  // least the smallest rescue means one fired (a month's $1 isn't one); a jump in distance means it landed. Nothing
+  // about it is asked of anyone else, so its timing stays the owner's.
+  const [flight, setFlight] = useState<{ at: number; liq: number | null; d: number | null } | null>(null);
+  const [landed, setLanded] = useState<{ at: number; from: number | null; to: number | null } | null>(null);
+  const live = useRef({ d, liq });
+  live.current = { d, liq };
+  useEffect(() => {
+    if (!opened || state !== 'guarded') return;
+    const usdc = assetOf(opened.settings.reserve_asset).symbol === 'USDC';
+    let last: bigint | null = null;
+    const look = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const b = await backend.reserve(opened);
+        const held = BigInt(b[opened.settings.reserve_asset] ?? '0');
+        if (last !== null && last - held >= (usdc ? 2_000_000n : 1n))
+          setFlight({ at: Date.now(), liq: live.current.liq, d: live.current.d });
+        last = held;
+      } catch {
+        // The next look tries again.
+      }
+    };
+    void look();
+    const t = setInterval(look, 15_000);
+    return () => clearInterval(t);
+  }, [opened, state, backend]);
+  useEffect(() => {
+    if (!flight) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [flight]);
+  useEffect(() => {
+    if (!flight) return;
+    if (d !== null && flight.d !== null && d - flight.d >= 2) {
+      setLanded({ at: Date.now(), from: flight.liq, to: liq });
+      setFlight(null);
+    } else if (now - flight.at > 300_000) setFlight(null);
+  }, [flight, d, liq, now]);
+  const justLanded = landed !== null && now - landed.at < 120_000;
+
   const rows: HistoryRow[] = receipts.map((r) => {
     let added = `about ${usd(r.public.credit_usd)}`;
     if (opened) {
@@ -1020,7 +1061,17 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
       </section>
     ) : (
       <Now
-        title={paused ? 'Guard paused.' : control.frozen ? 'Reserve frozen.' : 'You’re guarded.'}
+        title={
+          flight
+            ? 'A rescue is on its way.'
+            : justLanded
+              ? 'Rescued.'
+              : paused
+                ? 'Guard paused.'
+                : control.frozen
+                  ? 'Reserve frozen.'
+                  : 'You’re guarded.'
+        }
         action={
           control.frozen ? (
             <QuietLink onClick={() => setTab('manage')}>Unfreeze it in Manage</QuietLink>
@@ -1041,13 +1092,17 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
           ['Rescues', String(receipts.length)],
         ]}
       >
-        {paused
-          ? paused
-          : control.frozen
-            ? 'Nothing can leave the reserve, rescues included, until you unfreeze it.'
-            : liq !== null
-              ? `If ${g.coin} ${moving} toward ${price(liq)}, your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.`
-              : 'Your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.'}
+        {flight
+          ? `Part of your hidden reserve is crossing into your margin through NEAR Intents, ${mmss((now - flight.at) / 1000)} so far. Watch the red line move away when it lands.`
+          : justLanded
+            ? `It landed in your margin. Your liquidation price moved from ${landed.from === null ? '—' : price(landed.from)} to ${landed.to === null ? '—' : price(landed.to)}.`
+            : paused
+              ? paused
+              : control.frozen
+                ? 'Nothing can leave the reserve, rescues included, until you unfreeze it.'
+                : liq !== null
+                  ? `If ${g.coin} ${moving} toward ${price(liq)}, your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.`
+                  : 'Your hidden reserve adds to your margin before the liquidator gets there. Nothing to do now.'}
       </Now>
     );
 
@@ -1061,11 +1116,11 @@ function LiveGuard({ g, h }: { g: ShownGuard; h: Holding | null }) {
             <GuardCard
               label={g.cardLabel ?? g.label}
               distance={d === null ? '—' : pct(d)}
-              sub="from liquidation"
+              sub={flight ? `rescue on its way · ${mmss((now - flight.at) / 1000)}` : 'from liquidation'}
               fingerprint={seal.fingerprint}
               commitment={seal.commitment}
-              state={shownState}
-              status={status}
+              state={flight ? 'rescuing' : justLanded ? 'rescued' : shownState}
+              status={flight ? 'Rescuing…' : justLanded ? 'Rescued' : status}
               reserve={DOTS}
               depth
             />
