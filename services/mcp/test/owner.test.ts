@@ -35,7 +35,12 @@ async function setup(passphrase: string | null = PASS) {
     if (u.startsWith(`${AURORA}/api/quote/`)) {
       quotes.push({ url: u, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
       return Response.json({
-        quote: { depositAddress: ONE_TIME, amountInFormatted: '0.012345', deadline: '2026-11-12T14:50:00.000Z' },
+        quote: {
+          depositAddress: ONE_TIME,
+          amountIn: '12345000000000000',
+          amountInFormatted: '0.012345',
+          deadline: '2026-11-12T14:50:00.000Z',
+        },
       });
     }
     return (await checker.fetchFn(url, init)) ?? hl(url, init);

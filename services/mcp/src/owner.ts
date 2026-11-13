@@ -224,6 +224,10 @@ export interface AnyTokenFunding {
   address: string;
   /** Exactly what to send there, in the agent's token. */
   amount: string;
+  /** The same amount in the token's smallest units, for a wallet to send exactly. */
+  units: string;
+  /** The token's NEAR Intents id, e.g. `nep141:base.omft.near` for ETH on Base. */
+  assetId: string;
   token: string;
   chain: string;
   /** What the guard's deposit address receives, in USDC. */
@@ -274,14 +278,16 @@ export async function fundGuardWithAnyToken(
     signal: AbortSignal.timeout(30_000),
   });
   const q = (await res.json()) as {
-    quote?: { depositAddress?: string; amountInFormatted?: string; deadline?: string };
+    quote?: { depositAddress?: string; amountIn?: string; amountInFormatted?: string; deadline?: string };
     message?: string;
   };
-  if (!res.ok || !q.quote?.depositAddress || !q.quote.amountInFormatted)
+  if (!res.ok || !q.quote?.depositAddress || !q.quote.amountInFormatted || !q.quote.amountIn)
     throw new Error(`Aurora couldn't quote it: ${q.message ?? `HTTP ${res.status}`}.`);
   return {
     address: q.quote.depositAddress,
     amount: q.quote.amountInFormatted,
+    units: q.quote.amountIn,
+    assetId: t.assetId,
     token: t.symbol,
     chain: t.blockchain,
     reserve: String(Number(dep.amount) / 10 ** dep.decimals),

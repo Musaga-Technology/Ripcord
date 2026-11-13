@@ -8,13 +8,15 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
     "start": "tsx src/main.ts",
-    "desk": "tsx src/desk-main.ts"
+    "desk": "tsx src/desk-main.ts",
+    "agent": "tsx src/agent-main.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "@ripcord/shared": "workspace:*",
+    "viem": "2.55.19",
     "zod": "3.25.76"
   }
 }

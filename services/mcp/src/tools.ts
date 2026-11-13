@@ -152,11 +152,12 @@ export function ripcordServer(d: ToolDeps): McpServer {
   );
 
   const owned =
-    <A>(run: (o: OwnerDeps, args: A) => Promise<string>) =>
+    <A>(run: (o: OwnerDeps, args: A) => Promise<string | { text: string; data: Record<string, unknown> }>) =>
     async (args: A) => {
       try {
         if (!d.owner) throw new Error('This server was started without an owner side.');
-        return text(await run(d.owner, args));
+        const r = await run(d.owner, args);
+        return typeof r === 'string' ? text(r) : { ...text(r.text), structuredContent: r.data };
       } catch (e) {
         return failed(e);
       }
@@ -255,11 +256,15 @@ export function ripcordServer(d: ToolDeps): McpServer {
             chain: a.chain,
             refundTo: a.refund_to,
           });
-          return [
-            `Send exactly ${f.amount} ${f.token} on ${f.chain} to ${f.address}${f.deadline ? ` before ${f.deadline}` : ''}.`,
-            `Aurora routes it confidentially through NEAR Intents, and the guard's deposit address receives exactly ${f.reserve} USDC. If it can't fill, it goes back to ${a.refund_to}.`,
-            'Then call finish_guard: it usually arrives in about a minute.',
-          ].join('\n');
+          return {
+            text: [
+              `Send exactly ${f.amount} ${f.token} on ${f.chain} to ${f.address}${f.deadline ? ` before ${f.deadline}` : ''}.`,
+              `Aurora routes it confidentially through NEAR Intents, and the guard's deposit address receives exactly ${f.reserve} USDC. If it can't fill, it goes back to ${a.refund_to}.`,
+              'Then call finish_guard: it usually arrives in about a minute.',
+            ].join('\n'),
+            // The quote as data, so a wallet pays these exact figures rather than text a model wrote.
+            data: { ...f },
+          };
         }
         return fundOne(o, a.guard_id, a.from);
       },
