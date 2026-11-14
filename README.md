@@ -4,7 +4,7 @@
 
 On Hyperliquid every position's liquidation price is public, and traders push the price to those lines. Ripcord guards a position with a reserve whose size and trigger point are hidden: the trigger is sealed in a TEE on NEAR, the reserve sits in a private NEAR Intents balance, and when the price crosses your hidden line the reserve is moved into your Hyperliquid margin in under a minute. It can only ever pay your own account.
 
-Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`, `agents`. Live on NEAR mainnet.
+Built for NEAR HACKATHON (Oct 19 – Nov 14, 2026). Tracks: `defi`, `privacy`, `security`, `agents`, `swarms`. Live on NEAR mainnet.
 
 Design notes, research and feasibility tests were prepared from Oct 20, inside the hackathon window that opened with the Oct 19 announcement; their results are in `docs/EVIDENCE.md` and `docs/ARCHITECTURE.md`. All code in this repository was written from Oct 30 to Nov 14. Libraries are listed under "Built with".
 
@@ -13,7 +13,7 @@ Design notes, research and feasibility tests were prepared from Oct 20, inside t
 - **Tested blind.** On Nov 3 we sealed six predictions about how the guard would do on October 2026 prices, before running that data, and committed only their hash. All six held: of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin, the same 20 as posting that reserve openly on the exchange. `bash scripts/demo.sh` checks the hash and rescores the result ([evidence](docs/EVIDENCE.md)).
 - **Live on NEAR mainnet.** The guard registry [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) and the checker `ripcord-registry.near/checker` on OutLayer run exactly the code in this repo: rebuild them and compare the hashes (table below), or open `/verify?example` and watch the app check the running build live.
 - **The money route is real.** In October we sent 4.79 USDC from a guard-style custody wallet into a Hyperliquid account's margin on mainnet; it landed 33.6 s after the call ([ARCHITECTURE §2](docs/ARCHITECTURE.md)).
-- **Tested.** 345 tests: 33 for the contract, 64 for the enclave, 14 for the Rust rules and replays, 124 shared, 55 web, 22 for the poker and 33 for the agent tools. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
+- **Tested.** 370 tests: 33 for the registry contract, 11 for the keeper market, 71 for the enclave (7 of them for keepers), 16 for the Rust rules and replays, 124 shared, 55 web, 24 for the poker and 36 for the agent tools. TypeScript, Rust and a Python reference agree on every hash and guard decision through golden vectors checked in CI.
 
 ## The problem
 
@@ -77,6 +77,16 @@ Every row links the code that uses the piece and a test or transaction that prov
 | Agent Market (market.near.ai) | The risk desk: a worker any person or agent can hire, or call over A2A and pay per call with x402; it answers with the liquidation risk report for the account in the brief, and declines (so the buyer is refunded) when there is none. Its token can't move funds, and it never logs an address | [the work loop](services/mcp/src/desk.ts#L48), [the report](services/mcp/src/risk.ts#L141), [the same report as an MCP tool](services/mcp/src/tools.ts#L57), [an agent guards its own account](services/mcp/src/owner.ts#L139) | [starts, reads the account and delivers](services/mcp/test/desk.test.ts#L50); [never writes an address to its log](services/mcp/test/desk.test.ts#L80); [the MCP tools over a real client](services/mcp/test/tools.test.ts); [an agent's guard is sealed on its machine and only hashes leave](services/mcp/test/owner.test.ts#L64), [its freeze signature passes the registry's check](services/mcp/test/owner.test.ts#L154); the listing opens with the public launch |
 | FastFS | Hosts the checker's binary; OutLayer pins it by sha256 | [upload](scripts/near/lib.ts) | The mainnet build at its FastFS URL (EVIDENCE) |
 
+## Open keeper network
+
+A guard is only as fast as whoever asks the enclave to check it. So anyone can run a poker, a "keeper", and name its NEAR account on its checks (`KEEPER_ACCOUNT`). Keepers form a swarm around every guard, and they compete on one thing: being the first to catch a guard in danger.
+
+- **A keeper can only ask.** It sends `check`; the enclave alone decides to rescue, and answers with a bare status. A keeper can't force a rescue, so bounties can't be farmed, and it never learns where the line is.
+- **The one that fires the rescue gets paid.** When a keeper's check is the one that fires a rescue, the enclave credits that keeper in the [keeper market](contracts/keeper-market/src/lib.rs), once per rescue, and the keeper claims a fixed bounty from a pool anyone can fund. Only the enclave's own account can credit.
+- **More keepers never mean more payments.** The pay-once rescue keys already make two pokers firing the same rescue pay once, and a failed credit never touches the rescue.
+
+The market is [live on NEAR testnet](https://testnet.nearblocks.io/address/ripcord-keepers-e3d46d7d.testnet), naming the testnet enclave as its only creditor (`corepack pnpm testnet:keepers status` reads it back). The enclave side is a `keepers` feature that the published builds leave off, so `bash checker/build.sh mainnet` still prints `8d2812d7…` and Verify's claim holds; testnet has no route for real rescue money, so the credit path is proven by tests. Proof: [11 contract tests](contracts/keeper-market/src/tests.rs), [7 enclave tests](checker/tests/keepers.rs) (`cargo test -p ripcord-checker --features keepers`), and [the poker names its keeper](services/poker/test/clients.test.ts).
+
 ## Trust model and honest limits
 
 See `docs/ARCHITECTURE.md` §2. In short:
@@ -132,6 +142,7 @@ Priced on live Hyperliquid positions ($12.0B open interest; method in `docs/EVID
 - **A make-good fund:** 10 % of every save fee in a public multisig treasury that pays back a liquidation the guard should have prevented.
 - **Hidden stops and a fast lane:** stop-loss sealed in the enclave, never on the public book, and opt-in reduce-only orders for moves faster than a rescue.
 - **Agents that pay their own way:** a trading agent sending its guard's deposit with its own wallet tools, so no person steps in between `fund_guard` and `finish_guard`.
+- **Keepers on mainnet:** the enclave's keepers build on mainnet, so real rescues pay the keepers that fire them.
 - **Mobile wallets** through WalletConnect.
 
 ## Repository layout
@@ -144,6 +155,7 @@ services/mcp              For agents: MCP tools to read risk and to guard an age
 crates/rules              Rust rules shared by the checker and the contract (same vectors as TypeScript)
 crates/replay             The crash replay harness and the sealed holdout
 contracts/guard-registry  NEAR contract: guard registry and wallet-policy controller
+contracts/keeper-market   NEAR contract: credits the keeper whose check fires a rescue, and pays its bounty
 checker                   The program in OutLayer's TEE: sealed guards, Hyperliquid reads, rescues, close
 scripts                   Reference implementation, testnet and mainnet deploys, replay data, the AI eval
 docs                      Architecture and trust model, interfaces (SPEC), design, evidence

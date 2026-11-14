@@ -330,6 +330,12 @@ export default function Home() {
                   'The risk desk',
                   src('services/mcp/src/desk.ts'),
                 ],
+                [
+                  'Keep watch, get paid.',
+                  'Anyone can run a keeper. The first to catch a guard in danger triggers its rescue and earns a bounty, without ever learning where the line is.',
+                  'The keeper market, on testnet',
+                  'https://testnet.nearblocks.io/address/ripcord-keepers-e3d46d7d.testnet',
+                ],
               ].map(([t, b, label, href]) => (
                 <div key={t} className="flex flex-col gap-2 border-t border-line pt-5">
                   <h3 className="text-[17px] font-semibold">{t}</h3>
