@@ -34,7 +34,7 @@ await Promise.all([server.connect(a), client.connect(b)]);
 console.log('Trading agent · thinks with NEAR AI Cloud · guards itself with Ripcord · pays from its own wallet\n');
 const end = await runAgent({
   client,
-  model: nearAi(env.NEARAI_API_KEY, env.NEARAI_MODEL),
+  model: nearAi(env.NEARAI_API_KEY, env.NEARAI_MODEL || undefined),
   wallet,
   account,
   reserveUsd: Number(env.AGENT_RESERVE_USD ?? '2'),
