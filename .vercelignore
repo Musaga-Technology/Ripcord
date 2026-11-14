@@ -1,0 +1,6 @@
+# Build output and installed packages stay local: Vercel installs and builds the web app itself.
+target
+**/target
+**/node_modules
+**/.next
+**/.vercel
