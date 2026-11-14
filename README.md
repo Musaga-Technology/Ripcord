@@ -6,6 +6,8 @@ On Hyperliquid every position's liquidation price is public, and traders push th
 
 Built at NEAR HACKATHON 2026 · live on NEAR mainnet · tracks `defi`, `privacy`, `security`, `agents`, `swarms`
 
+**[Try it live](https://ripcord-self.vercel.app)** (real accounts on mainnet, or a simulation with no funds) · [evidence for every claim](docs/EVIDENCE.md)
+
 <p>
 <img src="docs/img/rescued.jpg" alt="The guard page on mainnet, Nov 14: Rescued. It landed in the margin and the liquidation price moved from 54,852 to 44,224." width="49%">
 <img src="docs/img/verify.jpg" alt="Verify on the same guard: the settings match the seal, every line it drew sat inside the sealed range, and OutLayer runs the build this repository prints." width="49%">
