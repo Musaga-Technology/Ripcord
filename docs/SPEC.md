@@ -58,6 +58,19 @@ Exact interfaces. ARCHITECTURE says what and why; this file fixes the shapes. Ev
 
 **Storage.** A guard ≈ 0.005 NEAR plus the wallet policy's 0.01213 NEAR; `register_guard` takes 0.02 NEAR and refunds the rest. Ripcord's checker account pays it; `close` refunds it.
 
+## 2b. Contract: `contracts/keeper-market` (near-sdk, Rust; open keeper network)
+
+| Method | Who | Does |
+|---|---|---|
+| `new(checker, owner, bounty)` | deployer | the enclave's account, the owner, and the bounty per credited rescue (yoctoNEAR) |
+| `fund()` payable | anyone | adds the attached NEAR to the bounty pool; event `pool_funded` |
+| `credit(guard_id, receipt_index, keeper)` | `checker` | credits `keeper` for the registry receipt `guard_id/receipt_index`, at most once (`already credited`); event `keeper_credited {guard_id, receipt_index, keeper}` |
+| `claim()` | a keeper | pays its unclaimed credits × bounty if the pool (balance less locked storage) covers it, else `the pool can't pay this claim yet`; `on_claim` restores the credits if the payout fails; event `bounty_claimed` |
+| `set_bounty(bounty)` | `owner` | changes the bounty for credits not yet claimed |
+| `get_keeper(account)`, `leaderboard(from?, limit?)`, `get_config()`, `is_credited(guard_id, receipt_index)` | view | credits, claimed and owed per keeper; keepers by credits, most first; the pool and totals |
+
+Events use standard `ripcord-keepers`, version `1.0.0`, and name a guard and a keeper, never a trading account or a setting.
+
 ## 3. Checker: `checker/` (Rust → wasm32-wasip2 on OutLayer)
 
 **Manifest.** `callers: {"direct": "deny", "contract": "deny"}` (HTTPS only, G7). Network: `api.hyperliquid.xyz`, `api.outlayer.ai`, one NEAR RPC for registry writes (the checker signs NEAR transactions with its signing key and sends them over HTTPS: `checker/src/near_tx.rs`), `1click.chaindefuser.com` for token prices. Signing key `checker` ed25519, `bind: project`. Encrypted storage. Every ungated version removed (`remove_version`). Output ≤ 900 bytes JSON.
@@ -71,6 +84,7 @@ Exact interfaces. ARCHITECTURE says what and why; this file fixes the shapes. Ev
 | `freeze` | `{guard_id, owner, owner_salt, sig, nonce, frozen}` | `{status: "frozen" \| "guarding"}`: submits the owner's NEP-413-signed `freeze_guard` or `unfreeze_guard` to the registry, which checks the owner commitment and the signature, refuses a used nonce, and freezes or unfreezes the wallet on OutLayer. The enclave only pays the gas |
 | `close` | `{guard_id, sig, nonce}` | `{status: "pending" \| "closed"}`, one step per call: the owner's NEP-413 signature over `ripcord:close:<guard_id>:hypercore:<hl_address>:<nonce>`, checked in the enclave against the sealed owner key; from then on `check` answers `skipped`. Swaps a non-USDC reserve into USDC (refused under 97 % of its listed value), withdraws all USDC to `hl_address` (nothing under $2, the route's minimum), then calls registry `close`, which deletes the wallet policy and refunds its storage |
 | `check` | `{guard_id}` | `{status: guarding | rescued | pending | skipped}`, nothing else (rule 4) |
+| `check` (feature `keepers`) | `{guard_id, keeper?}` | the same status; when this call fires a rescue, `keeper` (a NEAR account) is kept, and once the rescue's receipt is on the registry the enclave credits it on `keeper-market` (§2b). Off in the published builds |
 | `topup` | `{guard_id, enc_amount, source_asset, owner_salt, sig, nonce}` | `{status: "pending", sealed}`. `enc_amount` is `{cents, salt}` sealed to `enc_pk`, so Ripcord's servers relay it unread; the owner signs `ripcord:topup:<guard_id>:<digest>:<nonce>` with `digest = sha256("ripcord:topup-amount:<guard_id>:<cents>:<salt>")`, checked in the enclave against the sealed owner key. Once per nonce: builds the wallet policy with its daily cap at the budget plus every top-up, has the wallet sign it, calls registry `top_up` (the digest, never the amount) and raises the sealed budget. Then a private deposit address for the amount in `source_asset`, one per top-up, sealed to `receipt_pk`. $2 or more; a guard not yet on chain is funded with `fund` |
 | `reseal` | `{guard_id, enc_range, commitment, owner_salt, sig, nonce}` | `{status: "resealed", from_epoch}`. `enc_range` is `{preset, line_range_pct, target_range_pct}` sealed to `enc_pk`; the enclave puts it in the sealed settings, validates them, recomputes their commitment (must equal `commitment`), checks the owner's signature over `ripcord:reseal:<guard_id>:<commitment>:<nonce>`, waits while a rescue is landing or inside its cooldown, calls registry `reseal`, stores the new settings and draws the next epoch's line from the new range (`from_epoch`; the owner's seal file keeps the earlier range with it, for Verify). Before the guard is on chain only the vault changes |
 
@@ -118,7 +132,7 @@ No `approval` block. The fee wallet is a confidential identity: `/confidential/t
 | `DELETE /v1/watch/{guard_id} {hl_address, account_salt}` | stops watching, with the same proof (also on `guard_closed`) |
 | `GET /v1/health/{guard_id}` | `{last_check_at, checks_24h}`, no address. The app shows "Guard paused" when `last_check_at` is older than 2× the heartbeat |
 
-Checker call: `POST https://api.outlayer.ai/call/<owner>/<project>` with `X-Payment-Key`, body `{action: "check", guard_id}`, 30 s timeout; duplicates are harmless. Two pokers on different providers, each independent. Payment key monitor: `GET /public/payment-keys/<owner>/<nonce>/balance`, alert under 7 days of runway. `claim_check_fee` with a function-call key. Logs: guard id, status, timing; never an address.
+Checker call: `POST https://api.outlayer.ai/call/<owner>/<project>` with `X-Payment-Key`, body `{action: "check", guard_id}` (plus `keeper` when `KEEPER_ACCOUNT` is set: the open keeper network, §2b), 30 s timeout; duplicates are harmless. Two pokers on different providers, each independent. Payment key monitor: `GET /public/payment-keys/<owner>/<nonce>/balance`, alert under 7 days of runway. `claim_check_fee` with a function-call key. Logs: guard id, status, timing; never an address.
 
 ## 5. MCP tool: `packages/mcp/` (stdio, runs on the owner's machine)
 
