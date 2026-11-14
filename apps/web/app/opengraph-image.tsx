@@ -8,7 +8,7 @@ export const contentType = 'image/png';
 
 const COMMITMENT = '7f3a91c2e04b5d18a6f2c3b9d07e41a2b6c8d9e0f1a2b3c4d5e6f708192ac91e';
 
-/** Geist as TrueType, which the image renderer reads (Google serves it to an old user agent); none if offline. */
+/** Geist as TrueType, which the image renderer reads (Google serves it to an old user agent); null when offline. */
 async function font(weight: number): Promise<ArrayBuffer | null> {
   try {
     const css = await (
@@ -105,6 +105,7 @@ export default async function Image() {
         </div>
       </div>
     </div>,
-    { ...size, fonts },
+    // Offline, the renderer's own built-in font draws it instead: an empty list would fail the build.
+    { ...size, ...(fonts.length ? { fonts } : {}) },
   );
 }
