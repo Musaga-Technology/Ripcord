@@ -42,6 +42,8 @@ if command -v cargo >/dev/null; then
   run cargo test --quiet -p ripcord-checker --test near_tx && ok "signs its own NEAR transactions, byte for byte with near-api-js"
   run cargo test --quiet -p ripcord-checker --test owner && ok "only the owner's key freezes, tops up, changes the range or closes; a top-up names no amount on chain; a close pays the rest to the owner's own Hyperliquid account"
   run cargo test --quiet -p ripcord-checker --test agent && ok "an isolated position's agent signs only one add of the credit that landed; a cross guard never signs"
+  run cargo test --quiet -p ripcord-checker --features keepers --test keepers && ok "open keeper network: the keeper whose check fires a rescue is credited once; a check that doesn't rescue credits nobody; the rescue is the same with or without keepers"
+  run cargo test --quiet -p keeper-market && ok "keeper market: only the enclave credits, once per rescue; a keeper claims its bounty once"
 else
   skip "cargo not found; the checker's tests need Rust"
 fi
