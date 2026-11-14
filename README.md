@@ -15,7 +15,7 @@ Built at NEAR HACKATHON 2026 · live on NEAR mainnet · tracks `defi`, `privacy`
 
 ## Proof at a glance
 
-- **A real rescue on mainnet, on camera (Nov 14).** We guarded a 40× BTC long on Hyperliquid with our own money, then pulled margin out. The enclave fired; 1.68 USDC landed in the margin 26 s after the rescue started, and the liquidation price moved from 54,852 to 44,224. On NEAR: [guard registered when funded](https://nearblocks.io/txns/DD2eXHvBxKH51S44arfdF6oG4BwukSdN8aYmE5AnUXJR), [rescue recorded](https://nearblocks.io/txns/69KGkypbRxRqKAvqxbeyFAZ5kg5QfswkbPrccKrZPCRk).
+- **Two real rescues on mainnet, with our own money (Nov 14).** On a 40× BTC long, we pulled margin out and the enclave fired: 1.68 USDC landed in the margin 26 s after the rescue started, and the liquidation price moved from 54,852 to 44,224 ([guard registered](https://nearblocks.io/txns/DD2eXHvBxKH51S44arfdF6oG4BwukSdN8aYmE5AnUXJR), [rescue recorded](https://nearblocks.io/txns/69KGkypbRxRqKAvqxbeyFAZ5kg5QfswkbPrccKrZPCRk); filmed in the demo). Later the guard the agent below sealed for itself fired on a fast drop: 1.68 USDC landed 87 s after the margin was pulled, liquidation price 48,658 to 38,030 ([rescue recorded](https://nearblocks.io/txns/3AawRfDaKS4m61hFwQ17SCTY9Bkp8RoKCBUM7PewGckS)).
 - **A trading agent guarded itself on mainnet (Nov 14).** With NEAR AI Cloud and Ripcord's MCP tools, an agent read its risk, sealed a guard, and paid for it in ETH on Base through Aurora and NEAR Intents (exactly 2.00 USDC of reserve). Guarding 2 min 21 s after it started: [registered](https://nearblocks.io/txns/9zt6sSQ3rorxwpgF5emjgE8YizkRJSiM2opVeCDYq3QU), [guarding](https://nearblocks.io/txns/C1zsvDoFF1EDM1oK2S2Y8JxiAiTsipqKcMHZKh7bQL9P), [its wallet on Base](https://basescan.org/address/0x95E97F5c16d00173d62Fe30Ca6d4FAb1dCC8b709).
 - **Verifiable.** The registry [`ripcord-registry.near`](https://nearblocks.io/address/ripcord-registry.near) and the checker in OutLayer's TEE run exactly the code in this repo: rebuild them and compare the hashes ([table](#live-on-near-mainnet)), or open `/verify` with a seal file and watch the app check the running build live.
 - **Tested blind.** On Nov 3 we sealed six predictions about October 2026 prices before running that data, and committed only their hash. All six held: of 992 simulated positions, 211 were liquidated with no guard and 20 with a hidden reserve the size of the margin. `bash scripts/demo.sh` checks the hash and rescores the result ([evidence](docs/EVIDENCE.md)).
@@ -99,7 +99,7 @@ Optional keys, in `apps/web/.env.local` (every variable is described in [`.env.e
 | The enclave's own NEAR account | [`d09e4db7…`](https://nearblocks.io/address/d09e4db7a197abc0a8126fdf694d3d556fa45f4154b3dc9a491afc6ea3fcfca6), a key only the enclave holds | [Named the registry's only checker](https://nearblocks.io/txns/4eA3AZBesupk9N4LK5Er7vZCCVsMVe4SRhVnxP78Bm8W) |
 | Ripcord's fee wallet | An OutLayer custody wallet, NEAR id `7b3d43bb…190f` | Compiled into the checker build, so the attested hash covers it |
 | A real rescue | Guard `g-fbkqwpqxgx` on our Hyperliquid test wallet, Nov 14 | [Registered when funded](https://nearblocks.io/txns/DD2eXHvBxKH51S44arfdF6oG4BwukSdN8aYmE5AnUXJR), [first check](https://nearblocks.io/txns/EX5nqVJPDS3zKVLc2nFGaztbmeMmExWaN1vQF5Db1uQ8), [rescue recorded](https://nearblocks.io/txns/69KGkypbRxRqKAvqxbeyFAZ5kg5QfswkbPrccKrZPCRk) |
-| An agent's own guard | Guard `g-sok5bicogo`, sealed and paid for by the demo agent, Nov 14 | [Registered](https://nearblocks.io/txns/9zt6sSQ3rorxwpgF5emjgE8YizkRJSiM2opVeCDYq3QU), [guarding](https://nearblocks.io/txns/C1zsvDoFF1EDM1oK2S2Y8JxiAiTsipqKcMHZKh7bQL9P) |
+| An agent's own guard | Guard `g-sok5bicogo`, sealed and paid for by the demo agent, Nov 14 | [Registered](https://nearblocks.io/txns/9zt6sSQ3rorxwpgF5emjgE8YizkRJSiM2opVeCDYq3QU), [guarding](https://nearblocks.io/txns/C1zsvDoFF1EDM1oK2S2Y8JxiAiTsipqKcMHZKh7bQL9P), [rescue recorded](https://nearblocks.io/txns/3AawRfDaKS4m61hFwQ17SCTY9Bkp8RoKCBUM7PewGckS) |
 
 ## Built on NEAR
 
@@ -142,7 +142,7 @@ The full model is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **Pasted addresses:** a guard pays only the account it was set up for, so the app asks you to confirm the account is yours.
 - **Small remainders:** less than $2 can't be sent back to Hyperliquid (the route's minimum) and stays in the guard's wallet.
 - **Third parties:** OutLayer (TEE, keystore, liveness), Confidential Intents operators, 1Click solvers, and Hyperliquid.
-- **Known issue:** the first rescue's public receipt, and the Ledger's "Margin added", read 170 instead of 1.70. Hyperliquid counts USDC in 8 decimals and the running enclave divides by 10^6. The payment itself was exact. The one-line fix in `checker/src/check.rs` changes the enclave's build hash, so it ships in the next release.
+- **Known issue:** each rescue's public receipt, and the Ledger's "Margin added", reads about 100× the real amount (170 for 1.70). Hyperliquid counts USDC in 8 decimals and the running enclave divides by 10^6. The payment itself was exact. The one-line fix in `checker/src/check.rs` changes the enclave's build hash, so it ships in the next release.
 
 | Who | Can see | Can't see |
 |---|---|---|
