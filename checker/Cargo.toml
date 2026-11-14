@@ -18,6 +18,9 @@ required-features = ["outlayer"]
 
 [features]
 outlayer = ["dep:wit-bindgen", "dep:wasi-http-client", "dep:wasi"]
+# The open keeper network (src/keepers.rs): checks name their keeper, who is credited for the rescues they fire.
+# Off in the published builds (checker/build.sh), which stay byte-identical without it.
+keepers = []
 
 [dependencies]
 ripcord-rules = { path = "../crates/rules", features = ["seal"] }

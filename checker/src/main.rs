@@ -108,7 +108,11 @@ impl Host for OutLayer {
 fn main() {
     let mut input = String::new();
     let out = match std::io::stdin().read_to_string(&mut input) {
+        #[cfg(not(feature = "keepers"))]
         Ok(_) => run(&OutLayer, &input),
+        // A keepers build credits the keeper a check names (src/keepers.rs); every other action is `run`.
+        #[cfg(feature = "keepers")]
+        Ok(_) => ripcord_checker::keepers::run(&OutLayer, &input, run),
         Err(_) => refuse("input is not UTF-8"),
     };
     let mut text = out.to_string();

@@ -18,3 +18,6 @@ pub mod settings;
 pub mod vault;
 
 pub use ripcord_rules::{canonical, commitment, guard, seal, types};
+
+#[cfg(feature = "keepers")]
+pub mod keepers;
