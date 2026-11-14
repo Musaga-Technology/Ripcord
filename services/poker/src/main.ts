@@ -20,6 +20,7 @@ const watcher = new Watcher(
     api: env('OUTLAYER_API_BASE'),
     project: env('CHECKER_PROJECT'),
     paymentKey: env('OUTLAYER_PAYMENT_KEY'),
+    keeper: process.env.KEEPER_ACCOUNT || undefined,
   }),
   { ...DEFAULT_BAND, bandPct: Number(env('POKER_BAND_PCT', String(DEFAULT_BAND.bandPct))) },
 );

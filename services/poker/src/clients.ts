@@ -8,6 +8,9 @@ export interface CheckerConfig {
   /** `<owner>/<project>` */
   project: string;
   paymentKey: string;
+  /** This poker's NEAR account, named on every check: in the open keeper network, the keeper whose check fires a
+   * rescue is credited for it. Checkers without the network ignore it. */
+  keeper?: string | undefined;
 }
 
 export function checker(c: CheckerConfig, fetchFn: Fetch = fetch) {
@@ -15,7 +18,10 @@ export function checker(c: CheckerConfig, fetchFn: Fetch = fetch) {
     const res = await fetchFn(`${c.api}/call/${c.project}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Payment-Key': c.paymentKey },
-      body: JSON.stringify({ input: { action: 'check', guard_id: guardId }, async: false }),
+      body: JSON.stringify({
+        input: { action: 'check', guard_id: guardId, ...(c.keeper ? { keeper: c.keeper } : {}) },
+        async: false,
+      }),
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) return 'error';
