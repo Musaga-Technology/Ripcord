@@ -77,7 +77,7 @@ export const ASSETS: ReserveAsset[] = [
     chain: 'Arbitrum',
     source: 'nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near',
     reserve: USDC_NEAR,
-    digits: 0,
+    digits: 2,
     wait: 'USDC deposits from Arbitrum usually arrive in under a minute.',
     demoPrice: 1,
   },

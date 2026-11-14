@@ -27,6 +27,9 @@ import { backendFor, SessionProvider, useAccount, useSession } from '../../lib/s
 import { radioKeys } from '../../lib/radio';
 import { downloadSealFile, keepOpened, loadGuards, saveGuard, type LocalGuard } from '../../lib/store';
 import { pct, price, usd } from '../format';
+
+/** Dollars, with cents below $10 so a small reserve or margin reads as what it is. */
+const dollars = (n: number) => usd(n, n < 10 ? 2 : 0);
 import { GuardCard } from '../GuardCard';
 import { Card3D } from '../site/Card3D';
 import { connectNearOwner, type NearOwner } from '../../lib/nearWallet';
@@ -171,7 +174,7 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
     const usdNow = wanted !== null && unitPrice ? Math.max(wanted, MIN_RESERVE_USD) : null;
     setAmount(usdNow !== null && unitPrice ? suggestAmount(next, usdNow, unitPrice) : null);
     const parts = [
-      usdNow !== null ? `a ${usd(usdNow)} reserve in ${next.symbol}` : `a reserve in ${next.symbol}`,
+      usdNow !== null ? `a ${dollars(usdNow)} reserve in ${next.symbol}` : `a reserve in ${next.symbol}`,
       drop !== null && survive === 0 ? `it already survives a ${drop}% drop` : null,
       drop !== null && survive !== null && survive > 0 ? `enough to survive a ${drop}% drop` : null,
       i.preset ? `${i.preset[0]!.toUpperCase()}${i.preset.slice(1)}` : null,
@@ -381,11 +384,11 @@ function Flow({ holding, all }: { holding: Holding; all: Holding[] }) {
                 <span className="text-[15px] tabular-nums text-text-2">
                   {assetPrice ? (
                     <>
-                      {usd(reserveUsd)} ·{' '}
+                      {dollars(reserveUsd)} ·{' '}
                       <span className="font-medium text-text">
                         {reserveX < 1 ? reserveX.toPrecision(2) : reserveX.toFixed(1)}×
                       </span>{' '}
-                      your {usd(margin)} margin
+                      your {dollars(margin)} margin
                     </>
                   ) : (
                     'Reading prices…'
