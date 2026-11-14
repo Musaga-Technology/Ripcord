@@ -30,6 +30,8 @@ import {
 } from '../../lib/ownerActions';
 import { nearSign } from '../../lib/nearWallet';
 import { CrashRun, marginFor } from '../../lib/crash';
+import { KEEPERS, keeperFor } from '../../lib/keepers';
+import { KeeperStrip } from './KeeperStrip';
 import { guardName, guardsFor, STATE_TEXT, stateOf, watchedHolding, type ShownGuard } from '../../lib/guards';
 import { ASSETS } from '../../lib/assets';
 import { readCandles, readMark, type Holding } from '../../lib/hl';
@@ -73,6 +75,8 @@ interface HistoryRow {
   added: string;
   landedIn: string;
   outcome: 'Saved' | 'Settling' | 'Close call' | 'Liquidated';
+  /** The keeper whose check fired it, in the simulation. */
+  firedBy?: string;
 }
 
 const OUTCOME: Record<string, HistoryRow['outcome']> = {
@@ -354,6 +358,7 @@ function History({ rows }: { rows: HistoryRow[] }) {
                 <th className="py-3 pl-5 pr-2 font-medium">When</th>
                 <th className="px-2 py-3 font-medium">Margin added</th>
                 <th className="px-2 py-3 font-medium">Landed in</th>
+                {rows.some((r) => r.firedBy) && <th className="px-2 py-3 font-medium">Fired by</th>}
                 <th className="py-3 pl-2 pr-5 font-medium">Outcome</th>
               </tr>
             </thead>
@@ -363,6 +368,9 @@ function History({ rows }: { rows: HistoryRow[] }) {
                   <td className="py-3.5 pl-5 pr-2">{r.when}</td>
                   <td className="px-2 py-3.5">{r.added}</td>
                   <td className="px-2 py-3.5">{r.landedIn}</td>
+                  {rows.some((x) => x.firedBy) && (
+                    <td className="px-2 py-3.5 font-mono text-[14px]">{r.firedBy ?? ''}</td>
+                  )}
                   <td
                     className={`py-3.5 pl-2 pr-5 font-medium ${r.outcome === 'Saved' ? 'text-green' : r.outcome === 'Settling' ? 'text-amber' : r.outcome === 'Liquidated' ? 'text-red' : ''}`}
                   >
@@ -654,6 +662,7 @@ function ExampleGuard({
       added: usd(r.amount, 2),
       landedIn: `${(r.landedAt as number) - r.firedAt} s`,
       outcome: OUTCOME[r.outcome] ?? 'Settling',
+      firedBy: KEEPERS[keeperFor(run.seed, r.firedAt)],
     }));
   const d = distanceOf(G.liq, run.price);
   const simClock = (t: number) => hhmm(openedAt + (t - run.windowS) * 1000);
@@ -710,6 +719,14 @@ function ExampleGuard({
           >
             {p.say}
           </Now>
+          <KeeperStrip
+            winner={(() => {
+              const last = G.inFlight ?? G.rescues[G.rescues.length - 1];
+              return last ? keeperFor(run.seed, last.firedAt) : null;
+            })()}
+            watching={crashing && !run.over}
+            landed={!G.inFlight && G.rescues.length > 0}
+          />
         </div>
         <div className="order-1 lg:order-2">
           <Card3D>
